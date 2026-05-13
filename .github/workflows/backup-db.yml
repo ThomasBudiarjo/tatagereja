@@ -1,0 +1,22 @@
+name: db-backup
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Turso CLI
+        run: curl -sSfL https://get.tur.so/install.sh | bash
+      - name: Dump database
+        env:
+          TURSO_API_TOKEN: ${{ secrets.TURSO_API_TOKEN }}
+        run: |
+          turso db shell shepherd-prod ".dump" > backup-$(date +%Y%m%d).sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: backup-*.sql
+          retention-days: 90

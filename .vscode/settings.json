@@ -1,0 +1,8 @@
+{
+  "go.useLanguageServer": true,
+  "go.lintTool": "golangci-lint",
+  "editor.formatOnSave": true,
+  "[go]": { "editor.defaultFormatter": "golang.go" },
+  "[svelte]": { "editor.defaultFormatter": "svelte.svelte-vscode" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}

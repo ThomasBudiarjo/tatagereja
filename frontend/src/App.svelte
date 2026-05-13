@@ -1,0 +1,26 @@
+<script lang="ts">
+  import Router from 'svelte-spa-router';
+  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+  import { routes } from '$lib/routes';
+  import { onMount } from 'svelte';
+  import { auth } from '$lib/stores/auth.svelte';
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60_000,
+        retry: 1,
+      },
+    },
+  });
+
+  onMount(() => {
+    auth.restore();
+  });
+</script>
+
+<QueryClientProvider client={queryClient}>
+  <main class="min-h-screen bg-white">
+    <Router {routes} />
+  </main>
+</QueryClientProvider>

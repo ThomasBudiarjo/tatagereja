@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+.env.local
+local.db
+local.db-*
+tmp/
+bin/
+*.log
+.DS_Store
+.vscode/launch.json
+
+# Go
+backend/tmp/
+backend/bin/
+backend/local.db
+backend/local.db-*
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
