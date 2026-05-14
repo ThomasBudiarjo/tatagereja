@@ -1,49 +1,73 @@
 <script lang="ts">
+  import Button from '$lib/components/ui/Button.svelte';
+  import Input from '$lib/components/ui/Input.svelte';
+  import Label from '$lib/components/ui/Label.svelte';
   import { auth } from '$lib/stores/auth.svelte';
+  import { t } from '$lib/i18n';
+  import { push } from 'svelte-spa-router';
+  import { onMount } from 'svelte';
 
   let email = $state('');
   let password = $state('');
+
+  onMount(() => {
+    if (auth.isAuthenticated) {
+      push('/');
+    }
+  });
+
+  function handleSubmit(e: Event) {
+    e.preventDefault();
+    auth.login(email, password);
+  }
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-gray-50">
+<div class="flex min-h-screen items-center justify-center bg-muted/30 p-4">
   <form
-    class="w-full max-w-sm space-y-4 rounded-lg bg-white p-8 shadow-md"
-    onsubmit={(e) => {
-      e.preventDefault();
-      auth.login(email, password);
-    }}
+    class="w-full max-w-sm space-y-4 rounded-lg border bg-card p-8 shadow-sm"
+    onsubmit={handleSubmit}
   >
-    <h1 class="text-2xl font-semibold">Shepherd</h1>
-    <p class="text-sm text-gray-500">Masuk ke akun gereja Anda.</p>
+    <div class="space-y-1">
+      <h1 class="text-2xl font-semibold">Shepherd</h1>
+      <p class="text-sm text-muted-foreground">
+        {t('login.subtitle', 'Masuk ke akun gereja Anda.')}
+      </p>
+    </div>
 
-    <div>
-      <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-      <input
+    {#if auth.loginError}
+      <p class="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        {auth.loginError}
+      </p>
+    {/if}
+
+    <div class="space-y-1.5">
+      <Label for="email">{t('login.email', 'Email')}</Label>
+      <Input
         id="email"
         type="email"
-        bind:value={email}
         required
-        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        autocomplete="email"
+        bind:value={email}
       />
     </div>
 
-    <div>
-      <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-      <input
+    <div class="space-y-1.5">
+      <Label for="password">{t('login.password', 'Password')}</Label>
+      <Input
         id="password"
         type="password"
-        bind:value={password}
         required
-        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        autocomplete="current-password"
+        bind:value={password}
       />
     </div>
 
-    <button
-      type="submit"
-      disabled={auth.isLoading}
-      class="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-    >
-      {auth.isLoading ? 'Masuk...' : 'Masuk'}
-    </button>
+    <Button type="submit" class="w-full" disabled={auth.isLoading}>
+      {auth.isLoading ? t('login.loading', 'Masuk…') : t('login.submit', 'Masuk')}
+    </Button>
+
+    <p class="text-center text-xs text-muted-foreground">
+      Hubungi admin untuk membuat akun gereja baru.
+    </p>
   </form>
 </div>

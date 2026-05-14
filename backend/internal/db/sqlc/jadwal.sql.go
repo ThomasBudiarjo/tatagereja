@@ -9,6 +9,25 @@ import (
 	"context"
 )
 
+const countKebaktianByChurch = `-- name: CountKebaktianByChurch :one
+SELECT COUNT(*) FROM kebaktian
+WHERE church_id = ?
+  AND tanggal >= ? AND tanggal <= ?
+`
+
+type CountKebaktianByChurchParams struct {
+	ChurchID  int64  `db:"church_id" json:"church_id"`
+	Tanggal   string `db:"tanggal" json:"tanggal"`
+	Tanggal_2 string `db:"tanggal_2" json:"tanggal_2"`
+}
+
+func (q *Queries) CountKebaktianByChurch(ctx context.Context, arg CountKebaktianByChurchParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countKebaktianByChurch, arg.ChurchID, arg.Tanggal, arg.Tanggal_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createJadwalSlot = `-- name: CreateJadwalSlot :one
 INSERT INTO jadwal_pelayanan (church_id, kebaktian_id, service_type_id, pelayan_id, catatan)
 VALUES (?, ?, ?, ?, ?)
@@ -259,6 +278,80 @@ func (q *Queries) ListKebaktianByChurch(ctx context.Context, arg ListKebaktianBy
 			&i.Catatan,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUpcomingJadwalForPelayan = `-- name: ListUpcomingJadwalForPelayan :many
+SELECT jp.id, jp.church_id, jp.kebaktian_id, jp.service_type_id, jp.pelayan_id, jp.catatan, jp.status, jp.created_at, jp.updated_at, k.nama AS kebaktian_nama, k.tanggal, k.waktu_mulai, k.lokasi,
+       st.nama AS service_type_name, st.warna AS service_type_warna
+FROM jadwal_pelayanan jp
+JOIN kebaktian k ON k.id = jp.kebaktian_id
+JOIN service_types st ON st.id = jp.service_type_id
+WHERE jp.church_id = ?
+  AND jp.pelayan_id = ?
+  AND k.tanggal >= date('now')
+ORDER BY k.tanggal ASC, k.waktu_mulai ASC
+`
+
+type ListUpcomingJadwalForPelayanParams struct {
+	ChurchID  int64  `db:"church_id" json:"church_id"`
+	PelayanID *int64 `db:"pelayan_id" json:"pelayan_id"`
+}
+
+type ListUpcomingJadwalForPelayanRow struct {
+	ID               int64   `db:"id" json:"id"`
+	ChurchID         int64   `db:"church_id" json:"church_id"`
+	KebaktianID      int64   `db:"kebaktian_id" json:"kebaktian_id"`
+	ServiceTypeID    int64   `db:"service_type_id" json:"service_type_id"`
+	PelayanID        *int64  `db:"pelayan_id" json:"pelayan_id"`
+	Catatan          *string `db:"catatan" json:"catatan"`
+	Status           string  `db:"status" json:"status"`
+	CreatedAt        string  `db:"created_at" json:"created_at"`
+	UpdatedAt        string  `db:"updated_at" json:"updated_at"`
+	KebaktianNama    string  `db:"kebaktian_nama" json:"kebaktian_nama"`
+	Tanggal          string  `db:"tanggal" json:"tanggal"`
+	WaktuMulai       string  `db:"waktu_mulai" json:"waktu_mulai"`
+	Lokasi           *string `db:"lokasi" json:"lokasi"`
+	ServiceTypeName  string  `db:"service_type_name" json:"service_type_name"`
+	ServiceTypeWarna *string `db:"service_type_warna" json:"service_type_warna"`
+}
+
+func (q *Queries) ListUpcomingJadwalForPelayan(ctx context.Context, arg ListUpcomingJadwalForPelayanParams) ([]ListUpcomingJadwalForPelayanRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUpcomingJadwalForPelayan, arg.ChurchID, arg.PelayanID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUpcomingJadwalForPelayanRow{}
+	for rows.Next() {
+		var i ListUpcomingJadwalForPelayanRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChurchID,
+			&i.KebaktianID,
+			&i.ServiceTypeID,
+			&i.PelayanID,
+			&i.Catatan,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.KebaktianNama,
+			&i.Tanggal,
+			&i.WaktuMulai,
+			&i.Lokasi,
+			&i.ServiceTypeName,
+			&i.ServiceTypeWarna,
 		); err != nil {
 			return nil, err
 		}

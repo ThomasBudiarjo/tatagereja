@@ -6,6 +6,15 @@ WHERE p.church_id = ? AND p.is_active = 1
 ORDER BY j.nama_lengkap ASC
 LIMIT ? OFFSET ?;
 
+-- name: SearchPelayan :many
+SELECT p.*, j.nama_lengkap, j.nama_panggilan
+FROM pelayan p
+JOIN jemaat j ON j.id = p.jemaat_id
+WHERE p.church_id = ? AND p.is_active = 1
+  AND (j.nama_lengkap LIKE ? OR j.nama_panggilan LIKE ?)
+ORDER BY j.nama_lengkap ASC
+LIMIT ? OFFSET ?;
+
 -- name: CountPelayanByChurch :one
 SELECT COUNT(*) FROM pelayan WHERE church_id = ? AND is_active = 1;
 
@@ -14,6 +23,10 @@ SELECT p.*, j.nama_lengkap, j.nama_panggilan
 FROM pelayan p
 JOIN jemaat j ON j.id = p.jemaat_id
 WHERE p.id = ? AND p.church_id = ?;
+
+-- name: GetPelayanByJemaatID :one
+SELECT * FROM pelayan
+WHERE jemaat_id = ? AND church_id = ?;
 
 -- name: CreatePelayan :one
 INSERT INTO pelayan (church_id, jemaat_id, catatan)
@@ -35,7 +48,8 @@ DELETE FROM pelayan WHERE id = ? AND church_id = ?;
 SELECT st.*, pst.skill_level
 FROM pelayan_service_types pst
 JOIN service_types st ON st.id = pst.service_type_id
-WHERE pst.pelayan_id = ?;
+WHERE pst.pelayan_id = ?
+ORDER BY st.urutan ASC, st.nama ASC;
 
 -- name: ClearPelayanServiceTypes :exec
 DELETE FROM pelayan_service_types WHERE pelayan_id = ?;
