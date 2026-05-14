@@ -8,7 +8,7 @@
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60_000,
+        staleTime: 30_000,
         retry: 1,
       },
     },
@@ -20,7 +20,11 @@
 </script>
 
 <QueryClientProvider client={queryClient}>
-  <main class="min-h-screen bg-white">
+  {#if !auth.restored}
+    <div class="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      Memuat…
+    </div>
+  {:else}
     <Router {routes} />
-  </main>
+  {/if}
 </QueryClientProvider>

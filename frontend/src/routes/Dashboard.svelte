@@ -1,26 +1,71 @@
 <script lang="ts">
+  import AppShell from '$lib/components/layout/AppShell.svelte';
   import { auth } from '$lib/stores/auth.svelte';
+  import { t } from '$lib/i18n';
+  import { jemaatListQuery } from '$lib/api/jemaat';
+  import { pelayanListQuery } from '$lib/api/pelayan';
+  import { serviceTypesListQuery } from '$lib/api/service-types';
+  import { kebaktianListQuery } from '$lib/api/kebaktian';
+
+  const jemaatQ = jemaatListQuery(() => ({ limit: 1 }));
+  const pelayanQ = pelayanListQuery(() => ({ limit: 1 }));
+  const stQ = serviceTypesListQuery();
+  const kebaktianQ = kebaktianListQuery(() => ({ limit: 50 }));
+
+  const cards = $derived([
+    {
+      label: t('dashboard.jemaat_count', 'Total Jemaat'),
+      value: $jemaatQ.data?.total ?? '—',
+      href: '#/jemaat',
+    },
+    {
+      label: t('dashboard.pelayan_count', 'Total Pelayan'),
+      value: $pelayanQ.data?.total ?? '—',
+      href: '#/pelayan',
+    },
+    {
+      label: t('dashboard.service_types_count', 'Jenis Pelayanan'),
+      value: $stQ.data?.total ?? '—',
+      href: '#/service-types',
+    },
+    {
+      label: t('dashboard.kebaktian_count', 'Kebaktian (90 hari)'),
+      value: $kebaktianQ.data?.total ?? '—',
+      href: '#/kebaktian',
+    },
+  ]);
 </script>
 
-<div class="container mx-auto p-6">
-  <header class="mb-6 flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">Dashboard</h1>
-    <button
-      class="rounded-md bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
-      onclick={() => auth.logout()}
-    >
-      Keluar
-    </button>
+<AppShell>
+  <header class="mb-6">
+    <h1 class="text-2xl font-semibold">{t('dashboard.title', 'Dashboard')}</h1>
+    {#if auth.user}
+      <p class="text-sm text-muted-foreground">
+        {t('dashboard.welcome', 'Selamat datang')}, {auth.user.display_name}.
+      </p>
+    {/if}
   </header>
 
-  {#if auth.user}
-    <p class="text-gray-600">Selamat datang, {auth.user.display_name}.</p>
-  {/if}
-
-  <div class="mt-6 grid gap-4 sm:grid-cols-2">
-    <a href="#/jemaat" class="rounded-lg border p-6 hover:shadow-md">
-      <h2 class="text-lg font-medium">Jemaat</h2>
-      <p class="text-sm text-gray-500">Kelola data anggota jemaat</p>
-    </a>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {#each cards as card (card.label)}
+      <a
+        href={card.href}
+        class="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
+      >
+        <p class="text-xs uppercase tracking-wide text-muted-foreground">{card.label}</p>
+        <p class="mt-2 text-3xl font-semibold">{card.value}</p>
+      </a>
+    {/each}
   </div>
-</div>
+
+  <section class="mt-10 rounded-lg border bg-card p-6">
+    <h2 class="mb-2 text-base font-semibold">
+      {t('dashboard.disclaimer_title', 'Hobby project — tanpa SLA')}
+    </h2>
+    <p class="text-sm text-muted-foreground">
+      Shepherd adalah aplikasi open source yang dihosting gratis. Tidak ada
+      jaminan uptime atau garansi data. Untuk kebutuhan kritis silakan backup
+      data secara berkala.
+    </p>
+  </section>
+</AppShell>

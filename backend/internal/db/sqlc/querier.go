@@ -11,7 +11,9 @@ import (
 type Querier interface {
 	AddPelayanServiceType(ctx context.Context, arg AddPelayanServiceTypeParams) error
 	ClearPelayanServiceTypes(ctx context.Context, pelayanID int64) error
+	CountJadwalByServiceType(ctx context.Context, arg CountJadwalByServiceTypeParams) (int64, error)
 	CountJemaatByChurch(ctx context.Context, churchID int64) (int64, error)
+	CountKebaktianByChurch(ctx context.Context, arg CountKebaktianByChurchParams) (int64, error)
 	CountPelayanByChurch(ctx context.Context, churchID int64) (int64, error)
 	CreateChurch(ctx context.Context, arg CreateChurchParams) (Church, error)
 	CreateJadwalSlot(ctx context.Context, arg CreateJadwalSlotParams) (JadwalPelayanan, error)
@@ -32,6 +34,7 @@ type Querier interface {
 	GetJemaatByID(ctx context.Context, arg GetJemaatByIDParams) (Jemaat, error)
 	GetKebaktianByID(ctx context.Context, arg GetKebaktianByIDParams) (Kebaktian, error)
 	GetPelayanByID(ctx context.Context, arg GetPelayanByIDParams) (GetPelayanByIDRow, error)
+	GetPelayanByJemaatID(ctx context.Context, arg GetPelayanByJemaatIDParams) (Pelayan, error)
 	GetServiceTypeByID(ctx context.Context, arg GetServiceTypeByIDParams) (ServiceType, error)
 	GetServiceTypesForPelayan(ctx context.Context, pelayanID int64) ([]GetServiceTypesForPelayanRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -40,7 +43,9 @@ type Querier interface {
 	ListKebaktianByChurch(ctx context.Context, arg ListKebaktianByChurchParams) ([]Kebaktian, error)
 	ListPelayanByChurch(ctx context.Context, arg ListPelayanByChurchParams) ([]ListPelayanByChurchRow, error)
 	ListServiceTypesByChurch(ctx context.Context, churchID int64) ([]ServiceType, error)
+	ListUpcomingJadwalForPelayan(ctx context.Context, arg ListUpcomingJadwalForPelayanParams) ([]ListUpcomingJadwalForPelayanRow, error)
 	SearchJemaat(ctx context.Context, arg SearchJemaatParams) ([]Jemaat, error)
+	SearchPelayan(ctx context.Context, arg SearchPelayanParams) ([]SearchPelayanRow, error)
 	UpdateJemaat(ctx context.Context, arg UpdateJemaatParams) (Jemaat, error)
 	UpdateKebaktian(ctx context.Context, arg UpdateKebaktianParams) (Kebaktian, error)
 	UpdateLastLogin(ctx context.Context, id int64) error

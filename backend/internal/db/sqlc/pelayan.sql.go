@@ -126,11 +126,37 @@ func (q *Queries) GetPelayanByID(ctx context.Context, arg GetPelayanByIDParams) 
 	return i, err
 }
 
+const getPelayanByJemaatID = `-- name: GetPelayanByJemaatID :one
+SELECT id, church_id, jemaat_id, catatan, is_active, created_at, updated_at FROM pelayan
+WHERE jemaat_id = ? AND church_id = ?
+`
+
+type GetPelayanByJemaatIDParams struct {
+	JemaatID int64 `db:"jemaat_id" json:"jemaat_id"`
+	ChurchID int64 `db:"church_id" json:"church_id"`
+}
+
+func (q *Queries) GetPelayanByJemaatID(ctx context.Context, arg GetPelayanByJemaatIDParams) (Pelayan, error) {
+	row := q.db.QueryRowContext(ctx, getPelayanByJemaatID, arg.JemaatID, arg.ChurchID)
+	var i Pelayan
+	err := row.Scan(
+		&i.ID,
+		&i.ChurchID,
+		&i.JemaatID,
+		&i.Catatan,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getServiceTypesForPelayan = `-- name: GetServiceTypesForPelayan :many
 SELECT st.id, st.church_id, st.nama, st.deskripsi, st.warna, st.urutan, st.is_active, st.created_at, st.updated_at, pst.skill_level
 FROM pelayan_service_types pst
 JOIN service_types st ON st.id = pst.service_type_id
 WHERE pst.pelayan_id = ?
+ORDER BY st.urutan ASC, st.nama ASC
 `
 
 type GetServiceTypesForPelayanRow struct {
@@ -216,6 +242,75 @@ func (q *Queries) ListPelayanByChurch(ctx context.Context, arg ListPelayanByChur
 	items := []ListPelayanByChurchRow{}
 	for rows.Next() {
 		var i ListPelayanByChurchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChurchID,
+			&i.JemaatID,
+			&i.Catatan,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.NamaLengkap,
+			&i.NamaPanggilan,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchPelayan = `-- name: SearchPelayan :many
+SELECT p.id, p.church_id, p.jemaat_id, p.catatan, p.is_active, p.created_at, p.updated_at, j.nama_lengkap, j.nama_panggilan
+FROM pelayan p
+JOIN jemaat j ON j.id = p.jemaat_id
+WHERE p.church_id = ? AND p.is_active = 1
+  AND (j.nama_lengkap LIKE ? OR j.nama_panggilan LIKE ?)
+ORDER BY j.nama_lengkap ASC
+LIMIT ? OFFSET ?
+`
+
+type SearchPelayanParams struct {
+	ChurchID      int64   `db:"church_id" json:"church_id"`
+	NamaLengkap   string  `db:"nama_lengkap" json:"nama_lengkap"`
+	NamaPanggilan *string `db:"nama_panggilan" json:"nama_panggilan"`
+	Limit         int64   `db:"limit" json:"limit"`
+	Offset        int64   `db:"offset" json:"offset"`
+}
+
+type SearchPelayanRow struct {
+	ID            int64   `db:"id" json:"id"`
+	ChurchID      int64   `db:"church_id" json:"church_id"`
+	JemaatID      int64   `db:"jemaat_id" json:"jemaat_id"`
+	Catatan       *string `db:"catatan" json:"catatan"`
+	IsActive      int64   `db:"is_active" json:"is_active"`
+	CreatedAt     string  `db:"created_at" json:"created_at"`
+	UpdatedAt     string  `db:"updated_at" json:"updated_at"`
+	NamaLengkap   string  `db:"nama_lengkap" json:"nama_lengkap"`
+	NamaPanggilan *string `db:"nama_panggilan" json:"nama_panggilan"`
+}
+
+func (q *Queries) SearchPelayan(ctx context.Context, arg SearchPelayanParams) ([]SearchPelayanRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchPelayan,
+		arg.ChurchID,
+		arg.NamaLengkap,
+		arg.NamaPanggilan,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchPelayanRow{}
+	for rows.Next() {
+		var i SearchPelayanRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ChurchID,

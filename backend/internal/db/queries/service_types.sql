@@ -23,3 +23,7 @@ RETURNING *;
 
 -- name: DeleteServiceType :exec
 DELETE FROM service_types WHERE id = ? AND church_id = ?;
+
+-- name: CountJadwalByServiceType :one
+SELECT COUNT(*) FROM jadwal_pelayanan
+WHERE service_type_id = ? AND church_id = ?;

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Heroku Go buildpack runs this script after `go install`.
+# We fetch the Atlas binary so the `release` phase in Procfile can apply migrations.
+
+set -euo pipefail
+
+echo "-----> Installing Atlas (community)"
+
+ATLAS_URL="https://release.ariga.io/atlas/atlas-community-linux-amd64-latest"
+mkdir -p bin
+curl -sSf -L -o bin/atlas "${ATLAS_URL}"
+chmod +x bin/atlas
+
+echo "-----> Atlas installed at bin/atlas"
+bin/atlas version | head -1

@@ -9,6 +9,23 @@ import (
 	"context"
 )
 
+const countJadwalByServiceType = `-- name: CountJadwalByServiceType :one
+SELECT COUNT(*) FROM jadwal_pelayanan
+WHERE service_type_id = ? AND church_id = ?
+`
+
+type CountJadwalByServiceTypeParams struct {
+	ServiceTypeID int64 `db:"service_type_id" json:"service_type_id"`
+	ChurchID      int64 `db:"church_id" json:"church_id"`
+}
+
+func (q *Queries) CountJadwalByServiceType(ctx context.Context, arg CountJadwalByServiceTypeParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countJadwalByServiceType, arg.ServiceTypeID, arg.ChurchID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createServiceType = `-- name: CreateServiceType :one
 INSERT INTO service_types (church_id, nama, deskripsi, warna, urutan)
 VALUES (?, ?, ?, ?, ?)

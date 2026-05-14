@@ -5,6 +5,11 @@ WHERE church_id = ?
 ORDER BY tanggal ASC, waktu_mulai ASC
 LIMIT ? OFFSET ?;
 
+-- name: CountKebaktianByChurch :one
+SELECT COUNT(*) FROM kebaktian
+WHERE church_id = ?
+  AND tanggal >= ? AND tanggal <= ?;
+
 -- name: GetKebaktianByID :one
 SELECT * FROM kebaktian WHERE id = ? AND church_id = ?;
 
@@ -46,3 +51,14 @@ DELETE FROM jadwal_pelayanan WHERE kebaktian_id = ? AND church_id = ?;
 INSERT INTO jadwal_pelayanan (church_id, kebaktian_id, service_type_id, pelayan_id, catatan)
 VALUES (?, ?, ?, ?, ?)
 RETURNING *;
+
+-- name: ListUpcomingJadwalForPelayan :many
+SELECT jp.*, k.nama AS kebaktian_nama, k.tanggal, k.waktu_mulai, k.lokasi,
+       st.nama AS service_type_name, st.warna AS service_type_warna
+FROM jadwal_pelayanan jp
+JOIN kebaktian k ON k.id = jp.kebaktian_id
+JOIN service_types st ON st.id = jp.service_type_id
+WHERE jp.church_id = ?
+  AND jp.pelayan_id = ?
+  AND k.tanggal >= date('now')
+ORDER BY k.tanggal ASC, k.waktu_mulai ASC;

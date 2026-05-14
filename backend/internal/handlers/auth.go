@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -18,22 +17,67 @@ import (
 
 type AuthHandler struct {
 	cfg      *config.Config
-	q        sqlc.Querier
+	q        *sqlc.Queries
 	validate *validator.Validate
 }
 
-func NewAuthHandler(cfg *config.Config, q sqlc.Querier) *AuthHandler {
-	return &AuthHandler{cfg: cfg, q: q, validate: validator.New()}
+func NewAuthHandler(cfg *config.Config, db *sql.DB) *AuthHandler {
+	return &AuthHandler{cfg: cfg, q: sqlc.New(db), validate: validator.New()}
+}
+
+func (h *AuthHandler) cookieSecure() bool {
+	return h.cfg.Env == "production"
+}
+
+func (h *AuthHandler) cookieSameSite() http.SameSite {
+	if h.cfg.Env == "production" {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
+func (h *AuthHandler) setAccessCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "shepherd_session",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(auth.AccessTokenTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   h.cookieSecure(),
+		SameSite: h.cookieSameSite(),
+	})
+}
+
+func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "shepherd_refresh",
+		Value:    token,
+		Path:     "/auth",
+		MaxAge:   int(auth.RefreshTokenTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   h.cookieSecure(),
+		SameSite: h.cookieSameSite(),
+	})
+}
+
+func (h *AuthHandler) clearCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name: "shepherd_session", Value: "", Path: "/", MaxAge: -1,
+		HttpOnly: true, Secure: h.cookieSecure(), SameSite: h.cookieSameSite(),
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name: "shepherd_refresh", Value: "", Path: "/auth", MaxAge: -1,
+		HttpOnly: true, Secure: h.cookieSecure(), SameSite: h.cookieSameSite(),
+	})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	if err := h.validate.Struct(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "validation failed")
+		writeValidationError(w, err)
 		return
 	}
 
@@ -67,25 +111,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "shepherd_session",
-		Value:    accessToken,
-		Path:     "/",
-		MaxAge:   int(auth.AccessTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "shepherd_refresh",
-		Value:    refreshToken,
-		Path:     "/api/auth",
-		MaxAge:   int(auth.RefreshTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-	})
+	h.setAccessCookie(w, accessToken)
+	h.setRefreshCookie(w, refreshToken)
 
 	_ = h.q.UpdateLastLogin(r.Context(), user.ID)
 
@@ -126,38 +153,13 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "shepherd_session",
-		Value:    accessToken,
-		Path:     "/",
-		MaxAge:   int(auth.AccessTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-	})
+	h.setAccessCookie(w, accessToken)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "shepherd_session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     "shepherd_refresh",
-		Value:    "",
-		Path:     "/api/auth",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-	})
+	h.clearCookies(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 

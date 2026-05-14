@@ -2,17 +2,18 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*.local
 local.db
 local.db-*
 tmp/
-bin/
 *.log
 .DS_Store
 .vscode/launch.json
 
 # Go
 backend/tmp/
-backend/bin/
+backend/bin/*
+!backend/bin/post_compile
 backend/local.db
 backend/local.db-*
 
