@@ -5,31 +5,34 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
-  import JemaatForm from '$lib/components/domain/JemaatForm.svelte';
-  import { jemaatListQuery, useCreateJemaat } from '$lib/api/jemaat';
+  import KeluargaForm from '$lib/components/domain/KeluargaForm.svelte';
+  import {
+    keluargaListQuery,
+    useCreateKeluarga,
+  } from '$lib/api/keluarga';
   import { toast } from '$lib/stores/toast.svelte';
   import { t } from '$lib/i18n';
-  import type { CreateJemaatInput } from '$lib/types';
+  import type { CreateKeluargaInput } from '$lib/types';
   import { Users } from 'lucide-svelte';
 
   let q = $state('');
   let limit = $state(25);
   let offset = $state(0);
-  let showCreate = $state(false);
+  let creating = $state(false);
 
-  const query = jemaatListQuery(() => ({ q, limit, offset }));
-  const create = useCreateJemaat();
+  const query = keluargaListQuery(() => ({ q, limit, offset }));
+  const create = useCreateKeluarga();
 
   function handleSearch(e: Event) {
     e.preventDefault();
     offset = 0;
   }
 
-  function handleCreate(data: CreateJemaatInput) {
+  function submitCreate(data: CreateKeluargaInput) {
     $create.mutate(data, {
-      onSuccess: (j) => {
-        showCreate = false;
-        toast.success(`${j.nama_lengkap} ditambahkan.`);
+      onSuccess: (k) => {
+        creating = false;
+        toast.success(`Keluarga "${k.nama_keluarga}" ditambahkan.`);
       },
       onError: (err) => toast.error(err.message),
     });
@@ -46,16 +49,16 @@
 <AppShell>
   <header class="mb-6 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
     <div>
-      <h1 class="text-2xl font-semibold">{t('jemaat.title', 'Daftar Jemaat')}</h1>
+      <h1 class="text-2xl font-semibold">{t('keluarga.title', 'Keluarga')}</h1>
       <p class="text-sm text-muted-foreground">
-        {t('jemaat.subtitle', 'Kelola data anggota jemaat.')}
+        {t('keluarga.subtitle', 'Daftar keluarga dan anggotanya.')}
       </p>
     </div>
-    <Button onclick={() => (showCreate = true)}>+ {t('jemaat.add', 'Tambah Jemaat')}</Button>
+    <Button onclick={() => (creating = true)}>+ {t('keluarga.add', 'Tambah Keluarga')}</Button>
   </header>
 
   <form class="mb-4 flex gap-2" onsubmit={handleSearch}>
-    <Input placeholder={t('jemaat.search_placeholder', 'Cari nama atau email...')} bind:value={q} />
+    <Input placeholder={t('keluarga.search', 'Cari nama atau alamat...')} bind:value={q} />
     <Button type="submit" variant="outline">{t('common.search', 'Cari')}</Button>
   </form>
 
@@ -71,43 +74,32 @@
     {#if $query.data.data.length === 0}
       <EmptyState
         icon={Users}
-        title={t('jemaat.empty.title', 'Belum ada jemaat')}
-        description={q
-          ? t('jemaat.empty.search_desc', 'Tidak ada hasil untuk pencarian Anda.')
-          : t('jemaat.empty.desc', 'Mulai dengan menambahkan satu jemaat.')}
+        title={t('keluarga.empty.title', 'Belum ada keluarga')}
+        description={t('keluarga.empty.desc', 'Mulai dengan menambah satu keluarga.')}
       >
-        {#if !q}
-          <Button onclick={() => (showCreate = true)}>+ {t('jemaat.add', 'Tambah Jemaat')}</Button>
-        {/if}
+        <Button onclick={() => (creating = true)}>+ {t('keluarga.add', 'Tambah Keluarga')}</Button>
       </EmptyState>
     {:else}
       <div class="overflow-x-auto rounded-lg border bg-card">
         <table class="w-full text-left text-sm">
           <thead class="bg-muted/40">
             <tr>
-              <th class="px-3 py-2 font-medium">{t('jemaat.col.nama', 'Nama')}</th>
-              <th class="px-3 py-2 font-medium">{t('jemaat.col.jk', 'JK')}</th>
-              <th class="px-3 py-2 font-medium">{t('jemaat.col.kontak', 'Kontak')}</th>
-              <th class="px-3 py-2 font-medium">{t('jemaat.col.status', 'Status')}</th>
+              <th class="px-3 py-2 font-medium">{t('keluarga.col.nama', 'Nama')}</th>
+              <th class="px-3 py-2 font-medium">{t('keluarga.col.alamat', 'Alamat')}</th>
               <th class="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody class="divide-y">
-            {#each $query.data.data as j (j.id)}
+            {#each $query.data.data as k (k.id)}
               <tr class="hover:bg-muted/30">
                 <td class="px-3 py-2">
-                  <a href={`#/jemaat/${j.id}`} class="font-medium text-foreground hover:underline">
-                    {j.nama_lengkap}
+                  <a href={`#/keluarga/${k.id}`} class="font-medium hover:underline">
+                    {k.nama_keluarga}
                   </a>
-                  {#if j.nama_panggilan}
-                    <span class="ml-1 text-xs text-muted-foreground">({j.nama_panggilan})</span>
-                  {/if}
                 </td>
-                <td class="px-3 py-2 text-muted-foreground">{j.jenis_kelamin ?? '-'}</td>
-                <td class="px-3 py-2 text-muted-foreground">{j.email ?? j.nomor_telepon ?? '-'}</td>
-                <td class="px-3 py-2 text-muted-foreground">{j.status_pernikahan ?? '-'}</td>
+                <td class="px-3 py-2 text-muted-foreground">{k.alamat ?? '-'}</td>
                 <td class="px-3 py-2 text-right">
-                  <a href={`#/jemaat/${j.id}`} class="text-sm text-primary hover:underline">
+                  <a href={`#/keluarga/${k.id}`} class="text-sm text-primary hover:underline">
                     {t('common.detail', 'Detail')}
                   </a>
                 </td>
@@ -116,14 +108,12 @@
           </tbody>
         </table>
       </div>
-      <div class="mt-4 flex flex-col items-stretch justify-between gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center">
+      <div class="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
           {t('common.showing', 'Menampilkan')} {$query.data.data.length} dari {$query.data.total}
         </span>
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" onclick={prevPage} disabled={offset === 0}>
-            ← Prev
-          </Button>
+          <Button variant="outline" size="sm" onclick={prevPage} disabled={offset === 0}>← Prev</Button>
           <Button
             variant="outline"
             size="sm"
@@ -139,13 +129,14 @@
 </AppShell>
 
 <Modal
-  open={showCreate}
-  title={t('jemaat.add', 'Tambah Jemaat')}
-  onClose={() => (showCreate = false)}
+  open={creating}
+  title={t('keluarga.add', 'Tambah Keluarga')}
+  onClose={() => (creating = false)}
+  size="sm"
 >
-  <JemaatForm
+  <KeluargaForm
     submitting={$create.isPending}
-    onCancel={() => (showCreate = false)}
-    onSubmit={handleCreate}
+    onCancel={() => (creating = false)}
+    onSubmit={submitCreate}
   />
 </Modal>

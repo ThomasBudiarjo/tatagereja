@@ -14,6 +14,7 @@
   const navLinks = [
     { href: '/', label: t('nav.dashboard', 'Dashboard') },
     { href: '/jemaat', label: t('nav.jemaat', 'Jemaat') },
+    { href: '/keluarga', label: t('nav.keluarga', 'Keluarga') },
     { href: '/pelayan', label: t('nav.pelayan', 'Pelayan') },
     { href: '/service-types', label: t('nav.service_types', 'Jenis Pelayanan') },
     { href: '/kebaktian', label: t('nav.kebaktian', 'Kebaktian') },

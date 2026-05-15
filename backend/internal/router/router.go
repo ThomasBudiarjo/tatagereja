@@ -53,6 +53,9 @@ func New(cfg *config.Config, database *sql.DB) http.Handler {
 		auth := handlers.NewAuthHandler(cfg, database)
 		r.Get("/me", auth.Me)
 
+		dh := handlers.NewDashboardHandler(database)
+		r.Get("/dashboard/birthdays", dh.UpcomingBirthdays)
+
 		jh := handlers.NewJemaatHandler(database)
 		r.Route("/jemaat", func(r chi.Router) {
 			r.Get("/", jh.List)
@@ -62,6 +65,15 @@ func New(cfg *config.Config, database *sql.DB) http.Handler {
 			r.Delete("/{id}", jh.Delete)
 		})
 
+		kelh := handlers.NewKeluargaHandler(database)
+		r.Route("/keluarga", func(r chi.Router) {
+			r.Get("/", kelh.List)
+			r.Post("/", kelh.Create)
+			r.Get("/{id}", kelh.Get)
+			r.Put("/{id}", kelh.Update)
+			r.Delete("/{id}", kelh.Delete)
+		})
+
 		ph := handlers.NewPelayanHandler(database)
 		r.Route("/pelayan", func(r chi.Router) {
 			r.Get("/", ph.List)
@@ -69,6 +81,7 @@ func New(cfg *config.Config, database *sql.DB) http.Handler {
 			r.Get("/{id}", ph.Get)
 			r.Put("/{id}", ph.Update)
 			r.Delete("/{id}", ph.Delete)
+			r.Get("/{id}/jadwal", ph.UpcomingJadwal)
 		})
 
 		sth := handlers.NewServiceTypeHandler(database)
@@ -83,6 +96,7 @@ func New(cfg *config.Config, database *sql.DB) http.Handler {
 		r.Route("/kebaktian", func(r chi.Router) {
 			r.Get("/", kh.List)
 			r.Post("/", kh.Create)
+			r.Post("/recurring", kh.CreateRecurring)
 			r.Get("/{id}", kh.Get)
 			r.Put("/{id}", kh.Update)
 			r.Delete("/{id}", kh.Delete)

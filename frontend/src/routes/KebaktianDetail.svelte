@@ -1,6 +1,7 @@
 <script lang="ts">
   import AppShell from '$lib/components/layout/AppShell.svelte';
   import Button from '$lib/components/ui/Button.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import KebaktianForm from '$lib/components/domain/KebaktianForm.svelte';
   import JadwalEditor from '$lib/components/domain/JadwalEditor.svelte';
   import {
@@ -12,9 +13,11 @@
   } from '$lib/api/kebaktian';
   import { serviceTypesListQuery } from '$lib/api/service-types';
   import { pelayanListQuery } from '$lib/api/pelayan';
+  import { toast } from '$lib/stores/toast.svelte';
   import { t, formatDate } from '$lib/i18n';
   import { push } from 'svelte-spa-router';
   import type { CreateKebaktianInput, JadwalSlotInput } from '$lib/types';
+  import { Printer } from 'lucide-svelte';
 
   interface Props {
     params?: { id?: string };
@@ -35,18 +38,39 @@
 
   function save(data: CreateKebaktianInput) {
     if (id === null) return;
-    $update.mutate({ id, data }, { onSuccess: () => (editing = false) });
+    $update.mutate(
+      { id, data },
+      {
+        onSuccess: (k) => {
+          editing = false;
+          toast.success(`Kebaktian "${k.nama}" diperbarui.`);
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
   }
 
   function handleDelete() {
     if (id === null) return;
     if (!confirm(t('kebaktian.confirm_delete', 'Hapus kebaktian ini? Jadwal terkait akan ikut terhapus.'))) return;
-    $remove.mutate(id, { onSuccess: () => push('/kebaktian') });
+    $remove.mutate(id, {
+      onSuccess: () => {
+        toast.success('Kebaktian dihapus.');
+        push('/kebaktian');
+      },
+      onError: (err) => toast.error(err.message),
+    });
   }
 
   function saveJadwal(slots: JadwalSlotInput[]) {
     if (id === null) return;
-    $upsertJadwal.mutate({ id, slots });
+    $upsertJadwal.mutate(
+      { id, slots },
+      {
+        onSuccess: () => toast.success('Jadwal tersimpan.'),
+        onError: (err) => toast.error(err.message),
+      },
+    );
   }
 </script>
 
@@ -58,12 +82,16 @@
   </div>
 
   {#if $detail.isLoading}
-    <p class="text-sm text-muted-foreground">Memuat…</p>
+    <div class="space-y-3">
+      <Skeleton class="h-8 w-1/2" />
+      <Skeleton class="h-4 w-1/3" />
+      <Skeleton class="h-32 w-full" />
+    </div>
   {:else if $detail.isError}
     <p class="text-sm text-destructive">{$detail.error.message}</p>
   {:else if $detail.data}
     {@const k = $detail.data}
-    <header class="mb-6 flex items-start justify-between gap-4">
+    <header class="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
       <div>
         <h1 class="text-2xl font-semibold">{k.nama}</h1>
         <p class="text-sm text-muted-foreground">
@@ -76,8 +104,17 @@
           <p class="text-sm">{t('kebaktian.pengkhotbah', 'Pengkhotbah')}: {k.pengkhotbah}</p>
         {/if}
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         {#if !editing}
+          <a
+            href={`#/kebaktian/${k.id}/print`}
+            target="_blank"
+            rel="noopener"
+            class="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
+          >
+            <Printer class="h-4 w-4" />
+            {t('kebaktian.print', 'Cetak')}
+          </a>
           <Button variant="outline" onclick={() => (editing = true)}>
             {t('common.edit', 'Edit')}
           </Button>
@@ -121,9 +158,6 @@
           submitting={$upsertJadwal.isPending}
           onSubmit={saveJadwal}
         />
-        {#if $upsertJadwal.isSuccess}
-          <p class="text-xs text-emerald-600">{t('jadwal.saved', 'Jadwal tersimpan.')}</p>
-        {/if}
       {/if}
     </section>
   {/if}

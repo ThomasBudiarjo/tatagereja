@@ -47,6 +47,10 @@ export const jemaatSchema = z.object({
   tanggal_baptis: dateOrNull,
   tanggal_sidi: dateOrNull,
   catatan: nullableString,
+  keluarga_id: z
+    .union([z.coerce.number().int().positive(), z.null(), z.undefined(), z.literal('')])
+    .transform((v) => (typeof v === 'number' ? v : null))
+    .optional(),
 });
 
 export type JemaatFormValues = z.infer<typeof jemaatSchema>;

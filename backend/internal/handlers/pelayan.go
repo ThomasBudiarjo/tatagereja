@@ -388,6 +388,61 @@ func (h *PelayanHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *PelayanHandler) UpcomingJadwal(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseIDParam(r, "id")
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	churchID := appmw.GetChurchID(r)
+	ctx := r.Context()
+
+	if _, err := h.q.GetPelayanByID(ctx, sqlc.GetPelayanByIDParams{ID: id, ChurchID: churchID}); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "pelayan not found")
+			return
+		}
+		slog.Error("get pelayan for upcoming jadwal", "err", err)
+		writeError(w, http.StatusInternalServerError, "db error")
+		return
+	}
+
+	pelayanID := id
+	rows, err := h.q.ListUpcomingJadwalForPelayan(ctx, sqlc.ListUpcomingJadwalForPelayanParams{
+		ChurchID:  churchID,
+		PelayanID: &pelayanID,
+	})
+	if err != nil {
+		slog.Error("list upcoming jadwal", "err", err)
+		writeError(w, http.StatusInternalServerError, "db error")
+		return
+	}
+
+	resp := make([]models.UpcomingJadwalEntry, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, models.UpcomingJadwalEntry{
+			ID:            row.ID,
+			KebaktianID:   row.KebaktianID,
+			KebaktianNama: row.KebaktianNama,
+			Tanggal:       row.Tanggal,
+			WaktuMulai:    row.WaktuMulai,
+			Lokasi:        row.Lokasi,
+			ServiceType: models.UpcomingJadwalServiceType{
+				ID:    row.ServiceTypeID,
+				Nama:  row.ServiceTypeName,
+				Warna: row.ServiceTypeWarna,
+			},
+			Catatan: row.Catatan,
+			Status:  row.Status,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data":       resp,
+		"pelayan_id": id,
+	})
+}
+
 func (h *PelayanHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIDParam(r, "id")
 	if !ok {

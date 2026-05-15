@@ -14,11 +14,13 @@ type Querier interface {
 	CountJadwalByServiceType(ctx context.Context, arg CountJadwalByServiceTypeParams) (int64, error)
 	CountJemaatByChurch(ctx context.Context, churchID int64) (int64, error)
 	CountKebaktianByChurch(ctx context.Context, arg CountKebaktianByChurchParams) (int64, error)
+	CountKeluargaByChurch(ctx context.Context, churchID int64) (int64, error)
 	CountPelayanByChurch(ctx context.Context, churchID int64) (int64, error)
 	CreateChurch(ctx context.Context, arg CreateChurchParams) (Church, error)
 	CreateJadwalSlot(ctx context.Context, arg CreateJadwalSlotParams) (JadwalPelayanan, error)
 	CreateJemaat(ctx context.Context, arg CreateJemaatParams) (Jemaat, error)
 	CreateKebaktian(ctx context.Context, arg CreateKebaktianParams) (Kebaktian, error)
+	CreateKeluarga(ctx context.Context, arg CreateKeluargaParams) (Keluarga, error)
 	CreatePelayan(ctx context.Context, arg CreatePelayanParams) (Pelayan, error)
 	CreateServiceType(ctx context.Context, arg CreateServiceTypeParams) (ServiceType, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
@@ -26,6 +28,7 @@ type Querier interface {
 	DeleteJadwalByKebaktian(ctx context.Context, arg DeleteJadwalByKebaktianParams) error
 	DeleteJemaat(ctx context.Context, arg DeleteJemaatParams) error
 	DeleteKebaktian(ctx context.Context, arg DeleteKebaktianParams) error
+	DeleteKeluarga(ctx context.Context, arg DeleteKeluargaParams) error
 	DeletePelayan(ctx context.Context, arg DeletePelayanParams) error
 	DeleteServiceType(ctx context.Context, arg DeleteServiceTypeParams) error
 	GetChurchByID(ctx context.Context, id int64) (Church, error)
@@ -33,21 +36,27 @@ type Querier interface {
 	GetJadwalByKebaktian(ctx context.Context, arg GetJadwalByKebaktianParams) ([]GetJadwalByKebaktianRow, error)
 	GetJemaatByID(ctx context.Context, arg GetJemaatByIDParams) (Jemaat, error)
 	GetKebaktianByID(ctx context.Context, arg GetKebaktianByIDParams) (Kebaktian, error)
+	GetKeluargaByID(ctx context.Context, arg GetKeluargaByIDParams) (Keluarga, error)
 	GetPelayanByID(ctx context.Context, arg GetPelayanByIDParams) (GetPelayanByIDRow, error)
 	GetPelayanByJemaatID(ctx context.Context, arg GetPelayanByJemaatIDParams) (Pelayan, error)
 	GetServiceTypeByID(ctx context.Context, arg GetServiceTypeByIDParams) (ServiceType, error)
 	GetServiceTypesForPelayan(ctx context.Context, pelayanID int64) ([]GetServiceTypesForPelayanRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	ListActiveJemaatWithBirthday(ctx context.Context, churchID int64) ([]ListActiveJemaatWithBirthdayRow, error)
 	ListJemaatByChurch(ctx context.Context, arg ListJemaatByChurchParams) ([]Jemaat, error)
+	ListJemaatByKeluarga(ctx context.Context, arg ListJemaatByKeluargaParams) ([]Jemaat, error)
 	ListKebaktianByChurch(ctx context.Context, arg ListKebaktianByChurchParams) ([]Kebaktian, error)
+	ListKeluargaByChurch(ctx context.Context, arg ListKeluargaByChurchParams) ([]Keluarga, error)
 	ListPelayanByChurch(ctx context.Context, arg ListPelayanByChurchParams) ([]ListPelayanByChurchRow, error)
 	ListServiceTypesByChurch(ctx context.Context, churchID int64) ([]ServiceType, error)
 	ListUpcomingJadwalForPelayan(ctx context.Context, arg ListUpcomingJadwalForPelayanParams) ([]ListUpcomingJadwalForPelayanRow, error)
 	SearchJemaat(ctx context.Context, arg SearchJemaatParams) ([]Jemaat, error)
+	SearchKeluarga(ctx context.Context, arg SearchKeluargaParams) ([]Keluarga, error)
 	SearchPelayan(ctx context.Context, arg SearchPelayanParams) ([]SearchPelayanRow, error)
 	UpdateJemaat(ctx context.Context, arg UpdateJemaatParams) (Jemaat, error)
 	UpdateKebaktian(ctx context.Context, arg UpdateKebaktianParams) (Kebaktian, error)
+	UpdateKeluarga(ctx context.Context, arg UpdateKeluargaParams) (Keluarga, error)
 	UpdateLastLogin(ctx context.Context, id int64) error
 	UpdatePelayan(ctx context.Context, arg UpdatePelayanParams) (Pelayan, error)
 	UpdateServiceType(ctx context.Context, arg UpdateServiceTypeParams) (ServiceType, error)

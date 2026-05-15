@@ -152,6 +152,50 @@ func (q *Queries) GetJemaatByID(ctx context.Context, arg GetJemaatByIDParams) (J
 	return i, err
 }
 
+const listActiveJemaatWithBirthday = `-- name: ListActiveJemaatWithBirthday :many
+SELECT id, nama_lengkap, nama_panggilan, tanggal_lahir
+FROM jemaat
+WHERE church_id = ?
+  AND is_active = 1
+  AND tanggal_lahir IS NOT NULL
+ORDER BY nama_lengkap ASC
+`
+
+type ListActiveJemaatWithBirthdayRow struct {
+	ID            int64   `db:"id" json:"id"`
+	NamaLengkap   string  `db:"nama_lengkap" json:"nama_lengkap"`
+	NamaPanggilan *string `db:"nama_panggilan" json:"nama_panggilan"`
+	TanggalLahir  *string `db:"tanggal_lahir" json:"tanggal_lahir"`
+}
+
+func (q *Queries) ListActiveJemaatWithBirthday(ctx context.Context, churchID int64) ([]ListActiveJemaatWithBirthdayRow, error) {
+	rows, err := q.db.QueryContext(ctx, listActiveJemaatWithBirthday, churchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveJemaatWithBirthdayRow{}
+	for rows.Next() {
+		var i ListActiveJemaatWithBirthdayRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NamaLengkap,
+			&i.NamaPanggilan,
+			&i.TanggalLahir,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJemaatByChurch = `-- name: ListJemaatByChurch :many
 SELECT id, church_id, nama_lengkap, nama_panggilan, jenis_kelamin, tanggal_lahir, tempat_lahir, alamat, nomor_telepon, email, status_pernikahan, tanggal_baptis, tanggal_sidi, keluarga_id, catatan, is_active, created_at, updated_at FROM jemaat WHERE church_id = ? AND is_active = 1
 ORDER BY nama_lengkap ASC

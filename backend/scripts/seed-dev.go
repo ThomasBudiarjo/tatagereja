@@ -86,16 +86,38 @@ func main() {
 		{NamaLengkap: "Lidia Wibowo", NamaPanggilan: strp("Lidia"), JenisKelamin: strp("P"), TanggalLahir: strp("1982-10-25"), Alamat: strp("Jl. Flamboyan No. 6"), StatusPernikahan: strp("menikah")},
 	}
 
+	keluargaSamples := []sqlc.CreateKeluargaParams{
+		{ChurchID: church.ID, NamaKeluarga: "Keluarga Santoso", Alamat: strp("Jl. Mawar No. 1")},
+		{ChurchID: church.ID, NamaKeluarga: "Keluarga Wijaya", Alamat: strp("Jl. Anggrek No. 7")},
+		{ChurchID: church.ID, NamaKeluarga: "Keluarga Hartono", Alamat: strp("Jl. Sakura No. 2")},
+	}
+	createdKeluarga := make([]sqlc.Keluarga, 0, len(keluargaSamples))
+	for _, p := range keluargaSamples {
+		k, err := q.CreateKeluarga(ctx, p)
+		if err != nil {
+			log.Fatalf("create keluarga %q: %v", p.NamaKeluarga, err)
+		}
+		createdKeluarga = append(createdKeluarga, k)
+	}
+	log.Printf("Seeded %d keluarga.", len(createdKeluarga))
+
+	// Assign some jemaat to keluarga (by sample order).
+	keluargaAssignments := map[int]int{0: 0, 4: 0, 2: 1, 8: 2, 9: 2}
+
 	createdJemaat := make([]sqlc.Jemaat, 0, len(jemaatSamples))
-	for _, p := range jemaatSamples {
+	for i, p := range jemaatSamples {
 		p.ChurchID = church.ID
+		if idx, ok := keluargaAssignments[i]; ok {
+			kid := createdKeluarga[idx].ID
+			p.KeluargaID = &kid
+		}
 		j, err := q.CreateJemaat(ctx, p)
 		if err != nil {
 			log.Fatalf("create jemaat %q: %v", p.NamaLengkap, err)
 		}
 		createdJemaat = append(createdJemaat, j)
 	}
-	log.Printf("Seeded %d jemaat.", len(createdJemaat))
+	log.Printf("Seeded %d jemaat (with keluarga links).", len(createdJemaat))
 
 	serviceTypeSamples := []sqlc.CreateServiceTypeParams{
 		{ChurchID: church.ID, Nama: "Worship Leader", Deskripsi: strp("Memimpin pujian"), Warna: strp("#3b82f6"), Urutan: 1},

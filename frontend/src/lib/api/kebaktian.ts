@@ -6,6 +6,7 @@ import {
 import { apiClient } from './client';
 import type {
   CreateKebaktianInput,
+  CreateRecurringKebaktianInput,
   JadwalSlot,
   JadwalSlotInput,
   Kebaktian,
@@ -53,6 +54,15 @@ export function useCreateKebaktian() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
     },
+  });
+}
+
+export function useCreateRecurringKebaktian() {
+  const qc = useQueryClient();
+  return createMutation({
+    mutationFn: (data: CreateRecurringKebaktianInput) =>
+      apiClient.post<{ created: Kebaktian[] }>('/kebaktian/recurring', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
 

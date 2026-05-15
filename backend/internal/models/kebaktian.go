@@ -44,6 +44,26 @@ func KebaktianFromRow(k sqlc.Kebaktian) KebaktianResponse {
 	}
 }
 
+type RecurringKebaktianTemplate struct {
+	Nama        string  `json:"nama" validate:"required,min=1,max=200"`
+	WaktuMulai  string  `json:"waktu_mulai" validate:"required"`
+	Lokasi      *string `json:"lokasi" validate:"omitempty,max=200"`
+	Tema        *string `json:"tema" validate:"omitempty,max=200"`
+	Pengkhotbah *string `json:"pengkhotbah" validate:"omitempty,max=200"`
+	Catatan     *string `json:"catatan"`
+}
+
+type RecurringKebaktianRequest struct {
+	Template  RecurringKebaktianTemplate `json:"template" validate:"required"`
+	StartDate string                     `json:"start_date" validate:"required,datetime=2006-01-02"`
+	Weekday   int                        `json:"weekday" validate:"min=0,max=6"`
+	WeekCount int                        `json:"week_count" validate:"required,min=1,max=52"`
+}
+
+type RecurringKebaktianResponse struct {
+	Created []KebaktianResponse `json:"created"`
+}
+
 type JadwalSlotInput struct {
 	ServiceTypeID int64   `json:"service_type_id" validate:"required"`
 	PelayanID     *int64  `json:"pelayan_id"`

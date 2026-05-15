@@ -1,5 +1,6 @@
 import { apiClient, ApiError } from '$lib/api/client';
 import type { User } from '$lib/types';
+import { toast } from '$lib/stores/toast.svelte';
 import { push } from 'svelte-spa-router';
 
 class AuthStore {
@@ -25,6 +26,7 @@ class AuthStore {
       } else {
         this.loginError = 'Unable to login';
       }
+      toast.error(this.loginError ?? 'Unable to login');
     } finally {
       this.isLoading = false;
     }
