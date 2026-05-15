@@ -200,6 +200,71 @@ func (h *KebaktianHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *KebaktianHandler) CreateRecurring(w http.ResponseWriter, r *http.Request) {
+	var req models.RecurringKebaktianRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if err := h.validate.Struct(&req); err != nil {
+		writeValidationError(w, err)
+		return
+	}
+	if err := h.validate.Struct(&req.Template); err != nil {
+		writeValidationError(w, err)
+		return
+	}
+
+	start, err := time.Parse(dateLayout, req.StartDate)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid start_date")
+		return
+	}
+
+	first := start
+	delta := (req.Weekday - int(start.Weekday()) + 7) % 7
+	first = first.AddDate(0, 0, delta)
+
+	churchID := appmw.GetChurchID(r)
+	ctx := r.Context()
+
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		slog.Error("begin tx", "err", err)
+		writeError(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+	qtx := h.q.WithTx(tx)
+
+	created := make([]models.KebaktianResponse, 0, req.WeekCount)
+	for i := 0; i < req.WeekCount; i++ {
+		when := first.AddDate(0, 0, i*7)
+		row, err := qtx.CreateKebaktian(ctx, sqlc.CreateKebaktianParams{
+			ChurchID:    churchID,
+			Nama:        req.Template.Nama,
+			Tanggal:     when.Format(dateLayout),
+			WaktuMulai:  req.Template.WaktuMulai,
+			Lokasi:      req.Template.Lokasi,
+			Tema:        req.Template.Tema,
+			Pengkhotbah: req.Template.Pengkhotbah,
+			Catatan:     req.Template.Catatan,
+		})
+		if err != nil {
+			slog.Error("create recurring kebaktian", "err", err, "iteration", i)
+			writeError(w, http.StatusInternalServerError, "failed to create kebaktian")
+			return
+		}
+		created = append(created, models.KebaktianFromRow(row))
+	}
+	if err := tx.Commit(); err != nil {
+		slog.Error("commit recurring kebaktian", "err", err)
+		writeError(w, http.StatusInternalServerError, "db error")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, models.RecurringKebaktianResponse{Created: created})
+}
+
 func (h *KebaktianHandler) GetJadwal(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIDParam(r, "id")
 	if !ok {

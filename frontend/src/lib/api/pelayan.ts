@@ -8,6 +8,7 @@ import type {
   CreatePelayanInput,
   Paginated,
   Pelayan,
+  UpcomingJadwalEntry,
   UpdatePelayanInput,
 } from '$lib/types';
 
@@ -60,6 +61,20 @@ export function useUpdatePelayan() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
     },
+  });
+}
+
+interface UpcomingJadwalResponse {
+  data: UpcomingJadwalEntry[];
+  pelayan_id: number;
+}
+
+export function pelayanUpcomingJadwalQuery(id: () => number | null) {
+  return createQuery({
+    queryKey: ['pelayan', 'upcoming-jadwal', id()],
+    enabled: id() !== null,
+    queryFn: () =>
+      apiClient.get<UpcomingJadwalResponse>(`/pelayan/${id()}/jadwal`),
   });
 }
 

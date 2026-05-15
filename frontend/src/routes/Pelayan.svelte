@@ -4,6 +4,8 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
   import PelayanForm from '$lib/components/domain/PelayanForm.svelte';
   import { jemaatListQuery } from '$lib/api/jemaat';
   import { serviceTypesListQuery } from '$lib/api/service-types';
@@ -13,11 +15,13 @@
     useUpdatePelayan,
     useDeletePelayan,
   } from '$lib/api/pelayan';
+  import { toast } from '$lib/stores/toast.svelte';
   import { t } from '$lib/i18n';
   import type {
     CreatePelayanInput,
     Pelayan,
   } from '$lib/types';
+  import { ListChecks } from 'lucide-svelte';
 
   let q = $state('');
   let limit = $state(25);
@@ -39,7 +43,11 @@
 
   function submitCreate(data: CreatePelayanInput) {
     $create.mutate(data, {
-      onSuccess: () => (creating = false),
+      onSuccess: (p) => {
+        creating = false;
+        toast.success(`${p.nama_lengkap} ditambahkan sebagai pelayan.`);
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -53,18 +61,27 @@
           service_type_ids: data.service_type_ids,
         },
       },
-      { onSuccess: () => (editing = null) },
+      {
+        onSuccess: (p) => {
+          editing = null;
+          toast.success(`${p.nama_lengkap} diperbarui.`);
+        },
+        onError: (err) => toast.error(err.message),
+      },
     );
   }
 
   function handleDelete(p: Pelayan) {
     if (!confirm(t('pelayan.confirm_delete', `Hapus status pelayan untuk ${p.nama_lengkap}?`))) return;
-    $remove.mutate(p.id);
+    $remove.mutate(p.id, {
+      onSuccess: () => toast.success('Pelayan dihapus.'),
+      onError: (err) => toast.error(err.message),
+    });
   }
 </script>
 
 <AppShell>
-  <header class="mb-6 flex items-center justify-between gap-4">
+  <header class="mb-6 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
     <div>
       <h1 class="text-2xl font-semibold">{t('pelayan.title', 'Pelayan')}</h1>
       <p class="text-sm text-muted-foreground">
@@ -80,16 +97,24 @@
   </form>
 
   {#if $query.isLoading}
-    <p class="text-sm text-muted-foreground">Memuat…</p>
+    <div class="space-y-2">
+      {#each Array(5) as _, i (i)}
+        <Skeleton class="h-12 w-full" />
+      {/each}
+    </div>
   {:else if $query.isError}
     <p class="text-sm text-destructive">{$query.error.message}</p>
   {:else if $query.data}
     {#if $query.data.data.length === 0}
-      <div class="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-        Belum ada pelayan.
-      </div>
+      <EmptyState
+        icon={ListChecks}
+        title={t('pelayan.empty.title', 'Belum ada pelayan')}
+        description={t('pelayan.empty.desc', 'Pilih satu jemaat dan tambahkan sebagai pelayan.')}
+      >
+        <Button onclick={() => (creating = true)}>+ {t('pelayan.add', 'Tambah Pelayan')}</Button>
+      </EmptyState>
     {:else}
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="overflow-x-auto rounded-lg border bg-card">
         <table class="w-full text-left text-sm">
           <thead class="bg-muted/40">
             <tr>
@@ -102,7 +127,9 @@
           <tbody class="divide-y">
             {#each $query.data.data as p (p.id)}
               <tr class="hover:bg-muted/30">
-                <td class="px-3 py-2 font-medium">{p.nama_lengkap}</td>
+                <td class="px-3 py-2 font-medium">
+                  <a href={`#/pelayan/${p.id}`} class="hover:underline">{p.nama_lengkap}</a>
+                </td>
                 <td class="px-3 py-2">
                   <div class="flex flex-wrap gap-1">
                     {#each p.service_types as st (st.id)}

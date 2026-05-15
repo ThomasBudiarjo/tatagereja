@@ -3,13 +3,19 @@
   import Button from '$lib/components/ui/Button.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
   import KebaktianForm from '$lib/components/domain/KebaktianForm.svelte';
+  import RecurringKebaktianForm from '$lib/components/domain/RecurringKebaktianForm.svelte';
   import {
     kebaktianListQuery,
     useCreateKebaktian,
+    useCreateRecurringKebaktian,
   } from '$lib/api/kebaktian';
+  import { toast } from '$lib/stores/toast.svelte';
   import { t, formatDate } from '$lib/i18n';
-  import type { CreateKebaktianInput } from '$lib/types';
+  import type { CreateKebaktianInput, CreateRecurringKebaktianInput } from '$lib/types';
+  import { CalendarDays } from 'lucide-svelte';
 
   function today(): string {
     return new Date().toISOString().slice(0, 10);
@@ -23,26 +29,47 @@
   let from = $state(today());
   let to = $state(plusDays(90));
   let creating = $state(false);
+  let creatingSeries = $state(false);
 
   const query = kebaktianListQuery(() => ({ from, to, limit: 100 }));
   const create = useCreateKebaktian();
+  const createSeries = useCreateRecurringKebaktian();
 
   function submitCreate(data: CreateKebaktianInput) {
     $create.mutate(data, {
-      onSuccess: () => (creating = false),
+      onSuccess: (k) => {
+        creating = false;
+        toast.success(`Kebaktian "${k.nama}" dibuat.`);
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  }
+
+  function submitSeries(data: CreateRecurringKebaktianInput) {
+    $createSeries.mutate(data, {
+      onSuccess: (res) => {
+        creatingSeries = false;
+        toast.success(`${res.created.length} kebaktian dibuat.`);
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 </script>
 
 <AppShell>
-  <header class="mb-6 flex items-center justify-between gap-4">
+  <header class="mb-6 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
     <div>
       <h1 class="text-2xl font-semibold">{t('kebaktian.title', 'Kebaktian')}</h1>
       <p class="text-sm text-muted-foreground">
         {t('kebaktian.subtitle', 'Atur jadwal kebaktian & persekutuan.')}
       </p>
     </div>
-    <Button onclick={() => (creating = true)}>+ {t('kebaktian.add', 'Tambah Kebaktian')}</Button>
+    <div class="flex flex-wrap gap-2">
+      <Button variant="outline" onclick={() => (creatingSeries = true)}>
+        {t('kebaktian.add_series', 'Buat seri mingguan')}
+      </Button>
+      <Button onclick={() => (creating = true)}>+ {t('kebaktian.add', 'Tambah Kebaktian')}</Button>
+    </div>
   </header>
 
   <div class="mb-4 flex flex-wrap items-end gap-3">
@@ -61,16 +88,29 @@
   </div>
 
   {#if $query.isLoading}
-    <p class="text-sm text-muted-foreground">Memuat…</p>
+    <div class="space-y-2">
+      {#each Array(4) as _, i (i)}
+        <Skeleton class="h-14 w-full" />
+      {/each}
+    </div>
   {:else if $query.isError}
     <p class="text-sm text-destructive">{$query.error.message}</p>
   {:else if $query.data}
     {#if $query.data.data.length === 0}
-      <div class="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-        Belum ada kebaktian di rentang ini.
-      </div>
+      <EmptyState
+        icon={CalendarDays}
+        title={t('kebaktian.empty.title', 'Belum ada kebaktian di rentang ini')}
+        description={t('kebaktian.empty.desc', 'Buat satu kebaktian atau seri mingguan untuk mulai mengatur jadwal pelayanan.')}
+      >
+        <div class="flex flex-wrap gap-2">
+          <Button variant="outline" onclick={() => (creatingSeries = true)}>
+            {t('kebaktian.add_series', 'Buat seri mingguan')}
+          </Button>
+          <Button onclick={() => (creating = true)}>+ {t('kebaktian.add', 'Tambah Kebaktian')}</Button>
+        </div>
+      </EmptyState>
     {:else}
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="overflow-x-auto rounded-lg border bg-card">
         <table class="w-full text-left text-sm">
           <thead class="bg-muted/40">
             <tr>
@@ -121,5 +161,17 @@
     submitting={$create.isPending}
     onCancel={() => (creating = false)}
     onSubmit={submitCreate}
+  />
+</Modal>
+
+<Modal
+  open={creatingSeries}
+  title={t('kebaktian.add_series', 'Buat seri kebaktian mingguan')}
+  onClose={() => (creatingSeries = false)}
+>
+  <RecurringKebaktianForm
+    submitting={$createSeries.isPending}
+    onCancel={() => (creatingSeries = false)}
+    onSubmit={submitSeries}
   />
 </Modal>

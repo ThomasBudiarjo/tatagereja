@@ -147,6 +147,76 @@ export interface JadwalSlotInput {
   catatan?: string | null;
 }
 
+export interface Keluarga {
+  id: number;
+  church_id: number;
+  nama_keluarga: string;
+  alamat: string | null;
+  catatan: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeluargaMember {
+  id: number;
+  nama_lengkap: string;
+  nama_panggilan: string | null;
+}
+
+export interface KeluargaDetail extends Keluarga {
+  members: KeluargaMember[];
+}
+
+export interface CreateKeluargaInput {
+  nama_keluarga: string;
+  alamat?: string | null;
+  catatan?: string | null;
+}
+
+export interface UpcomingJadwalServiceType {
+  id: number;
+  nama: string;
+  warna: string | null;
+}
+
+export interface UpcomingJadwalEntry {
+  id: number;
+  kebaktian_id: number;
+  kebaktian_nama: string;
+  tanggal: string;
+  waktu_mulai: string;
+  lokasi: string | null;
+  service_type: UpcomingJadwalServiceType;
+  catatan: string | null;
+  status: string;
+}
+
+export interface BirthdayEntry {
+  jemaat_id: number;
+  nama_lengkap: string;
+  nama_panggilan: string | null;
+  tanggal_lahir: string;
+  next_birthday: string;
+  days_until: number;
+  age_turning: number;
+}
+
+export interface RecurringKebaktianTemplate {
+  nama: string;
+  waktu_mulai: string;
+  lokasi?: string | null;
+  tema?: string | null;
+  pengkhotbah?: string | null;
+  catatan?: string | null;
+}
+
+export interface CreateRecurringKebaktianInput {
+  template: RecurringKebaktianTemplate;
+  start_date: string;
+  weekday: number;
+  week_count: number;
+}
+
 export interface Paginated<T> {
   data: T[];
   total: number;

@@ -6,6 +6,7 @@
   import Textarea from '$lib/components/ui/Textarea.svelte';
   import type { CreateJemaatInput, Jemaat } from '$lib/types';
   import { jemaatSchema } from '$lib/schemas/jemaat';
+  import { keluargaListQuery } from '$lib/api/keluarga';
   import { t } from '$lib/i18n';
 
   interface Props {
@@ -36,7 +37,10 @@
   let tanggal_baptis = $state(initial.tanggal_baptis ?? '');
   let tanggal_sidi = $state(initial.tanggal_sidi ?? '');
   let catatan = $state(initial.catatan ?? '');
+  let keluarga_id = $state<number | ''>(initial.keluarga_id ?? '');
   let error = $state<string | null>(null);
+
+  const keluargaQ = keluargaListQuery(() => ({ limit: 200 }));
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -54,6 +58,7 @@
       tanggal_baptis,
       tanggal_sidi,
       catatan,
+      keluarga_id: keluarga_id === '' ? null : keluarga_id,
     };
     const parsed = jemaatSchema.safeParse(raw);
     if (!parsed.success) {
@@ -126,6 +131,15 @@
     <div class="space-y-1.5">
       <Label for="tanggal_sidi">{t('jemaat.tanggal_sidi', 'Tanggal sidi')}</Label>
       <Input id="tanggal_sidi" type="date" bind:value={tanggal_sidi} />
+    </div>
+    <div class="space-y-1.5 sm:col-span-2">
+      <Label for="keluarga_id">{t('jemaat.keluarga', 'Keluarga')}</Label>
+      <Select id="keluarga_id" bind:value={keluarga_id}>
+        <option value="">— Tanpa keluarga —</option>
+        {#each $keluargaQ.data?.data ?? [] as kel (kel.id)}
+          <option value={kel.id}>{kel.nama_keluarga}</option>
+        {/each}
+      </Select>
     </div>
     <div class="space-y-1.5 sm:col-span-2">
       <Label for="catatan">{t('jemaat.catatan', 'Catatan')}</Label>

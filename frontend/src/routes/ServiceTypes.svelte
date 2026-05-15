@@ -3,6 +3,8 @@
   import Button from '$lib/components/ui/Button.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
   import ServiceTypeForm from '$lib/components/domain/ServiceTypeForm.svelte';
   import {
     serviceTypesListQuery,
@@ -10,8 +12,10 @@
     useUpdateServiceType,
     useDeleteServiceType,
   } from '$lib/api/service-types';
+  import { toast } from '$lib/stores/toast.svelte';
   import { t } from '$lib/i18n';
   import type { CreateServiceTypeInput, ServiceType } from '$lib/types';
+  import { Tags } from 'lucide-svelte';
 
   const query = serviceTypesListQuery();
   const create = useCreateServiceType();
@@ -23,7 +27,11 @@
 
   function submitCreate(data: CreateServiceTypeInput) {
     $create.mutate(data, {
-      onSuccess: () => (creating = false),
+      onSuccess: (st) => {
+        creating = false;
+        toast.success(`"${st.nama}" ditambahkan.`);
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -31,18 +39,27 @@
     if (!editing) return;
     $update.mutate(
       { id: editing.id, data },
-      { onSuccess: () => (editing = null) },
+      {
+        onSuccess: (st) => {
+          editing = null;
+          toast.success(`"${st.nama}" diperbarui.`);
+        },
+        onError: (err) => toast.error(err.message),
+      },
     );
   }
 
   function handleDelete(st: ServiceType) {
     if (!confirm(t('service_type.confirm_delete', `Hapus "${st.nama}"?`))) return;
-    $remove.mutate(st.id);
+    $remove.mutate(st.id, {
+      onSuccess: () => toast.success(`"${st.nama}" dihapus.`),
+      onError: (err) => toast.error(err.message),
+    });
   }
 </script>
 
 <AppShell>
-  <header class="mb-6 flex items-center justify-between gap-4">
+  <header class="mb-6 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
     <div>
       <h1 class="text-2xl font-semibold">{t('service_type.title', 'Jenis Pelayanan')}</h1>
       <p class="text-sm text-muted-foreground">
@@ -53,16 +70,24 @@
   </header>
 
   {#if $query.isLoading}
-    <p class="text-sm text-muted-foreground">Memuat…</p>
+    <div class="space-y-2">
+      {#each Array(4) as _, i (i)}
+        <Skeleton class="h-12 w-full" />
+      {/each}
+    </div>
   {:else if $query.isError}
     <p class="text-sm text-destructive">{$query.error.message}</p>
   {:else if $query.data}
     {#if $query.data.data.length === 0}
-      <div class="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-        Belum ada jenis pelayanan.
-      </div>
+      <EmptyState
+        icon={Tags}
+        title={t('service_type.empty.title', 'Belum ada jenis pelayanan')}
+        description={t('service_type.empty.desc', 'Tambahkan jenis pelayanan seperti Worship Leader, Singer, atau Multimedia.')}
+      >
+        <Button onclick={() => (creating = true)}>+ {t('service_type.add', 'Tambah')}</Button>
+      </EmptyState>
     {:else}
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="overflow-x-auto rounded-lg border bg-card">
         <table class="w-full text-left text-sm">
           <thead class="bg-muted/40">
             <tr>

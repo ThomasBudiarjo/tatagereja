@@ -50,3 +50,11 @@ WHERE id = ? AND church_id = ?;
 
 -- name: DeleteJemaat :exec
 DELETE FROM jemaat WHERE id = ? AND church_id = ?;
+
+-- name: ListActiveJemaatWithBirthday :many
+SELECT id, nama_lengkap, nama_panggilan, tanggal_lahir
+FROM jemaat
+WHERE church_id = ?
+  AND is_active = 1
+  AND tanggal_lahir IS NOT NULL
+ORDER BY nama_lengkap ASC;

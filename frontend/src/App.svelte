@@ -4,6 +4,7 @@
   import { routes } from '$lib/routes';
   import { onMount } from 'svelte';
   import { auth } from '$lib/stores/auth.svelte';
+  import Toaster from '$lib/components/ui/Toaster.svelte';
 
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -27,4 +28,5 @@
   {:else}
     <Router {routes} />
   {/if}
+  <Toaster />
 </QueryClientProvider>

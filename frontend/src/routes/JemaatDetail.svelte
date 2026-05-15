@@ -2,11 +2,13 @@
   import AppShell from '$lib/components/layout/AppShell.svelte';
   import Button from '$lib/components/ui/Button.svelte';
   import JemaatForm from '$lib/components/domain/JemaatForm.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import {
     jemaatDetailQuery,
     useUpdateJemaat,
     useDeleteJemaat,
   } from '$lib/api/jemaat';
+  import { toast } from '$lib/stores/toast.svelte';
   import { t, formatDate } from '$lib/i18n';
   import type { CreateJemaatInput } from '$lib/types';
   import { push } from 'svelte-spa-router';
@@ -29,9 +31,11 @@
     $update.mutate(
       { id, data },
       {
-        onSuccess: () => {
+        onSuccess: (j) => {
           editing = false;
+          toast.success(`${j.nama_lengkap} diperbarui.`);
         },
+        onError: (err) => toast.error(err.message),
       },
     );
   }
@@ -40,7 +44,11 @@
     if (id === null) return;
     if (!confirm(t('jemaat.confirm_delete', 'Yakin menonaktifkan jemaat ini?'))) return;
     $remove.mutate(id, {
-      onSuccess: () => push('/jemaat'),
+      onSuccess: () => {
+        toast.success('Jemaat dinonaktifkan.');
+        push('/jemaat');
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 </script>
@@ -53,19 +61,23 @@
   </div>
 
   {#if $query.isLoading}
-    <p class="text-sm text-muted-foreground">Memuat…</p>
+    <div class="space-y-3">
+      <Skeleton class="h-8 w-1/3" />
+      <Skeleton class="h-4 w-1/4" />
+      <Skeleton class="h-64 w-full" />
+    </div>
   {:else if $query.isError}
     <p class="text-sm text-destructive">{$query.error.message}</p>
   {:else if $query.data}
     {@const j = $query.data}
-    <header class="mb-6 flex items-start justify-between gap-4">
+    <header class="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
       <div>
         <h1 class="text-2xl font-semibold">{j.nama_lengkap}</h1>
         {#if j.nama_panggilan}
           <p class="text-sm text-muted-foreground">"{j.nama_panggilan}"</p>
         {/if}
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         {#if !editing}
           <Button variant="outline" onclick={() => (editing = true)}>
             {t('common.edit', 'Edit')}
