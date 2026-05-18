@@ -82,7 +82,8 @@ See [§15 Out of Scope](#15-out-of-scope).
 |-------|--------|-----------|
 | Frontend framework | **Svelte 5** + Vite + TypeScript | Lightweight, small bundle, pure SPA. |
 | Frontend routing | **svelte-spa-router** | Simple hash-based SPA routing, no SSR. |
-| Frontend styling | **Tailwind CSS** + **shadcn-svelte** (CLI-copied) | Fast styling, accessible primitives. |
+| Frontend styling | **Tailwind CSS** + **shadcn-svelte** (CLI-copied), **mobile-first** | Fast styling, accessible primitives. Breakpoints layer up from phone; see §6.10. |
+| Frontend mobile patterns | **`vaul-svelte`** drawer + shadcn `Sheet` | Bottom-sheet forms on mobile, side sheet for filters; dialog reserved for desktop. |
 | Frontend data fetching | **TanStack Query (Svelte)** | Caching, retries, invalidation. |
 | Frontend state | Svelte 5 runes (`$state`, `$derived`) | Built-in. |
 | Frontend forms | Native form handling + **Zod** on submit | One fewer dep than Felte. |
@@ -1512,7 +1513,8 @@ npm install
     "date-fns": "^3.0.0",
     "date-fns-tz": "^3.0.0",
     "clsx": "^2.0.0",
-    "tailwind-merge": "^2.0.0"
+    "tailwind-merge": "^2.0.0",
+    "vaul-svelte": "^0.3.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -1537,7 +1539,7 @@ npm install
 
 ```bash
 npx shadcn-svelte@latest init
-npx shadcn-svelte@latest add button input label table dialog select form sonner
+npx shadcn-svelte@latest add button input label table dialog sheet drawer select form sonner card dropdown-menu
 ```
 
 ### 6.3 `vite.config.ts`
@@ -1768,6 +1770,44 @@ export function localToUTC(local: string): string {
 - All server state via TanStack Query.
 - No `any`. Use `unknown` and narrow.
 - User-facing Indonesian strings live inline in components for MVP. Extract to an i18n file only when (and if) a second language is added.
+
+### 6.10 Mobile-first design conventions
+
+The app is designed for a phone first; desktop is a progressive enhancement.
+
+**Breakpoints (Tailwind defaults, used as layer-up only):**
+
+| Prefix | Width   | Used for |
+|--------|---------|----------|
+| (none) | < 640px | Default. All base styles target this. |
+| `sm:`  | ≥ 640px | Large phone / small tablet adjustments. |
+| `md:`  | ≥ 768px | Tablet. Sidebar appears, tables replace card lists. |
+| `lg:`  | ≥ 1024px| Desktop. Multi-column layouts. |
+
+Rule: never write a desktop style without a breakpoint prefix. Base classes describe the phone.
+
+**App chrome:**
+
+- **`< md`:** top bar with hamburger + page title; **bottom nav** with 4–5 primary destinations (Dashboard, Jemaat, Kebaktian, Jadwal, More). Hamburger opens a left `Sheet`.
+- **`≥ md`:** persistent left sidebar, no bottom nav.
+
+**Layout patterns:**
+
+- **Lists:** card list on `< md` (one card per row, key fields stacked), `Table` on `≥ md`. Don't horizontally scroll a desktop table on mobile — it loses context.
+- **Create / edit forms:** `vaul-svelte` bottom `Drawer` on `< md`, shadcn `Dialog` on `≥ md`. Same form component, different container.
+- **Filters / detail panels:** shadcn `Sheet` from the right edge on all sizes; full-height on mobile, fixed-width on desktop.
+- **Destructive confirmations:** `Drawer` on mobile (thumb-reachable), `AlertDialog` on desktop.
+
+**Touch & input:**
+
+- Tap targets: `min-h-11 min-w-11` (44px) for any actionable element.
+- Body text: `text-base` (16px) on mobile to prevent iOS zoom-on-focus for inputs.
+- Inputs: set proper `inputmode` and `autocomplete` (`inputmode="email"`, `autocomplete="tel"`, etc.). Use `type="date"` / `type="datetime-local"` — native pickers beat any custom widget on mobile.
+- Sticky form actions: primary submit pinned to bottom of `Drawer` with `safe-area-inset-bottom` padding.
+
+**Performance:**
+
+- No heavy desktop-only components loaded on mobile. If a component (e.g., a rich `JadwalEditor` grid) is desktop-shaped, dynamic-import it behind an `md:` breakpoint guard, and render a simpler mobile editor below `md`.
 
 ---
 
