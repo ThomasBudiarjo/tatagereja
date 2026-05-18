@@ -24,7 +24,7 @@ type Handler struct {
 }
 
 func NewHandler(q sqlc.Querier, db *sql.DB) *Handler {
-	return &Handler{q: q, db: db, validate: validator.New()}
+	return &Handler{q: q, db: db, validate: httpx.NewValidator()}
 }
 
 type createRequest struct {

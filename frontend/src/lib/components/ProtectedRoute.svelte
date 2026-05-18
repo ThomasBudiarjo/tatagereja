@@ -1,16 +1,9 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { auth } from '$lib/stores/auth.svelte';
   import { push } from 'svelte-spa-router';
-  import AppShell from './AppShell.svelte';
-  import { onMount } from 'svelte';
 
-  let { children } = $props<{ children: () => unknown }>();
-
-  onMount(() => {
-    if (auth.bootResolved && !auth.isAuthenticated) {
-      push('/login');
-    }
-  });
+  let { children }: { children: Snippet } = $props();
 
   $effect(() => {
     if (auth.bootResolved && !auth.isAuthenticated) {
@@ -20,9 +13,11 @@
 </script>
 
 {#if auth.isAuthenticated}
-  <AppShell {children} />
+  {@render children()}
 {:else}
-  <div class="flex h-screen items-center justify-center">
-    <p class="text-muted-foreground">Mengarahkan ke login…</p>
+  <div class="app">
+    <div class="empty" style="margin: auto;">
+      <div class="empty-title">Mengarahkan ke login…</div>
+    </div>
   </div>
 {/if}

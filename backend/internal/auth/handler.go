@@ -21,7 +21,7 @@ type Handler struct {
 }
 
 func NewHandler(cfg *config.Config, q sqlc.Querier, db *sql.DB) *Handler {
-	return &Handler{cfg: cfg, q: q, db: db, validate: validator.New()}
+	return &Handler{cfg: cfg, q: q, db: db, validate: httpx.NewValidator()}
 }
 
 type loginRequest struct {

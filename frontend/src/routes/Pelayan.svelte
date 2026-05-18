@@ -6,176 +6,347 @@
   import { jemaatApi } from '$lib/api/jemaat';
   import { serviceTypesApi } from '$lib/api/service-types';
   import { ApiError } from '$lib/api/client';
-  import { Plus, Pencil, Trash2 } from 'lucide-svelte';
+  import { push } from 'svelte-spa-router';
   import { emptyToNull } from '$lib/utils/format';
-  import type { Pelayan } from '$lib/types';
+  import { toast } from '$lib/stores/toast.svelte';
+  import { viewport } from '$lib/stores/viewport.svelte';
+  import TopBar from '$lib/components/TopBar.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import Icon from '$lib/components/Icon.svelte';
+  import Avatar from '$lib/components/Avatar.svelte';
+  import Sheet from '$lib/components/Sheet.svelte';
+  import Field from '$lib/components/Field.svelte';
+  import DesktopLayout from '$lib/components/DesktopLayout.svelte';
+  import DesktopDialog from '$lib/components/DesktopDialog.svelte';
 
   const qc = useQueryClient();
 
-  const listQ = createQuery(toStore(() => ({
-    queryKey: ['pelayan'],
-    queryFn: () => pelayanApi.list({ limit: 200, offset: 0 }),
-  })));
-  const jemaatQ = createQuery(toStore(() => ({
-    queryKey: ['jemaat', 'all-for-pelayan'],
-    queryFn: () => jemaatApi.list({ limit: 200, offset: 0 }),
-  })));
-  const stQ = createQuery(toStore(() => ({
-    queryKey: ['service-types'],
-    queryFn: () => serviceTypesApi.list(),
-  })));
+  const listQ = createQuery(
+    toStore(() => ({
+      queryKey: ['pelayan', 'all'],
+      queryFn: () => pelayanApi.list({ limit: 500, offset: 0 }),
+    })),
+  );
+  const jemaatQ = createQuery(
+    toStore(() => ({
+      queryKey: ['jemaat', 'all-for-pelayan'],
+      queryFn: () => jemaatApi.list({ limit: 500, offset: 0 }),
+    })),
+  );
+  const stQ = createQuery(
+    toStore(() => ({
+      queryKey: ['service-types'],
+      queryFn: () => serviceTypesApi.list(),
+    })),
+  );
+
+  let filter = $state<number>(0); // 0 = all
+
+  const filtered = $derived.by(() => {
+    const all = $listQ.data?.data ?? [];
+    if (filter === 0) return all;
+    return all.filter((p) => (p.service_type_ids ?? []).includes(filter));
+  });
+
+  function nameForServiceTypeIds(ids: number[]): string[] {
+    const all = $stQ.data?.data ?? [];
+    return ids
+      .map((id) => all.find((s) => s.id === id)?.nama)
+      .filter((x): x is string => !!x);
+  }
+
+  function jemaatById(id: number) {
+    return ($jemaatQ.data?.data ?? []).find((j) => j.id === id) ?? null;
+  }
 
   let showForm = $state(false);
-  let editing = $state<Pelayan | null>(null);
-  let form = $state<{
-    jemaat_id: number | null;
-    catatan: string | null;
-    service_type_ids: number[];
-  }>({ jemaat_id: null, catatan: null, service_type_ids: [] });
-  let errors = $state<Record<string, string>>({});
+  let pickedJemaat = $state<{ id: number; nama: string; panggilan: string | null } | null>(null);
+  let pickerQ = $state('');
+  let selectedTypes = $state<number[]>([]);
+  let formCatatan = $state('');
+
+  const candidates = $derived.by(() => {
+    const all = $jemaatQ.data?.data ?? [];
+    const pelayanIds = new Set(($listQ.data?.data ?? []).map((p) => p.jemaat_id));
+    const remaining = all.filter((j) => !pelayanIds.has(j.id));
+    if (!pickerQ) return remaining;
+    const lc = pickerQ.toLowerCase();
+    return remaining.filter((j) => j.nama_lengkap.toLowerCase().includes(lc));
+  });
 
   function openCreate() {
-    editing = null;
-    form = { jemaat_id: null, catatan: null, service_type_ids: [] };
-    errors = {};
-    showForm = true;
-  }
-  function openEdit(p: Pelayan) {
-    editing = p;
-    form = { jemaat_id: p.jemaat_id, catatan: p.catatan, service_type_ids: [...(p.service_type_ids ?? [])] };
-    errors = {};
+    pickedJemaat = null;
+    pickerQ = '';
+    selectedTypes = [];
+    formCatatan = '';
     showForm = true;
   }
 
-  function toggleST(id: number) {
-    form.service_type_ids = form.service_type_ids.includes(id)
-      ? form.service_type_ids.filter((x) => x !== id)
-      : [...form.service_type_ids, id];
+  function toggleType(id: number) {
+    selectedTypes = selectedTypes.includes(id) ? selectedTypes.filter((x) => x !== id) : [...selectedTypes, id];
   }
 
   const saveMut = createMutation({
     mutationFn: async () => {
-      if (editing) {
-        return pelayanApi.update(editing.id, {
-          catatan: emptyToNull(form.catatan ?? ''),
-          service_type_ids: form.service_type_ids,
-        });
-      }
-      if (!form.jemaat_id) throw new Error('Pilih jemaat');
+      if (!pickedJemaat) throw new Error('Pilih jemaat');
+      if (selectedTypes.length === 0) throw new Error('Pilih jenis pelayanan');
       return pelayanApi.create({
-        jemaat_id: form.jemaat_id,
-        catatan: emptyToNull(form.catatan ?? ''),
-        service_type_ids: form.service_type_ids,
+        jemaat_id: pickedJemaat.id,
+        catatan: emptyToNull(formCatatan),
+        service_type_ids: selectedTypes,
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pelayan'] });
+      toast.show('Pelayan baru ditambahkan');
       showForm = false;
     },
     onError: (e) => {
-      if (e instanceof ApiError) errors = e.fields ?? { _: e.message };
-      else errors = { _: (e as Error).message };
+      toast.show(e instanceof ApiError ? e.message : (e as Error).message);
     },
   });
 
-  const deleteMut = createMutation({
-    mutationFn: (id: number) => pelayanApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pelayan'] }),
-  });
-
-  function submit(e: SubmitEvent) {
-    e.preventDefault();
-    errors = {};
-    $saveMut.mutate();
-  }
-
-  function serviceTypeNames(ids: number[]): string {
-    const all = $stQ.data?.data ?? [];
-    return ids
-      .map((id) => all.find((s) => s.id === id)?.nama)
-      .filter((x): x is string => !!x)
-      .join(', ');
+  function countForServiceType(stId: number): number {
+    return ($listQ.data?.data ?? []).filter((p) => (p.service_type_ids ?? []).includes(stId)).length;
   }
 </script>
 
+{#snippet promoteForm()}
+  <div style="display: flex; flex-direction: column; gap: 14px;">
+    <Field label="Pilih jemaat" required>
+      {#if pickedJemaat}
+        <div class="row" style="background: var(--accent-soft); border-color: transparent;">
+          <Avatar name={pickedJemaat.nama} />
+          <div class="row-body">
+            <div class="row-title">{pickedJemaat.nama}</div>
+            {#if pickedJemaat.panggilan}<div class="row-sub">{pickedJemaat.panggilan}</div>{/if}
+          </div>
+          <button class="icon-btn" type="button" onclick={() => (pickedJemaat = null)} aria-label="Hapus">
+            <Icon name="close" />
+          </button>
+        </div>
+      {:else}
+        <input class="input" placeholder="Cari nama jemaat…" bind:value={pickerQ} />
+        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-top: 6px;">
+          {#each candidates.slice(0, 12) as c (c.id)}
+            <button
+              type="button"
+              onclick={() => (pickedJemaat = { id: c.id, nama: c.nama_lengkap, panggilan: c.nama_panggilan })}
+              style="display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+                     border-radius: 10px; background: var(--surface);
+                     border: 1px solid var(--line); width: 100%; text-align: left;"
+            >
+              <Avatar name={c.nama_lengkap} size="sm" />
+              <div style="flex: 1;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--ink);">{c.nama_lengkap}</div>
+                {#if c.nama_panggilan}
+                  <div style="font-size: 12px; color: var(--ink-3);">{c.nama_panggilan}</div>
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </Field>
+
+    <Field label="Jenis pelayanan" required hint="Pilih satu atau lebih">
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        {#each $stQ.data?.data ?? [] as st (st.id)}
+          <button
+            type="button"
+            class="chip chip-toggle {selectedTypes.includes(st.id) ? 'on' : ''}"
+            onclick={() => toggleType(st.id)}
+          >
+            {#if selectedTypes.includes(st.id)}
+              <Icon name="check" size={14} />
+            {/if}
+            {st.nama}
+          </button>
+        {/each}
+      </div>
+    </Field>
+
+    <Field label="Catatan">
+      <textarea
+        class="textarea"
+        rows="3"
+        bind:value={formCatatan}
+        placeholder="Misal: 'tersedia setiap Minggu kecuali minggu pertama'"
+      ></textarea>
+    </Field>
+  </div>
+{/snippet}
+
 <ProtectedRoute>
   {#snippet children()}
-    <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Pelayan</h1>
-      <button class="btn-primary" onclick={openCreate}><Plus class="h-4 w-4" /> Tambah</button>
-    </div>
+    {#if viewport.isDesktop}
+      <!-- ════════ DESKTOP ════════ -->
+      <DesktopLayout title="Pelayan" subtitle={`${$listQ.data?.data?.length ?? 0} pelayan aktif`}>
+        {#snippet actions()}
+          <button class="dt-btn dt-btn-primary" type="button" onclick={openCreate}>
+            <Icon name="plus" size={16} /> Promosikan jemaat
+          </button>
+        {/snippet}
 
-    {#if $listQ.isLoading}
-      <p>Memuat…</p>
-    {:else if !$listQ.data || $listQ.data.data.length === 0}
-      <p class="text-sm text-muted-foreground">Belum ada pelayan. Tambahkan jemaat sebagai pelayan.</p>
-    {:else}
-      <ul class="space-y-2">
-        {#each $listQ.data.data as p (p.id)}
-          <li class="card flex items-center justify-between p-3">
-            <div>
-              <p class="font-medium">{p.nama_lengkap}</p>
-              <p class="text-xs text-muted-foreground">{serviceTypeNames(p.service_type_ids ?? [])}</p>
-              {#if p.catatan}<p class="text-xs text-muted-foreground">{p.catatan}</p>{/if}
-            </div>
-            <div class="flex gap-1">
-              <button class="btn-ghost p-2" onclick={() => openEdit(p)}><Pencil class="h-4 w-4" /></button>
-              <button class="btn-ghost p-2 text-destructive" onclick={() => confirm(`Hapus pelayan "${p.nama_lengkap}"?`) && $deleteMut.mutate(p.id)}>
-                <Trash2 class="h-4 w-4" />
-              </button>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    {#if showForm}
-      <div class="fixed inset-0 z-40 bg-black/40" role="presentation" onclick={() => (showForm = false)}></div>
-      <div class="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:w-[500px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg">
-        <h2 class="mb-4 text-lg font-semibold">{editing ? 'Ubah Pelayan' : 'Tambah Pelayan'}</h2>
-        <form onsubmit={submit} class="space-y-3">
-          <div class="field">
-            <label class="label" for="p-jemaat">Jemaat *</label>
-            <select id="p-jemaat" class="input" disabled={!!editing} bind:value={form.jemaat_id}>
-              <option value={null}>-- pilih --</option>
-              {#if $jemaatQ.data}
-                {#each $jemaatQ.data.data as j (j.id)}
-                  <option value={j.id}>{j.nama_lengkap}</option>
-                {/each}
-              {/if}
-            </select>
-          </div>
-          <fieldset>
-            <legend class="label">Jenis Pelayanan</legend>
-            {#if !$stQ.data || $stQ.data.data.length === 0}
-              <p class="text-xs text-muted-foreground">Belum ada jenis pelayanan. Tambahkan dulu di halaman "Jenis Pelayanan".</p>
-            {:else}
-              <div class="grid grid-cols-2 gap-2">
-                {#each $stQ.data.data as st (st.id)}
-                  <label class="flex items-center gap-2 rounded-md border border-border p-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.service_type_ids.includes(st.id)}
-                      onchange={() => toggleST(st.id)}
-                    />
-                    {st.nama}
-                  </label>
-                {/each}
-              </div>
-            {/if}
-          </fieldset>
-          <div class="field">
-            <label class="label" for="p-cat">Catatan</label>
-            <textarea id="p-cat" class="input min-h-[80px]" maxlength="2000" bind:value={form.catatan}></textarea>
-          </div>
-          {#if errors._}<p class="field-error">{errors._}</p>{/if}
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-secondary" onclick={() => (showForm = false)}>Batal</button>
-            <button type="submit" class="btn-primary" disabled={$saveMut.isPending}>
-              {$saveMut.isPending ? 'Menyimpan…' : 'Simpan'}
+        <div class="dt-toolbar">
+          <button class="chip chip-toggle {filter === 0 ? 'on' : ''}" type="button" onclick={() => (filter = 0)}>
+            Semua <span style="opacity: 0.7; margin-left: 4px;">{$listQ.data?.data?.length ?? 0}</span>
+          </button>
+          {#each $stQ.data?.data ?? [] as st (st.id)}
+            <button
+              class="chip chip-toggle {filter === st.id ? 'on' : ''}"
+              type="button"
+              onclick={() => (filter = st.id)}
+            >
+              {st.nama} <span style="opacity: 0.7; margin-left: 4px;">{countForServiceType(st.id)}</span>
             </button>
+          {/each}
+        </div>
+
+        <div class="dt-table-wrap">
+          <table class="dt-table">
+            <thead>
+              <tr>
+                <th>Pelayan</th>
+                <th>Jenis pelayanan</th>
+                <th>Telepon</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each filtered as p (p.id)}
+                {@const names = nameForServiceTypeIds(p.service_type_ids ?? [])}
+                {@const j = jemaatById(p.jemaat_id)}
+                <tr onclick={() => push(`/jemaat/${p.jemaat_id}`)}>
+                  <td>
+                    <div class="dt-cell-primary">
+                      <Avatar name={p.nama_lengkap} size="sm" />
+                      <div>
+                        <div>{p.nama_lengkap}</div>
+                        {#if p.nama_panggilan}<div class="dt-cell-meta">{p.nama_panggilan}</div>{/if}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                      {#each names as n, i (i)}
+                        <span class="chip chip-accent dt-chip-sm">{n}</span>
+                      {/each}
+                    </div>
+                  </td>
+                  <td class="mono" style="font-size: 13px;">{j?.nomor_telepon || '—'}</td>
+                  <td style="width: 40px;">
+                    <button class="icon-btn" type="button" style="width: 28px; height: 28px;" aria-label="Lainnya">
+                      <Icon name="more" size={16} />
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+              {#if filtered.length === 0}
+                <tr>
+                  <td colspan="4" style="padding: 32px; text-align: center; color: var(--ink-3);">
+                    {$listQ.isLoading ? 'Memuat…' : 'Belum ada pelayan.'}
+                  </td>
+                </tr>
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </DesktopLayout>
+
+      <DesktopDialog
+        open={showForm}
+        title="Promosikan jemaat menjadi pelayan"
+        width={520}
+        onClose={() => (showForm = false)}
+      >
+        {@render promoteForm()}
+        {#snippet footer()}
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (showForm = false)}>Batal</button>
+          <button
+            class="dt-btn dt-btn-primary"
+            type="button"
+            disabled={!pickedJemaat || selectedTypes.length === 0 || $saveMut.isPending}
+            onclick={() => $saveMut.mutate()}
+          >
+            {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+          </button>
+        {/snippet}
+      </DesktopDialog>
+    {:else}
+      <!-- ════════ MOBILE (unchanged) ════════ -->
+      <div class="app">
+        <TopBar title="Pelayan" large />
+
+        <div class="app-scroll" style="padding-bottom: 80px;">
+          <div style="padding: 0 16px 12px; display: flex; gap: 8px; overflow-x: auto;" class="no-scrollbar">
+            <button class="chip chip-toggle {filter === 0 ? 'on' : ''}" type="button" onclick={() => (filter = 0)}>
+              Semua <span style="opacity: 0.7; margin-left: 4px;">{$listQ.data?.data?.length ?? 0}</span>
+            </button>
+            {#each $stQ.data?.data ?? [] as st (st.id)}
+              <button class="chip chip-toggle {filter === st.id ? 'on' : ''}" type="button" onclick={() => (filter = st.id)}>
+                {st.nama} <span style="opacity: 0.7; margin-left: 4px;">{countForServiceType(st.id)}</span>
+              </button>
+            {/each}
           </div>
-        </form>
+
+          <div class="list">
+            {#if $listQ.isLoading}
+              <div class="row" style="justify-content: center; color: var(--ink-3);">Memuat…</div>
+            {:else if filtered.length === 0}
+              <div class="empty">
+                <div class="empty-icon"><Icon name="grid" /></div>
+                <div class="empty-title">Belum ada pelayan</div>
+                <div class="empty-sub">Tambahkan jemaat sebagai pelayan untuk mulai mengatur jadwal.</div>
+              </div>
+            {:else}
+              {#each filtered as p (p.id)}
+                {@const names = nameForServiceTypeIds(p.service_type_ids ?? [])}
+                <button
+                  class="row row-tap"
+                  type="button"
+                  onclick={() => push(`/jemaat/${p.jemaat_id}`)}
+                  style="align-items: flex-start; padding-top: 14px; padding-bottom: 14px; min-height: auto;"
+                >
+                  <Avatar name={p.nama_lengkap} />
+                  <div class="row-body">
+                    <div class="row-title">{p.nama_lengkap}</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                      {#each names as n, i (i)}
+                        <span class="chip" style="height: 22px; font-size: 11px; padding: 0 8px;">{n}</span>
+                      {/each}
+                    </div>
+                  </div>
+                </button>
+              {/each}
+            {/if}
+          </div>
+        </div>
+
+        <button class="fab with-label" type="button" onclick={openCreate}>
+          <Icon name="plus" /> Promosikan
+        </button>
+
+        <BottomNav />
+
+        <Sheet open={showForm} onClose={() => (showForm = false)} title="Tambah pelayan">
+          {@render promoteForm()}
+
+          {#snippet footer()}
+            <button class="btn btn-ghost" type="button" style="flex: 1;" onclick={() => (showForm = false)}>
+              Batal
+            </button>
+            <button
+              class="btn btn-primary"
+              type="button"
+              style="flex: 2;"
+              disabled={!pickedJemaat || selectedTypes.length === 0 || $saveMut.isPending}
+              onclick={() => $saveMut.mutate()}
+            >
+              {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+            </button>
+          {/snippet}
+        </Sheet>
       </div>
     {/if}
   {/snippet}

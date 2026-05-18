@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { link } from 'svelte-spa-router';
+  import { push } from 'svelte-spa-router';
+  import Icon from '$lib/components/Icon.svelte';
 </script>
 
-<div class="flex min-h-screen items-center justify-center p-4">
-  <div class="text-center">
-    <h1 class="text-3xl font-bold">404</h1>
-    <p class="text-muted-foreground">Halaman tidak ditemukan.</p>
-    <a href="/" use:link class="btn-primary mt-4 inline-block">Kembali</a>
+<div class="app">
+  <div class="app-scroll">
+    <div class="empty" style="margin-top: 80px;">
+      <div class="empty-icon"><Icon name="help" /></div>
+      <div class="empty-title">Halaman tidak ditemukan</div>
+      <div class="empty-sub">Coba kembali ke beranda.</div>
+      <button class="btn btn-primary" type="button" style="margin-top: 16px;" onclick={() => push('/')}>
+        Ke beranda
+      </button>
+    </div>
   </div>
 </div>

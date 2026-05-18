@@ -3,16 +3,38 @@
   import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { serviceTypesApi, type ServiceTypeWrite } from '$lib/api/service-types';
+  import { pelayanApi } from '$lib/api/pelayan';
   import { ApiError } from '$lib/api/client';
-  import { Plus, Pencil, Trash2 } from 'lucide-svelte';
-  import type { ServiceType } from '$lib/types';
+  import { push } from 'svelte-spa-router';
   import { emptyToNull } from '$lib/utils/format';
+  import { toast } from '$lib/stores/toast.svelte';
+  import { viewport } from '$lib/stores/viewport.svelte';
+  import type { ServiceType } from '$lib/types';
+  import TopBar from '$lib/components/TopBar.svelte';
+  import Icon from '$lib/components/Icon.svelte';
+  import Sheet from '$lib/components/Sheet.svelte';
+  import Field from '$lib/components/Field.svelte';
+  import DesktopLayout from '$lib/components/DesktopLayout.svelte';
+  import DesktopDialog from '$lib/components/DesktopDialog.svelte';
 
   const qc = useQueryClient();
-  const listQ = createQuery(toStore(() => ({
-    queryKey: ['service-types'],
-    queryFn: () => serviceTypesApi.list(),
-  })));
+
+  const listQ = createQuery(
+    toStore(() => ({
+      queryKey: ['service-types'],
+      queryFn: () => serviceTypesApi.list(),
+    })),
+  );
+  const pelayanQ = createQuery(
+    toStore(() => ({
+      queryKey: ['pelayan', 'all'],
+      queryFn: () => pelayanApi.list({ limit: 500, offset: 0 }),
+    })),
+  );
+
+  function pelayanCountForServiceType(stId: number): number {
+    return ($pelayanQ.data?.data ?? []).filter((p) => (p.service_type_ids ?? []).includes(stId)).length;
+  }
 
   let showForm = $state(false);
   let editing = $state<ServiceType | null>(null);
@@ -21,7 +43,7 @@
 
   function openCreate() {
     editing = null;
-    form = { nama: '', deskripsi: null, urutan: 0 };
+    form = { nama: '', deskripsi: null, urutan: ($listQ.data?.data?.length ?? 0) + 1 };
     errors = {};
     showForm = true;
   }
@@ -44,13 +66,11 @@
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['service-types'] });
+      toast.show(editing ? 'Jenis pelayanan diperbarui' : 'Jenis pelayanan ditambahkan');
       showForm = false;
     },
     onError: (e) => {
-      if (e instanceof ApiError) {
-        if (e.fields) errors = e.fields;
-        else errors = { nama: e.message };
-      }
+      if (e instanceof ApiError) errors = e.fields ?? { nama: e.message };
     },
   });
 
@@ -59,15 +79,15 @@
     onSuccess: () => qc.invalidateQueries({ queryKey: ['service-types'] }),
     onError: (e) => {
       if (e instanceof ApiError && e.status === 409) {
-        alert('Tidak dapat hapus: masih dipakai pada jadwal.');
+        toast.show('Tidak dapat hapus: masih dipakai pada jadwal.');
       } else {
-        alert('Gagal menghapus.');
+        toast.show('Gagal menghapus.');
       }
     },
   });
 
-  function submit(e: SubmitEvent) {
-    e.preventDefault();
+  function submit(e?: Event) {
+    e?.preventDefault();
     errors = {};
     if (!form.nama.trim()) {
       errors = { nama: 'Wajib diisi' };
@@ -75,61 +95,200 @@
     }
     $saveMut.mutate(form);
   }
+
+  function iconForName(name: string): 'mic' | 'music' | 'doc' | 'person' | 'sparkle' | 'tag' {
+    const n = name.toLowerCase();
+    if (n.includes('pujian') || n.includes('worship') || n.includes('pemimpin')) return 'mic';
+    if (n.includes('singer') || n.includes('musisi') || n.includes('music')) return 'music';
+    if (n.includes('multimedia') || n.includes('slide') || n.includes('sound')) return 'doc';
+    if (n.includes('usher') || n.includes('penyambut')) return 'person';
+    if (n.includes('doa')) return 'sparkle';
+    return 'tag';
+  }
+
+  function back() {
+    history.length > 1 ? history.back() : push('/more');
+  }
 </script>
+
+{#snippet stForm()}
+  <form onsubmit={submit} style="display: flex; flex-direction: column; gap: 14px;">
+    <Field label="Nama" required error={errors.nama}>
+      <input class="input" bind:value={form.nama} placeholder="contoh: Worship Leader" />
+    </Field>
+    <Field label="Deskripsi">
+      <input class="input" bind:value={form.deskripsi} />
+    </Field>
+    <Field label="Urutan" hint="Menentukan urutan tampil di jadwal">
+      <input class="input" type="number" bind:value={form.urutan} />
+    </Field>
+  </form>
+{/snippet}
 
 <ProtectedRoute>
   {#snippet children()}
-    <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Jenis Pelayanan</h1>
-      <button class="btn-primary" onclick={openCreate}><Plus class="h-4 w-4" /> Tambah</button>
-    </div>
+    {#if viewport.isDesktop}
+      <!-- ════════ DESKTOP ════════ -->
+      <DesktopLayout title="Jenis Pelayanan" subtitle="Atur jenis pelayanan yang dipakai di kebaktian">
+        {#snippet actions()}
+          <button class="dt-btn dt-btn-primary" type="button" onclick={openCreate}>
+            <Icon name="plus" size={16} /> Tambah jenis
+          </button>
+        {/snippet}
 
-    {#if $listQ.isLoading}
-      <p>Memuat…</p>
-    {:else if !$listQ.data || $listQ.data.data.length === 0}
-      <p class="text-sm text-muted-foreground">Belum ada jenis pelayanan. Contoh: Worship Leader, Singer, Multimedia.</p>
+        <div class="dt-table-wrap" style="max-width: 720px;">
+          <table class="dt-table">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Deskripsi</th>
+                <th class="num-r">Urutan</th>
+                <th class="num-r">Pelayan</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each $listQ.data?.data ?? [] as st (st.id)}
+                <tr onclick={() => openEdit(st)}>
+                  <td>
+                    <div class="dt-cell-primary">
+                      <div
+                        style="width: 28px; height: 28px; border-radius: 7px;
+                               background: var(--surface-2); color: var(--ink-2);
+                               display: flex; align-items: center; justify-content: center;"
+                      >
+                        <Icon name={iconForName(st.nama)} size={14} />
+                      </div>
+                      {st.nama}
+                    </div>
+                  </td>
+                  <td style="color: var(--ink-2);">{st.deskripsi ?? '—'}</td>
+                  <td class="num-r num">{st.urutan}</td>
+                  <td class="num-r num">{pelayanCountForServiceType(st.id)}</td>
+                  <td style="width: 80px; text-align: right;">
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      style="width: 28px; height: 28px;"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        openEdit(st);
+                      }}
+                      aria-label="Ubah"
+                    >
+                      <Icon name="edit" size={14} />
+                    </button>
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      style="width: 28px; height: 28px; color: var(--danger);"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Hapus "${st.nama}"?`)) $deleteMut.mutate(st.id);
+                      }}
+                      aria-label="Hapus"
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+              {#if ($listQ.data?.data ?? []).length === 0}
+                <tr>
+                  <td colspan="5" style="padding: 32px; text-align: center; color: var(--ink-3);">
+                    {$listQ.isLoading ? 'Memuat…' : 'Belum ada jenis pelayanan.'}
+                  </td>
+                </tr>
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </DesktopLayout>
+
+      <DesktopDialog
+        open={showForm}
+        title={editing ? 'Ubah jenis pelayanan' : 'Tambah jenis pelayanan'}
+        width={480}
+        onClose={() => (showForm = false)}
+      >
+        {@render stForm()}
+        {#snippet footer()}
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (showForm = false)}>Batal</button>
+          <button
+            class="dt-btn dt-btn-primary"
+            type="button"
+            disabled={$saveMut.isPending}
+            onclick={() => submit()}
+          >
+            {$saveMut.isPending ? 'Menyimpan…' : editing ? 'Simpan' : 'Tambah'}
+          </button>
+        {/snippet}
+      </DesktopDialog>
     {:else}
-      <ul class="space-y-2">
-        {#each $listQ.data.data as s (s.id)}
-          <li class="card flex items-center justify-between p-3">
-            <div>
-              <p class="font-medium">{s.nama}</p>
-              {#if s.deskripsi}<p class="text-xs text-muted-foreground">{s.deskripsi}</p>{/if}
-            </div>
-            <div class="flex gap-1">
-              <button class="btn-ghost p-2" onclick={() => openEdit(s)}><Pencil class="h-4 w-4" /></button>
-              <button class="btn-ghost p-2 text-destructive" onclick={() => confirm(`Hapus "${s.nama}"?`) && $deleteMut.mutate(s.id)}><Trash2 class="h-4 w-4" /></button>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+      <!-- ════════ MOBILE (unchanged) ════════ -->
+      <div class="app">
+        <TopBar title="Jenis pelayanan">
+          {#snippet leading()}
+            <button class="icon-btn" type="button" onclick={back} aria-label="Kembali"><Icon name="back" /></button>
+          {/snippet}
+        </TopBar>
 
-    {#if showForm}
-      <div class="fixed inset-0 z-40 bg-black/40" role="presentation" onclick={() => (showForm = false)}></div>
-      <div class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-background p-4 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:w-[480px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg">
-        <h2 class="mb-4 text-lg font-semibold">{editing ? 'Ubah Jenis' : 'Tambah Jenis'}</h2>
-        <form onsubmit={submit} class="space-y-3">
-          <div class="field">
-            <label class="label" for="st-nama">Nama *</label>
-            <input id="st-nama" class="input" required maxlength="100" bind:value={form.nama} />
-            {#if errors.nama}<p class="field-error">{errors.nama}</p>{/if}
+        <div class="app-scroll" style="padding-bottom: 80px;">
+          <div style="padding: 8px 18px 4px; font-size: 13px; color: var(--ink-3);">
+            Atur jenis pelayanan yang ada di gereja Anda.
           </div>
-          <div class="field">
-            <label class="label" for="st-desk">Deskripsi</label>
-            <input id="st-desk" class="input" maxlength="500" bind:value={form.deskripsi} />
+          <div class="list">
+            {#if $listQ.isLoading}
+              <div class="row" style="justify-content: center; color: var(--ink-3);">Memuat…</div>
+            {:else if !$listQ.data || $listQ.data.data.length === 0}
+              <div class="empty">
+                <div class="empty-icon"><Icon name="tag" /></div>
+                <div class="empty-title">Belum ada jenis pelayanan</div>
+                <div class="empty-sub">Contoh: Worship Leader, Singer, Musisi, Multimedia.</div>
+              </div>
+            {:else}
+              {#each $listQ.data.data as st (st.id)}
+                <div class="row">
+                  <div
+                    style="width: 36px; height: 36px; border-radius: 10px;
+                           background: var(--surface-2); color: var(--ink-2);
+                           display: flex; align-items: center; justify-content: center;"
+                  >
+                    <Icon name={iconForName(st.nama)} size={18} />
+                  </div>
+                  <div class="row-body">
+                    <div class="row-title">{st.nama}</div>
+                    {#if st.deskripsi}<div class="row-sub">{st.deskripsi}</div>{/if}
+                  </div>
+                  <button class="icon-btn" type="button" onclick={() => openEdit(st)} aria-label="Ubah"><Icon name="edit" /></button>
+                </div>
+              {/each}
+            {/if}
           </div>
-          <div class="field">
-            <label class="label" for="st-urutan">Urutan</label>
-            <input id="st-urutan" type="number" class="input" bind:value={form.urutan} />
-          </div>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-secondary" onclick={() => (showForm = false)}>Batal</button>
-            <button type="submit" class="btn-primary" disabled={$saveMut.isPending}>
-              {$saveMut.isPending ? 'Menyimpan…' : 'Simpan'}
+        </div>
+
+        <button class="fab with-label" type="button" onclick={openCreate}>
+          <Icon name="plus" /> Tambah
+        </button>
+
+        <Sheet open={showForm} onClose={() => (showForm = false)} title={editing ? 'Ubah jenis pelayanan' : 'Tambah jenis pelayanan'}>
+          {@render stForm()}
+
+          {#snippet footer()}
+            <button class="btn btn-ghost" type="button" style="flex: 1;" onclick={() => (showForm = false)}>
+              Batal
             </button>
-          </div>
-        </form>
+            <button
+              class="btn btn-primary"
+              type="button"
+              style="flex: 2;"
+              disabled={$saveMut.isPending}
+              onclick={() => submit()}
+            >
+              {$saveMut.isPending ? 'Menyimpan…' : editing ? 'Simpan' : 'Tambah'}
+            </button>
+          {/snippet}
+        </Sheet>
       </div>
     {/if}
   {/snippet}

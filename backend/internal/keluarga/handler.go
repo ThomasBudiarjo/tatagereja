@@ -22,7 +22,7 @@ type Handler struct {
 }
 
 func NewHandler(q sqlc.Querier, _ *sql.DB) *Handler {
-	return &Handler{q: q, validate: validator.New()}
+	return &Handler{q: q, validate: httpx.NewValidator()}
 }
 
 type writeRequest struct {

@@ -3,52 +3,85 @@
   import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { kebaktianApi, type KebaktianWrite } from '$lib/api/kebaktian';
+  import { serviceTypesApi } from '$lib/api/service-types';
   import { ApiError } from '$lib/api/client';
-  import { link } from 'svelte-spa-router';
-  import { Plus, Pencil, Trash2, Calendar } from 'lucide-svelte';
+  import { push } from 'svelte-spa-router';
   import { emptyToNull } from '$lib/utils/format';
-  import { formatDateTime, localToUTC, utcToLocalInput } from '$lib/utils/date';
-  import type { Kebaktian, Paginated } from '$lib/types';
+  import { localToUTC } from '$lib/utils/date';
+  import { fmtDayMonth, fmtMediumID, fmtTime } from '$lib/utils/idDate';
+  import { toast } from '$lib/stores/toast.svelte';
+  import { viewport } from '$lib/stores/viewport.svelte';
+  import type { Kebaktian, Paginated, ListWrap } from '$lib/types';
+  import TopBar from '$lib/components/TopBar.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import Icon from '$lib/components/Icon.svelte';
+  import Sheet from '$lib/components/Sheet.svelte';
+  import Field from '$lib/components/Field.svelte';
+  import DesktopLayout from '$lib/components/DesktopLayout.svelte';
+  import DesktopDialog from '$lib/components/DesktopDialog.svelte';
 
   const qc = useQueryClient();
-  let limit = $state(25);
-  let offset = $state(0);
 
-  const listQ = createQuery(toStore(() => ({
-    queryKey: ['kebaktian', 'list', limit, offset] as const,
-    queryFn: () => kebaktianApi.list({ limit, offset }) as Promise<Paginated<Kebaktian>>,
-  })));
+  type Filter = 'upcoming' | 'past' | 'all';
+  let filter = $state<Filter>('upcoming');
+
+  const listQ = createQuery(
+    toStore(() => ({
+      queryKey: ['kebaktian', 'list'],
+      queryFn: () =>
+        kebaktianApi.list({ limit: 200, offset: 0 }) as Promise<Paginated<Kebaktian> | ListWrap<Kebaktian>>,
+    })),
+  );
+  const stQ = createQuery(
+    toStore(() => ({
+      queryKey: ['service-types'],
+      queryFn: () => serviceTypesApi.list(),
+    })),
+  );
+  const jadwalCountsQ = createQuery(
+    toStore(() => ({
+      queryKey: ['kebaktian', 'jadwal-counts', ($listQ.data?.data ?? []).map((k) => k.id).join(',')] as const,
+      enabled: ($listQ.data?.data ?? []).length > 0,
+      queryFn: async () => {
+        const ks = $listQ.data?.data ?? [];
+        const results = await Promise.all(
+          ks.map((k) =>
+            kebaktianApi
+              .getJadwal(k.id)
+              .then((r) => ({ id: k.id, filled: r.data.filter((s) => s.pelayan_id !== null).length }))
+              .catch(() => ({ id: k.id, filled: 0 })),
+          ),
+        );
+        const map: Record<number, number> = {};
+        for (const r of results) map[r.id] = r.filled;
+        return map;
+      },
+    })),
+  );
+
+  const total = $derived($stQ.data?.data?.length ?? 0);
+
+  const filtered = $derived.by(() => {
+    const all = ($listQ.data?.data ?? []).slice().sort((a, b) => a.waktu_mulai.localeCompare(b.waktu_mulai));
+    const now = Date.now();
+    if (filter === 'upcoming') return all.filter((k) => new Date(k.waktu_mulai).getTime() >= now - 86_400_000);
+    if (filter === 'past') return all.filter((k) => new Date(k.waktu_mulai).getTime() < now - 86_400_000).reverse();
+    return all;
+  });
 
   let showForm = $state(false);
-  let editing = $state<Kebaktian | null>(null);
-  let form = $state<KebaktianWrite & { waktuLocal: string }>({
-    nama: '',
-    waktu_mulai: '',
-    waktuLocal: '',
-    lokasi: null,
-    tema: null,
-    pengkhotbah: null,
-    catatan: null,
-  });
+  let form = $state<{
+    nama: string;
+    waktuLocal: string;
+    lokasi: string | null;
+    tema: string | null;
+    pengkhotbah: string | null;
+    catatan: string | null;
+  }>({ nama: '', waktuLocal: '', lokasi: null, tema: null, pengkhotbah: null, catatan: null });
   let errors = $state<Record<string, string>>({});
 
   function openCreate() {
-    editing = null;
-    form = { nama: '', waktu_mulai: '', waktuLocal: '', lokasi: null, tema: null, pengkhotbah: null, catatan: null };
-    errors = {};
-    showForm = true;
-  }
-  function openEdit(k: Kebaktian) {
-    editing = k;
-    form = {
-      nama: k.nama,
-      waktu_mulai: k.waktu_mulai,
-      waktuLocal: utcToLocalInput(k.waktu_mulai),
-      lokasi: k.lokasi,
-      tema: k.tema,
-      pengkhotbah: k.pengkhotbah,
-      catatan: k.catatan,
-    };
+    form = { nama: '', waktuLocal: '', lokasi: null, tema: null, pengkhotbah: null, catatan: null };
     errors = {};
     showForm = true;
   }
@@ -65,11 +98,11 @@
         pengkhotbah: emptyToNull(form.pengkhotbah ?? ''),
         catatan: emptyToNull(form.catatan ?? ''),
       };
-      if (editing) return kebaktianApi.update(editing.id, payload);
       return kebaktianApi.create(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kebaktian'] });
+      toast.show('Kebaktian ditambahkan');
       showForm = false;
     },
     onError: (e) => {
@@ -78,96 +111,269 @@
     },
   });
 
-  const deleteMut = createMutation({
-    mutationFn: (id: number) => kebaktianApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['kebaktian'] }),
-  });
-
-  function submit(e: SubmitEvent) {
-    e.preventDefault();
+  function submit(e?: Event) {
+    e?.preventDefault();
     errors = {};
     $saveMut.mutate();
   }
+
+  const dayMonth = fmtDayMonth;
 </script>
+
+{#snippet kebaktianForm()}
+  <form onsubmit={submit} style="display: flex; flex-direction: column; gap: 14px;">
+    <Field label="Nama" required error={errors.nama}>
+      <input class="input" bind:value={form.nama} placeholder="Kebaktian Umum / Persekutuan Doa" />
+    </Field>
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px;">
+      <Field label="Tanggal & jam" required error={errors.waktu_mulai}>
+        <input class="input" type="datetime-local" bind:value={form.waktuLocal} />
+      </Field>
+      <Field label="Lokasi">
+        <input class="input" bind:value={form.lokasi} />
+      </Field>
+    </div>
+    <Field label="Tema">
+      <input class="input" bind:value={form.tema} />
+    </Field>
+    <Field label="Pengkhotbah">
+      <input class="input" bind:value={form.pengkhotbah} />
+    </Field>
+    {#if errors._}<p class="field-error">{errors._}</p>{/if}
+  </form>
+{/snippet}
 
 <ProtectedRoute>
   {#snippet children()}
-    <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Kebaktian</h1>
-      <button class="btn-primary" onclick={openCreate}><Plus class="h-4 w-4" /> Tambah</button>
-    </div>
+    {#if viewport.isDesktop}
+      <!-- ════════ DESKTOP ════════ -->
+      <DesktopLayout
+        title="Kebaktian"
+        subtitle={`${filtered.length} kebaktian ${filter === 'upcoming' ? 'akan datang' : filter === 'past' ? 'telah lewat' : 'tercatat'}`}
+      >
+        {#snippet actions()}
+          <button class="dt-btn dt-btn-outline" type="button">
+            <Icon name="calendar" size={16} /> Tampilan kalender
+          </button>
+          <button class="dt-btn dt-btn-primary" type="button" onclick={openCreate}>
+            <Icon name="plus" size={16} /> Tambah kebaktian
+          </button>
+        {/snippet}
 
-    {#if $listQ.isLoading}
-      <p>Memuat…</p>
-    {:else if !$listQ.data || $listQ.data.data.length === 0}
-      <p class="text-sm text-muted-foreground">Belum ada kebaktian.</p>
-    {:else}
-      <ul class="space-y-2">
-        {#each $listQ.data.data as k (k.id)}
-          <li class="card flex items-center justify-between p-3">
-            <div class="min-w-0">
-              <p class="font-medium">{k.nama}</p>
-              <p class="text-xs text-muted-foreground">{formatDateTime(k.waktu_mulai)}</p>
-              {#if k.lokasi}<p class="text-xs text-muted-foreground">{k.lokasi}</p>{/if}
-            </div>
-            <div class="flex shrink-0 gap-1">
-              <a class="btn-ghost p-2" href={`/kebaktian/${k.id}/jadwal`} use:link aria-label="Jadwal"><Calendar class="h-4 w-4" /></a>
-              <button class="btn-ghost p-2" onclick={() => openEdit(k)}><Pencil class="h-4 w-4" /></button>
-              <button class="btn-ghost p-2 text-destructive" onclick={() => confirm(`Hapus kebaktian "${k.nama}"?`) && $deleteMut.mutate(k.id)}>
-                <Trash2 class="h-4 w-4" />
-              </button>
-            </div>
-          </li>
-        {/each}
-      </ul>
-      <div class="mt-4 flex items-center justify-between text-sm">
-        <p class="text-muted-foreground">{$listQ.data.data.length} dari {$listQ.data.total}</p>
-        <div class="flex gap-2">
-          <button class="btn-secondary" disabled={offset === 0} onclick={() => (offset = Math.max(0, offset - limit))}>Prev</button>
-          <button class="btn-secondary"
-            disabled={offset + $listQ.data.data.length >= $listQ.data.total}
-            onclick={() => (offset = offset + limit)}>Next</button>
+        <div class="dt-toolbar">
+          <button class="chip chip-toggle {filter === 'upcoming' ? 'on' : ''}" type="button" onclick={() => (filter = 'upcoming')}>
+            Akan datang
+          </button>
+          <button class="chip chip-toggle {filter === 'past' ? 'on' : ''}" type="button" onclick={() => (filter = 'past')}>
+            Lewat
+          </button>
+          <button class="chip chip-toggle {filter === 'all' ? 'on' : ''}" type="button" onclick={() => (filter = 'all')}>
+            Semua
+          </button>
         </div>
-      </div>
-    {/if}
 
-    {#if showForm}
-      <div class="fixed inset-0 z-40 bg-black/40" role="presentation" onclick={() => (showForm = false)}></div>
-      <div class="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl md:inset-auto md:left-1/2 md:top-1/2 md:w-[560px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg">
-        <h2 class="mb-4 text-lg font-semibold">{editing ? 'Ubah Kebaktian' : 'Tambah Kebaktian'}</h2>
-        <form onsubmit={submit} class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div class="field md:col-span-2">
-            <label class="label" for="kb-nama">Nama *</label>
-            <input id="kb-nama" class="input" required maxlength="200" bind:value={form.nama} />
-          </div>
-          <div class="field md:col-span-2">
-            <label class="label" for="kb-waktu">Waktu Mulai *</label>
-            <input id="kb-waktu" type="datetime-local" class="input" required bind:value={form.waktuLocal} />
-          </div>
-          <div class="field">
-            <label class="label" for="kb-lokasi">Lokasi</label>
-            <input id="kb-lokasi" class="input" maxlength="200" bind:value={form.lokasi} />
-          </div>
-          <div class="field">
-            <label class="label" for="kb-pengkhotbah">Pengkhotbah</label>
-            <input id="kb-pengkhotbah" class="input" maxlength="200" bind:value={form.pengkhotbah} />
-          </div>
-          <div class="field md:col-span-2">
-            <label class="label" for="kb-tema">Tema</label>
-            <input id="kb-tema" class="input" maxlength="300" bind:value={form.tema} />
-          </div>
-          <div class="field md:col-span-2">
-            <label class="label" for="kb-cat">Catatan</label>
-            <textarea id="kb-cat" class="input min-h-[80px]" maxlength="2000" bind:value={form.catatan}></textarea>
-          </div>
-          {#if errors._}<p class="field-error md:col-span-2">{errors._}</p>{/if}
-          <div class="md:col-span-2 flex justify-end gap-2">
-            <button type="button" class="btn-secondary" onclick={() => (showForm = false)}>Batal</button>
-            <button type="submit" class="btn-primary" disabled={$saveMut.isPending}>
-              {$saveMut.isPending ? 'Menyimpan…' : 'Simpan'}
+        <div class="dt-table-wrap">
+          <table class="dt-table">
+            <thead>
+              <tr>
+                <th>Kebaktian</th>
+                <th>Tanggal</th>
+                <th>Pengkhotbah</th>
+                <th>Tema</th>
+                <th class="num-r">Jadwal</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each filtered as k (k.id)}
+                {@const dm = dayMonth(k.waktu_mulai)}
+                {@const filled = ($jadwalCountsQ.data ?? {})[k.id] ?? 0}
+                {@const chipCls = filled === total && total > 0
+                  ? 'chip-ok'
+                  : filled === 0
+                  ? 'chip-warn'
+                  : 'chip-accent'}
+                <tr onclick={() => push(`/kebaktian/${k.id}`)}>
+                  <td>
+                    <div class="dt-cell-primary">
+                      <div class="dt-date-tile" style="width: 40px; height: 44px;">
+                        <div class="m">{dm.month}</div>
+                        <div class="d" style="font-size: 16px;">{dm.day}</div>
+                      </div>
+                      <div>
+                        <div>{k.nama}</div>
+                        <div class="dt-cell-meta">{k.lokasi ?? '—'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    {fmtMediumID(k.waktu_mulai)}
+                    <div class="dt-cell-meta">{fmtTime(k.waktu_mulai)}</div>
+                  </td>
+                  <td>
+                    {#if k.pengkhotbah}
+                      {k.pengkhotbah}
+                    {:else}
+                      <span style="color: var(--ink-4);">—</span>
+                    {/if}
+                  </td>
+                  <td style="color: var(--ink-2); font-style: {k.tema ? 'italic' : 'normal'};">
+                    {#if k.tema}
+                      &ldquo;{k.tema}&rdquo;
+                    {:else}
+                      <span style="color: var(--ink-4); font-style: normal;">—</span>
+                    {/if}
+                  </td>
+                  <td class="num-r">
+                    <span class="chip {chipCls}">{filled}/{total}</span>
+                  </td>
+                  <td style="width: 90px; text-align: right;">
+                    <button
+                      class="dt-btn dt-btn-outline dt-btn-sm"
+                      type="button"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        push(`/kebaktian/${k.id}/jadwal`);
+                      }}
+                    >
+                      Atur →
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+              {#if filtered.length === 0}
+                <tr>
+                  <td colspan="6" style="padding: 32px; text-align: center; color: var(--ink-3);">
+                    {$listQ.isLoading ? 'Memuat…' : 'Belum ada kebaktian.'}
+                  </td>
+                </tr>
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </DesktopLayout>
+
+      <DesktopDialog
+        open={showForm}
+        title="Tambah kebaktian"
+        width={560}
+        onClose={() => (showForm = false)}
+      >
+        {@render kebaktianForm()}
+        {#snippet footer()}
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (showForm = false)}>Batal</button>
+          <button
+            class="dt-btn dt-btn-primary"
+            type="button"
+            disabled={$saveMut.isPending}
+            onclick={() => submit()}
+          >
+            {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+          </button>
+        {/snippet}
+      </DesktopDialog>
+    {:else}
+      <!-- ════════ MOBILE (unchanged) ════════ -->
+      <div class="app">
+        <TopBar title="Kebaktian" large>
+          {#snippet trailing()}
+            <button class="icon-btn" type="button" aria-label="Kalender"><Icon name="calendar" /></button>
+          {/snippet}
+        </TopBar>
+
+        <div class="app-scroll" style="padding-bottom: 80px;">
+          <div style="padding: 0 16px 12px; display: flex; gap: 8px;">
+            <button class="chip chip-toggle {filter === 'upcoming' ? 'on' : ''}" type="button" onclick={() => (filter = 'upcoming')}>
+              Akan datang
+            </button>
+            <button class="chip chip-toggle {filter === 'past' ? 'on' : ''}" type="button" onclick={() => (filter = 'past')}>
+              Lewat
+            </button>
+            <button class="chip chip-toggle {filter === 'all' ? 'on' : ''}" type="button" onclick={() => (filter = 'all')}>
+              Semua
             </button>
           </div>
-        </form>
+
+          <div class="list">
+            {#if $listQ.isLoading}
+              <div class="row" style="justify-content: center; color: var(--ink-3);">Memuat…</div>
+            {:else if filtered.length === 0}
+              <div class="empty">
+                <div class="empty-icon"><Icon name="calendar" /></div>
+                <div class="empty-title">Belum ada kebaktian</div>
+                <div class="empty-sub">Tambahkan kebaktian untuk mulai mengatur jadwal pelayanan.</div>
+              </div>
+            {:else}
+              {#each filtered as k (k.id)}
+                {@const dm = dayMonth(k.waktu_mulai)}
+                {@const filled = ($jadwalCountsQ.data ?? {})[k.id] ?? 0}
+                {@const chipCls = filled === total && total > 0 ? 'chip-ok' : filled === 0 ? 'chip-warn' : 'chip-accent'}
+                <button
+                  class="row row-tap"
+                  type="button"
+                  onclick={() => push(`/kebaktian/${k.id}`)}
+                  style="align-items: flex-start; padding-top: 14px; padding-bottom: 14px; flex-direction: column; gap: 10px; min-height: auto;"
+                >
+                  <div style="display: flex; align-items: flex-start; gap: 12px; width: 100%;">
+                    <div
+                      style="width: 48px; min-width: 48px; height: 56px; background: var(--accent-soft);
+                             border-radius: 12px; display: flex; flex-direction: column;
+                             align-items: center; justify-content: center; color: var(--accent-ink);"
+                    >
+                      <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em;">{dm.month}</div>
+                      <div style="font-size: 20px; font-weight: 800; line-height: 1; letter-spacing: -0.02em;">
+                        {dm.day}
+                      </div>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em;">
+                        {k.nama}
+                      </div>
+                      <div style="font-size: 13px; color: var(--ink-3); margin-top: 1px;">
+                        {fmtMediumID(k.waktu_mulai)}
+                      </div>
+                      <div style="font-size: 12px; color: var(--ink-3); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                        <Icon name="map" size={12} />
+                        {k.lokasi ?? '—'}{k.pengkhotbah ? ` · ${k.pengkhotbah}` : ''}
+                      </div>
+                    </div>
+                    <span class="chip {chipCls}">{filled}/{total}</span>
+                  </div>
+                  {#if k.tema}
+                    <div style="font-size: 12px; color: var(--ink-2); background: var(--surface-2); padding: 6px 10px; border-radius: 8px; align-self: stretch; margin-left: 60px;">
+                      &ldquo;{k.tema}&rdquo;
+                    </div>
+                  {/if}
+                </button>
+              {/each}
+            {/if}
+          </div>
+        </div>
+
+        <button class="fab with-label" type="button" onclick={openCreate}>
+          <Icon name="plus" /> Tambah
+        </button>
+
+        <BottomNav />
+
+        <Sheet open={showForm} onClose={() => (showForm = false)} title="Tambah kebaktian">
+          {@render kebaktianForm()}
+
+          {#snippet footer()}
+            <button class="btn btn-ghost" type="button" style="flex: 1;" onclick={() => (showForm = false)}>
+              Batal
+            </button>
+            <button
+              class="btn btn-primary"
+              type="button"
+              style="flex: 2;"
+              disabled={$saveMut.isPending}
+              onclick={() => submit()}
+            >
+              {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+            </button>
+          {/snippet}
+        </Sheet>
       </div>
     {/if}
   {/snippet}
