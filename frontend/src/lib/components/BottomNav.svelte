@@ -14,7 +14,7 @@
 
   function isActive(path: string): boolean {
     if (path === '/') return $location === '/';
-    return $location === path;
+    return $location === path || $location.startsWith(path + '/');
   }
 </script>
 

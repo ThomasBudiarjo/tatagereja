@@ -1,19 +1,27 @@
 <script lang="ts">
   import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { kebaktianApi } from '$lib/api/kebaktian';
+  import { kebaktianApi, type KebaktianWrite } from '$lib/api/kebaktian';
   import { serviceTypesApi } from '$lib/api/service-types';
+  import { ApiError } from '$lib/api/client';
   import { push } from 'svelte-spa-router';
   import { fmtFullID, fmtRelativeID } from '$lib/utils/idDate';
+  import { emptyToNull } from '$lib/utils/format';
+  import { localToUTC, utcToLocalInput } from '$lib/utils/date';
   import { viewport } from '$lib/stores/viewport.svelte';
+  import { toast } from '$lib/stores/toast.svelte';
   import TopBar from '$lib/components/TopBar.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
+  import Sheet from '$lib/components/Sheet.svelte';
+  import Field from '$lib/components/Field.svelte';
   import DesktopLayout from '$lib/components/DesktopLayout.svelte';
+  import DesktopDialog from '$lib/components/DesktopDialog.svelte';
 
   let { params } = $props<{ params: { id: string } }>();
   const id = $derived(Number(params.id));
+  const qc = useQueryClient();
 
   const kebaktianQ = createQuery(
     toStore(() => ({
@@ -36,6 +44,63 @@
 
   const total = $derived($stQ.data?.data?.length ?? 0);
   const filled = $derived(($jadwalQ.data?.data ?? []).filter((s) => s.pelayan_id !== null).length);
+
+  let showEditForm = $state(false);
+  let confirmDelete = $state(false);
+  let editForm = $state<{ nama: string; waktuLocal: string; lokasi: string | null; tema: string | null; pengkhotbah: string | null; catatan: string | null }>({
+    nama: '', waktuLocal: '', lokasi: null, tema: null, pengkhotbah: null, catatan: null,
+  });
+  let editErrors = $state<Record<string, string>>({});
+
+  function openEdit() {
+    const k = $kebaktianQ.data;
+    if (!k) return;
+    editForm = {
+      nama: k.nama,
+      waktuLocal: utcToLocalInput(k.waktu_mulai),
+      lokasi: k.lokasi,
+      tema: k.tema,
+      pengkhotbah: k.pengkhotbah,
+      catatan: k.catatan,
+    };
+    editErrors = {};
+    showEditForm = true;
+  }
+
+  const editMut = createMutation({
+    mutationFn: async () => {
+      if (!editForm.nama.trim()) throw new Error('Nama wajib diisi');
+      if (!editForm.waktuLocal) throw new Error('Waktu wajib diisi');
+      const payload: KebaktianWrite = {
+        nama: editForm.nama.trim(),
+        waktu_mulai: localToUTC(editForm.waktuLocal),
+        lokasi: emptyToNull(editForm.lokasi ?? ''),
+        tema: emptyToNull(editForm.tema ?? ''),
+        pengkhotbah: emptyToNull(editForm.pengkhotbah ?? ''),
+        catatan: emptyToNull(editForm.catatan ?? ''),
+      };
+      return kebaktianApi.update(id, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kebaktian'] });
+      toast.show('Kebaktian diperbarui');
+      showEditForm = false;
+    },
+    onError: (e) => {
+      if (e instanceof ApiError) editErrors = e.fields ?? { _: e.message };
+      else editErrors = { _: (e as Error).message };
+    },
+  });
+
+  const deleteMut = createMutation({
+    mutationFn: () => kebaktianApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kebaktian'] });
+      push('/kebaktian');
+      toast.show('Kebaktian dihapus');
+    },
+    onError: () => toast.show('Gagal menghapus kebaktian'),
+  });
 
   function relativeLabel(utc: string | undefined): string {
     if (!utc) return '';
@@ -61,6 +126,29 @@
   }
 </script>
 
+{#snippet kebaktianEditForm()}
+  <form style="display: flex; flex-direction: column; gap: 14px;">
+    <Field label="Nama" required error={editErrors.nama}>
+      <input class="input" bind:value={editForm.nama} placeholder="Kebaktian Umum / Persekutuan Doa" />
+    </Field>
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px;">
+      <Field label="Tanggal & jam" required error={editErrors.waktu_mulai}>
+        <input class="input" type="datetime-local" bind:value={editForm.waktuLocal} />
+      </Field>
+      <Field label="Lokasi">
+        <input class="input" bind:value={editForm.lokasi} />
+      </Field>
+    </div>
+    <Field label="Tema">
+      <input class="input" bind:value={editForm.tema} />
+    </Field>
+    <Field label="Pengkhotbah">
+      <input class="input" bind:value={editForm.pengkhotbah} />
+    </Field>
+    {#if editErrors._}<p class="field-error">{editErrors._}</p>{/if}
+  </form>
+{/snippet}
+
 <ProtectedRoute>
   {#snippet children()}
     {#if viewport.isDesktop}
@@ -72,6 +160,21 @@
           <button class="dt-btn dt-btn-outline" type="button" onclick={() => push('/kebaktian')}>
             <Icon name="back" size={16} /> Ke daftar
           </button>
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={openEdit}>
+            <Icon name="edit" size={16} /> Edit
+          </button>
+          {#if confirmDelete}
+            <button class="dt-btn dt-btn-primary" type="button" style="background: var(--danger);" onclick={() => $deleteMut.mutate()}>
+              Yakin hapus?
+            </button>
+            <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (confirmDelete = false)}>
+              Batal
+            </button>
+          {:else}
+            <button class="dt-btn dt-btn-ghost" type="button" style="color: var(--danger);" onclick={() => (confirmDelete = true)}>
+              <Icon name="trash" size={16} /> Hapus
+            </button>
+          {/if}
           <button class="dt-btn dt-btn-primary" type="button" onclick={() => push(`/kebaktian/${id}/jadwal`)}>
             <Icon name="edit" size={16} /> Atur jadwal
           </button>
@@ -134,6 +237,26 @@
           {/if}
         </div>
       </DesktopLayout>
+
+      <DesktopDialog
+        open={showEditForm}
+        title="Edit kebaktian"
+        width={560}
+        onClose={() => (showEditForm = false)}
+      >
+        {@render kebaktianEditForm()}
+        {#snippet footer()}
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (showEditForm = false)}>Batal</button>
+          <button
+            class="dt-btn dt-btn-primary"
+            type="button"
+            disabled={$editMut.isPending}
+            onclick={() => $editMut.mutate()}
+          >
+            {$editMut.isPending ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        {/snippet}
+      </DesktopDialog>
     {:else}
     <div class="app">
       <TopBar>
@@ -141,8 +264,22 @@
           <button class="icon-btn" type="button" onclick={back} aria-label="Kembali"><Icon name="back" /></button>
         {/snippet}
         {#snippet trailing()}
-          <button class="icon-btn" type="button" aria-label="Ubah"><Icon name="edit" /></button>
-          <button class="icon-btn" type="button" aria-label="Lainnya"><Icon name="more" /></button>
+          <button class="icon-btn" type="button" onclick={openEdit} aria-label="Ubah"><Icon name="edit" /></button>
+          {#if confirmDelete}
+            <button
+              class="icon-btn"
+              type="button"
+              style="color: var(--danger); background: var(--danger-soft); border-radius: 8px; padding: 0 8px; font-size: 13px; font-weight: 600;"
+              onclick={() => $deleteMut.mutate()}
+              aria-label="Konfirmasi hapus"
+            >
+              Hapus?
+            </button>
+          {:else}
+            <button class="icon-btn" type="button" onclick={() => (confirmDelete = true)} aria-label="Hapus">
+              <Icon name="trash" />
+            </button>
+          {/if}
         {/snippet}
       </TopBar>
 
@@ -250,6 +387,24 @@
           </div>
         {/if}
       </div>
+
+      <Sheet open={showEditForm} onClose={() => (showEditForm = false)} title="Edit kebaktian">
+        {@render kebaktianEditForm()}
+        {#snippet footer()}
+          <button class="btn btn-ghost" type="button" style="flex: 1;" onclick={() => (showEditForm = false)}>
+            Batal
+          </button>
+          <button
+            class="btn btn-primary"
+            type="button"
+            style="flex: 2;"
+            disabled={$editMut.isPending}
+            onclick={() => $editMut.mutate()}
+          >
+            {$editMut.isPending ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        {/snippet}
+      </Sheet>
     </div>
     {/if}
   {/snippet}

@@ -260,7 +260,20 @@
                     <div class="row-title">{st.nama}</div>
                     {#if st.deskripsi}<div class="row-sub">{st.deskripsi}</div>{/if}
                   </div>
-                  <button class="icon-btn" type="button" onclick={() => openEdit(st)} aria-label="Ubah"><Icon name="edit" /></button>
+                  <button class="icon-btn" type="button" onclick={() => openEdit(st)} aria-label="Ubah">
+                    <Icon name="edit" />
+                  </button>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    style="color: var(--danger);"
+                    onclick={() => {
+                      if (confirm(`Hapus "${st.nama}"?`)) $deleteMut.mutate(st.id);
+                    }}
+                    aria-label="Hapus"
+                  >
+                    <Icon name="trash" />
+                  </button>
                 </div>
               {/each}
             {/if}

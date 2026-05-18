@@ -7,7 +7,7 @@
   import { ApiError } from '$lib/api/client';
   import { push } from 'svelte-spa-router';
   import { emptyToNull } from '$lib/utils/format';
-  import { localToUTC } from '$lib/utils/date';
+  import { localToUTC, utcToLocalInput } from '$lib/utils/date';
   import { fmtDayMonth, fmtMediumID, fmtTime } from '$lib/utils/idDate';
   import { toast } from '$lib/stores/toast.svelte';
   import { viewport } from '$lib/stores/viewport.svelte';
@@ -70,6 +70,8 @@
   });
 
   let showForm = $state(false);
+  let editing = $state<Kebaktian | null>(null);
+  let confirmDeleteId = $state<number | null>(null);
   let form = $state<{
     nama: string;
     waktuLocal: string;
@@ -81,7 +83,22 @@
   let errors = $state<Record<string, string>>({});
 
   function openCreate() {
+    editing = null;
     form = { nama: '', waktuLocal: '', lokasi: null, tema: null, pengkhotbah: null, catatan: null };
+    errors = {};
+    showForm = true;
+  }
+
+  function openEdit(k: Kebaktian) {
+    editing = k;
+    form = {
+      nama: k.nama,
+      waktuLocal: utcToLocalInput(k.waktu_mulai),
+      lokasi: k.lokasi,
+      tema: k.tema,
+      pengkhotbah: k.pengkhotbah,
+      catatan: k.catatan,
+    };
     errors = {};
     showForm = true;
   }
@@ -98,17 +115,28 @@
         pengkhotbah: emptyToNull(form.pengkhotbah ?? ''),
         catatan: emptyToNull(form.catatan ?? ''),
       };
+      if (editing) return kebaktianApi.update(editing.id, payload);
       return kebaktianApi.create(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kebaktian'] });
-      toast.show('Kebaktian ditambahkan');
+      toast.show(editing ? 'Kebaktian diperbarui' : 'Kebaktian ditambahkan');
       showForm = false;
     },
     onError: (e) => {
       if (e instanceof ApiError) errors = e.fields ?? { _: e.message };
       else errors = { _: (e as Error).message };
     },
+  });
+
+  const deleteMut = createMutation({
+    mutationFn: (id: number) => kebaktianApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kebaktian'] });
+      confirmDeleteId = null;
+      toast.show('Kebaktian dihapus');
+    },
+    onError: () => toast.show('Gagal menghapus kebaktian'),
   });
 
   function submit(e?: Event) {
@@ -227,17 +255,44 @@
                   <td class="num-r">
                     <span class="chip {chipCls}">{filled}/{total}</span>
                   </td>
-                  <td style="width: 90px; text-align: right;">
+                  <td style="width: 140px; text-align: right; white-space: nowrap;">
                     <button
                       class="dt-btn dt-btn-outline dt-btn-sm"
                       type="button"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        push(`/kebaktian/${k.id}/jadwal`);
-                      }}
+                      onclick={(e) => { e.stopPropagation(); push(`/kebaktian/${k.id}/jadwal`); }}
                     >
                       Atur →
                     </button>
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      style="width: 28px; height: 28px; margin-left: 4px;"
+                      onclick={(e) => { e.stopPropagation(); openEdit(k); }}
+                      aria-label="Ubah"
+                    >
+                      <Icon name="edit" size={14} />
+                    </button>
+                    {#if confirmDeleteId === k.id}
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        style="width: 28px; height: 28px; color: var(--danger); background: var(--danger-soft);"
+                        onclick={(e) => { e.stopPropagation(); $deleteMut.mutate(k.id); }}
+                        aria-label="Konfirmasi hapus"
+                      >
+                        <Icon name="check" size={14} />
+                      </button>
+                    {:else}
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        style="width: 28px; height: 28px; color: var(--danger);"
+                        onclick={(e) => { e.stopPropagation(); confirmDeleteId = k.id; }}
+                        aria-label="Hapus"
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    {/if}
                   </td>
                 </tr>
               {/each}
@@ -255,7 +310,7 @@
 
       <DesktopDialog
         open={showForm}
-        title="Tambah kebaktian"
+        title={editing ? 'Edit kebaktian' : 'Tambah kebaktian'}
         width={560}
         onClose={() => (showForm = false)}
       >
@@ -268,7 +323,7 @@
             disabled={$saveMut.isPending}
             onclick={() => submit()}
           >
-            {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+            {$saveMut.isPending ? 'Menyimpan…' : editing ? 'Simpan' : 'Tambah'}
           </button>
         {/snippet}
       </DesktopDialog>
@@ -308,43 +363,66 @@
                 {@const dm = dayMonth(k.waktu_mulai)}
                 {@const filled = ($jadwalCountsQ.data ?? {})[k.id] ?? 0}
                 {@const chipCls = filled === total && total > 0 ? 'chip-ok' : filled === 0 ? 'chip-warn' : 'chip-accent'}
-                <button
-                  class="row row-tap"
-                  type="button"
-                  onclick={() => push(`/kebaktian/${k.id}`)}
-                  style="align-items: flex-start; padding-top: 14px; padding-bottom: 14px; flex-direction: column; gap: 10px; min-height: auto;"
-                >
+                <div class="row" style="align-items: flex-start; padding: 14px; flex-direction: column; gap: 10px; min-height: auto;">
                   <div style="display: flex; align-items: flex-start; gap: 12px; width: 100%;">
-                    <div
-                      style="width: 48px; min-width: 48px; height: 56px; background: var(--accent-soft);
-                             border-radius: 12px; display: flex; flex-direction: column;
-                             align-items: center; justify-content: center; color: var(--accent-ink);"
+                    <button
+                      type="button"
+                      style="display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0; background: none; text-align: left;"
+                      onclick={() => push(`/kebaktian/${k.id}`)}
                     >
-                      <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em;">{dm.month}</div>
-                      <div style="font-size: 20px; font-weight: 800; line-height: 1; letter-spacing: -0.02em;">
-                        {dm.day}
+                      <div
+                        style="width: 48px; min-width: 48px; height: 56px; background: var(--accent-soft);
+                               border-radius: 12px; display: flex; flex-direction: column;
+                               align-items: center; justify-content: center; color: var(--accent-ink);"
+                      >
+                        <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em;">{dm.month}</div>
+                        <div style="font-size: 20px; font-weight: 800; line-height: 1; letter-spacing: -0.02em;">{dm.day}</div>
+                      </div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em;">{k.nama}</div>
+                        <div style="font-size: 13px; color: var(--ink-3); margin-top: 1px;">{fmtMediumID(k.waktu_mulai)}</div>
+                        <div style="font-size: 12px; color: var(--ink-3); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                          <Icon name="map" size={12} />
+                          {k.lokasi ?? '—'}{k.pengkhotbah ? ` · ${k.pengkhotbah}` : ''}
+                        </div>
+                      </div>
+                    </button>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                      <span class="chip {chipCls}">{filled}/{total}</span>
+                      <div style="display: flex; gap: 2px;">
+                        <button class="icon-btn" type="button" onclick={() => openEdit(k)} aria-label="Ubah" style="width: 32px; height: 32px;">
+                          <Icon name="edit" size={15} />
+                        </button>
+                        {#if confirmDeleteId === k.id}
+                          <button
+                            class="icon-btn"
+                            type="button"
+                            style="width: 32px; height: 32px; color: var(--danger); background: var(--danger-soft);"
+                            onclick={() => { $deleteMut.mutate(k.id); confirmDeleteId = null; }}
+                            aria-label="Konfirmasi hapus"
+                          >
+                            <Icon name="check" size={15} />
+                          </button>
+                        {:else}
+                          <button
+                            class="icon-btn"
+                            type="button"
+                            style="width: 32px; height: 32px; color: var(--danger);"
+                            onclick={() => (confirmDeleteId = k.id)}
+                            aria-label="Hapus"
+                          >
+                            <Icon name="trash" size={15} />
+                          </button>
+                        {/if}
                       </div>
                     </div>
-                    <div style="flex: 1; min-width: 0;">
-                      <div style="font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em;">
-                        {k.nama}
-                      </div>
-                      <div style="font-size: 13px; color: var(--ink-3); margin-top: 1px;">
-                        {fmtMediumID(k.waktu_mulai)}
-                      </div>
-                      <div style="font-size: 12px; color: var(--ink-3); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
-                        <Icon name="map" size={12} />
-                        {k.lokasi ?? '—'}{k.pengkhotbah ? ` · ${k.pengkhotbah}` : ''}
-                      </div>
-                    </div>
-                    <span class="chip {chipCls}">{filled}/{total}</span>
                   </div>
                   {#if k.tema}
                     <div style="font-size: 12px; color: var(--ink-2); background: var(--surface-2); padding: 6px 10px; border-radius: 8px; align-self: stretch; margin-left: 60px;">
                       &ldquo;{k.tema}&rdquo;
                     </div>
                   {/if}
-                </button>
+                </div>
               {/each}
             {/if}
           </div>
@@ -356,7 +434,7 @@
 
         <BottomNav />
 
-        <Sheet open={showForm} onClose={() => (showForm = false)} title="Tambah kebaktian">
+        <Sheet open={showForm} onClose={() => (showForm = false)} title={editing ? 'Edit kebaktian' : 'Tambah kebaktian'}>
           {@render kebaktianForm()}
 
           {#snippet footer()}
@@ -370,7 +448,7 @@
               disabled={$saveMut.isPending}
               onclick={() => submit()}
             >
-              {$saveMut.isPending ? 'Menyimpan…' : 'Tambah'}
+              {$saveMut.isPending ? 'Menyimpan…' : editing ? 'Simpan' : 'Tambah'}
             </button>
           {/snippet}
         </Sheet>

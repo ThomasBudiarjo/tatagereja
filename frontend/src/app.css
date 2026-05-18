@@ -268,7 +268,7 @@ input, textarea, select { font-family: inherit; }
 .fab {
   position: absolute;
   right: 16px;
-  bottom: 16px;
+  bottom: 86px;
   width: 56px; height: 56px;
   border-radius: 18px;
   background: var(--accent);
@@ -468,7 +468,7 @@ input, textarea, select { font-family: inherit; }
 /* ── Toast ─────────────────────────────────────────────────── */
 .toast-wrap {
   position: absolute;
-  bottom: 84px; left: 16px; right: 16px;
+  bottom: 154px; left: 16px; right: 16px;
   z-index: 50;
   pointer-events: none;
   display: flex; flex-direction: column; gap: 8px; align-items: center;
@@ -562,6 +562,8 @@ input, textarea, select { font-family: inherit; }
 .dt-app {
   display: flex;
   height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   background: var(--bg);
   color: var(--ink);
@@ -571,6 +573,8 @@ input, textarea, select { font-family: inherit; }
 /* ── Sidebar ──────────────────────────────────────────────── */
 .dt-sidebar {
   width: 232px;
+  height: 100%;
+  overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--line);
   display: flex;

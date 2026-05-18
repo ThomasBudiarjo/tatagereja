@@ -168,6 +168,19 @@
     },
   });
 
+  const deleteMut = createMutation({
+    mutationFn: (id: number) => jemaatApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['jemaat'] });
+      qc.invalidateQueries({ queryKey: ['pelayan'] });
+      selectedId = null;
+      toast.show('Jemaat dihapus');
+    },
+    onError: () => toast.show('Gagal menghapus jemaat'),
+  });
+
+  let confirmDeleteId = $state<number | null>(null);
+
   function submit(e?: Event) {
     e?.preventDefault();
     errors = {};
@@ -372,19 +385,37 @@
                         </div>
                       {/if}
                     </td>
-                    <td style="width: 40px;">
+                    <td style="width: 80px; text-align: right;">
                       <button
                         class="icon-btn"
                         type="button"
                         style="width: 28px; height: 28px;"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          openEdit(j);
-                        }}
+                        onclick={(e) => { e.stopPropagation(); openEdit(j); }}
                         aria-label="Ubah"
                       >
-                        <Icon name="more" size={16} />
+                        <Icon name="edit" size={14} />
                       </button>
+                      {#if confirmDeleteId === j.id}
+                        <button
+                          class="icon-btn"
+                          type="button"
+                          style="width: 28px; height: 28px; color: var(--danger); background: var(--danger-soft);"
+                          onclick={(e) => { e.stopPropagation(); $deleteMut.mutate(j.id); confirmDeleteId = null; }}
+                          aria-label="Konfirmasi hapus"
+                        >
+                          <Icon name="check" size={14} />
+                        </button>
+                      {:else}
+                        <button
+                          class="icon-btn"
+                          type="button"
+                          style="width: 28px; height: 28px; color: var(--danger);"
+                          onclick={(e) => { e.stopPropagation(); confirmDeleteId = j.id; }}
+                          aria-label="Hapus"
+                        >
+                          <Icon name="trash" size={14} />
+                        </button>
+                      {/if}
                     </td>
                   </tr>
                 {/each}

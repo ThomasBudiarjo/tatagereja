@@ -1,22 +1,27 @@
 <script lang="ts">
   import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { jemaatApi } from '$lib/api/jemaat';
+  import { jemaatApi, type JemaatWrite } from '$lib/api/jemaat';
   import { keluargaApi } from '$lib/api/keluarga';
   import { pelayanApi } from '$lib/api/pelayan';
   import { serviceTypesApi } from '$lib/api/service-types';
+  import { ApiError } from '$lib/api/client';
   import { push } from 'svelte-spa-router';
-  import { formatDateID, ageFromIso, maritalStatusLabel, genderLabel } from '$lib/utils/format';
+  import { formatDateID, ageFromIso, maritalStatusLabel, genderLabel, emptyToNull } from '$lib/utils/format';
   import { toast } from '$lib/stores/toast.svelte';
   import { viewport } from '$lib/stores/viewport.svelte';
   import TopBar from '$lib/components/TopBar.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
+  import Sheet from '$lib/components/Sheet.svelte';
+  import Field from '$lib/components/Field.svelte';
   import DesktopLayout from '$lib/components/DesktopLayout.svelte';
+  import DesktopDialog from '$lib/components/DesktopDialog.svelte';
 
   let { params } = $props<{ params: { id: string } }>();
   const id = $derived(Number(params.id));
+  const qc = useQueryClient();
 
   const q = createQuery(
     toStore(() => ({
@@ -58,10 +63,146 @@
       .filter((x): x is { id: number; nama: string; deskripsi: string | null; urutan: number; created_at: string; updated_at: string; user_id: number } => !!x);
   });
 
+  // Edit form state
+  let showEditForm = $state(false);
+  let confirmDelete = $state(false);
+  let editForm = $state<JemaatWrite>({
+    nama_lengkap: '', nama_panggilan: null, jenis_kelamin: null, tanggal_lahir: null,
+    tempat_lahir: null, alamat: null, nomor_telepon: null, email: null,
+    status_pernikahan: null, tanggal_baptis: null, tanggal_sidi: null, keluarga_id: null, catatan: null,
+  });
+  let editErrors = $state<Record<string, string>>({});
+
+  function openEdit() {
+    const j = $q.data;
+    if (!j) return;
+    editForm = {
+      nama_lengkap: j.nama_lengkap,
+      nama_panggilan: j.nama_panggilan,
+      jenis_kelamin: j.jenis_kelamin,
+      tanggal_lahir: j.tanggal_lahir,
+      tempat_lahir: j.tempat_lahir,
+      alamat: j.alamat,
+      nomor_telepon: j.nomor_telepon,
+      email: j.email,
+      status_pernikahan: j.status_pernikahan,
+      tanggal_baptis: j.tanggal_baptis,
+      tanggal_sidi: j.tanggal_sidi,
+      keluarga_id: j.keluarga_id,
+      catatan: j.catatan,
+    };
+    editErrors = {};
+    showEditForm = true;
+  }
+
+  const editMut = createMutation({
+    mutationFn: async (input: JemaatWrite) => {
+      const payload: JemaatWrite = {
+        ...input,
+        nama_panggilan: emptyToNull(input.nama_panggilan ?? ''),
+        jenis_kelamin: (input.jenis_kelamin as string) === '' ? null : input.jenis_kelamin,
+        status_pernikahan: (input.status_pernikahan as string) === '' ? null : input.status_pernikahan,
+        tanggal_lahir: emptyToNull(input.tanggal_lahir ?? ''),
+        tempat_lahir: emptyToNull(input.tempat_lahir ?? ''),
+        alamat: emptyToNull(input.alamat ?? ''),
+        nomor_telepon: emptyToNull(input.nomor_telepon ?? ''),
+        email: emptyToNull(input.email ?? ''),
+        tanggal_baptis: emptyToNull(input.tanggal_baptis ?? ''),
+        tanggal_sidi: emptyToNull(input.tanggal_sidi ?? ''),
+        catatan: emptyToNull(input.catatan ?? ''),
+        keluarga_id: input.keluarga_id || null,
+      };
+      return jemaatApi.update(id, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['jemaat'] });
+      toast.show('Jemaat diperbarui');
+      showEditForm = false;
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.fields) editErrors = e.fields;
+    },
+  });
+
+  const deleteMut = createMutation({
+    mutationFn: () => jemaatApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['jemaat'] });
+      qc.invalidateQueries({ queryKey: ['pelayan'] });
+      push('/jemaat');
+      toast.show('Jemaat dihapus');
+    },
+    onError: () => toast.show('Gagal menghapus jemaat'),
+  });
+
   function back() {
     history.length > 1 ? history.back() : push('/jemaat');
   }
 </script>
+
+{#snippet jemaatEditForm()}
+  <form style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <Field label="Nama lengkap" required error={editErrors.nama_lengkap}>
+        <input class="input" bind:value={editForm.nama_lengkap} />
+      </Field>
+      <Field label="Nama panggilan">
+        <input class="input" bind:value={editForm.nama_panggilan} />
+      </Field>
+      <Field label="Jenis kelamin">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="chip chip-toggle {editForm.jenis_kelamin === 'L' ? 'on' : ''}" style="flex:1;justify-content:center;height:40px;border-radius:10px;" onclick={() => (editForm.jenis_kelamin = 'L')}>Laki-laki</button>
+          <button type="button" class="chip chip-toggle {editForm.jenis_kelamin === 'P' ? 'on' : ''}" style="flex:1;justify-content:center;height:40px;border-radius:10px;" onclick={() => (editForm.jenis_kelamin = 'P')}>Perempuan</button>
+        </div>
+      </Field>
+      <Field label="Tanggal lahir">
+        <input class="input" type="date" bind:value={editForm.tanggal_lahir} />
+      </Field>
+      <Field label="Nomor telepon">
+        <input class="input" type="tel" bind:value={editForm.nomor_telepon} />
+      </Field>
+      <Field label="Email" error={editErrors.email}>
+        <input class="input" type="email" bind:value={editForm.email} />
+      </Field>
+      <div style="grid-column: 1 / -1;">
+        <Field label="Alamat">
+          <textarea class="textarea" rows="2" bind:value={editForm.alamat}></textarea>
+        </Field>
+      </div>
+      <Field label="Status pernikahan">
+        <select class="select" bind:value={editForm.status_pernikahan}>
+          <option value={null}>—</option>
+          <option value="belum_menikah">Belum menikah</option>
+          <option value="menikah">Menikah</option>
+          <option value="cerai">Cerai</option>
+          <option value="duda">Duda</option>
+          <option value="janda">Janda</option>
+        </select>
+      </Field>
+      <Field label="Keluarga">
+        <select class="select" bind:value={editForm.keluarga_id}>
+          <option value={null}>— Tidak terhubung —</option>
+          {#if $keluargaQ.data}
+            {#each $keluargaQ.data.data as k (k.id)}
+              <option value={k.id}>{k.nama_keluarga}</option>
+            {/each}
+          {/if}
+        </select>
+      </Field>
+      <Field label="Tanggal baptis">
+        <input class="input" type="date" bind:value={editForm.tanggal_baptis} />
+      </Field>
+      <Field label="Tanggal sidi">
+        <input class="input" type="date" bind:value={editForm.tanggal_sidi} />
+      </Field>
+      <div style="grid-column: 1 / -1;">
+        <Field label="Catatan">
+          <textarea class="textarea" rows="3" bind:value={editForm.catatan}></textarea>
+        </Field>
+      </div>
+    </div>
+  </form>
+{/snippet}
 
 <ProtectedRoute>
   {#snippet children()}
@@ -71,6 +212,21 @@
           <button class="dt-btn dt-btn-outline" type="button" onclick={() => push('/jemaat')}>
             <Icon name="back" size={16} /> Ke daftar
           </button>
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={openEdit}>
+            <Icon name="edit" size={16} /> Edit
+          </button>
+          {#if confirmDelete}
+            <button class="dt-btn dt-btn-primary" type="button" style="background: var(--danger);" onclick={() => $deleteMut.mutate()}>
+              Yakin hapus?
+            </button>
+            <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (confirmDelete = false)}>
+              Batal
+            </button>
+          {:else}
+            <button class="dt-btn dt-btn-ghost" type="button" style="color: var(--danger);" onclick={() => (confirmDelete = true)}>
+              <Icon name="trash" size={16} /> Hapus
+            </button>
+          {/if}
         {/snippet}
         <div style="max-width: 760px; margin: 0 auto;">
           <div class="dt-card">
@@ -153,6 +309,26 @@
           </div>
         </div>
       </DesktopLayout>
+
+      <DesktopDialog
+        open={showEditForm}
+        title="Edit jemaat"
+        width={640}
+        onClose={() => (showEditForm = false)}
+      >
+        {@render jemaatEditForm()}
+        {#snippet footer()}
+          <button class="dt-btn dt-btn-ghost" type="button" onclick={() => (showEditForm = false)}>Batal</button>
+          <button
+            class="dt-btn dt-btn-primary"
+            type="button"
+            disabled={$editMut.isPending}
+            onclick={() => $editMut.mutate(editForm)}
+          >
+            {$editMut.isPending ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        {/snippet}
+      </DesktopDialog>
     {:else}
     <div class="app">
       <TopBar scrolled>
@@ -160,8 +336,22 @@
           <button class="icon-btn" type="button" onclick={back} aria-label="Kembali"><Icon name="back" /></button>
         {/snippet}
         {#snippet trailing()}
-          <button class="icon-btn" type="button" aria-label="Ubah"><Icon name="edit" /></button>
-          <button class="icon-btn" type="button" aria-label="Lainnya"><Icon name="more" /></button>
+          <button class="icon-btn" type="button" onclick={openEdit} aria-label="Ubah"><Icon name="edit" /></button>
+          {#if confirmDelete}
+            <button
+              class="icon-btn"
+              type="button"
+              style="color: var(--danger); background: var(--danger-soft); border-radius: 8px; padding: 0 8px; font-size: 13px; font-weight: 600;"
+              onclick={() => $deleteMut.mutate()}
+              aria-label="Konfirmasi hapus"
+            >
+              Hapus?
+            </button>
+          {:else}
+            <button class="icon-btn" type="button" onclick={() => (confirmDelete = true)} aria-label="Hapus">
+              <Icon name="trash" />
+            </button>
+          {/if}
         {/snippet}
       </TopBar>
 
@@ -352,6 +542,22 @@
           <div style="height: 24px;"></div>
         {/if}
       </div>
+
+      <Sheet open={showEditForm} onClose={() => (showEditForm = false)} title="Edit jemaat">
+        {@render jemaatEditForm()}
+        {#snippet footer()}
+          <button class="btn btn-ghost" type="button" style="flex: 1;" onclick={() => (showEditForm = false)}>Batal</button>
+          <button
+            class="btn btn-primary"
+            type="button"
+            style="flex: 2;"
+            disabled={$editMut.isPending}
+            onclick={() => $editMut.mutate(editForm)}
+          >
+            {$editMut.isPending ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        {/snippet}
+      </Sheet>
     </div>
     {/if}
   {/snippet}

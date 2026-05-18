@@ -80,6 +80,18 @@
     },
   });
 
+  const deleteMut = createMutation({
+    mutationFn: (id: number) => keluargaApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['keluarga'] });
+      qc.invalidateQueries({ queryKey: ['jemaat'] });
+      toast.show('Keluarga dihapus');
+    },
+    onError: () => toast.show('Gagal menghapus keluarga'),
+  });
+
+  let confirmDeleteId = $state<number | null>(null);
+
   function submit(e?: Event) {
     e?.preventDefault();
     errors = {};
@@ -168,19 +180,37 @@
                     </div>
                   </td>
                   <td style="color: var(--ink-3); font-size: 12px;">{k.catatan || '—'}</td>
-                  <td style="width: 40px;">
+                  <td style="width: 80px; text-align: right;">
                     <button
                       class="icon-btn"
                       type="button"
                       style="width: 28px; height: 28px;"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        openEdit(k);
-                      }}
+                      onclick={(e) => { e.stopPropagation(); openEdit(k); }}
                       aria-label="Ubah"
                     >
-                      <Icon name="more" size={16} />
+                      <Icon name="edit" size={14} />
                     </button>
+                    {#if confirmDeleteId === k.id}
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        style="width: 28px; height: 28px; color: var(--danger); background: var(--danger-soft);"
+                        onclick={(e) => { e.stopPropagation(); $deleteMut.mutate(k.id); confirmDeleteId = null; }}
+                        aria-label="Konfirmasi hapus"
+                      >
+                        <Icon name="check" size={14} />
+                      </button>
+                    {:else}
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        style="width: 28px; height: 28px; color: var(--danger);"
+                        onclick={(e) => { e.stopPropagation(); confirmDeleteId = k.id; }}
+                        aria-label="Hapus"
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    {/if}
                   </td>
                 </tr>
               {/each}
@@ -242,28 +272,51 @@
             {:else}
               {#each $listQ.data.data as k (k.id)}
                 {@const members = membersOf(k.id)}
-                <button class="row row-tap" type="button" onclick={() => push(`/keluarga/${k.id}`)}>
-                  <div
-                    style="width: 44px; height: 44px; border-radius: 12px;
-                           background: var(--accent-soft); color: var(--accent-ink);
-                           display: flex; align-items: center; justify-content: center;"
+                <div class="row" style="gap: 10px;">
+                  <button
+                    type="button"
+                    style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; text-align: left;"
+                    onclick={() => push(`/keluarga/${k.id}`)}
                   >
-                    <Icon name="home2" size={20} />
-                  </div>
-                  <div class="row-body">
-                    <div class="row-title">{k.nama_keluarga}</div>
-                    <div class="row-sub">
-                      {members.length} anggota{k.alamat ? ` · ${k.alamat}` : ''}
+                    <div
+                      style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px;
+                             background: var(--accent-soft); color: var(--accent-ink);
+                             display: flex; align-items: center; justify-content: center;"
+                    >
+                      <Icon name="home2" size={20} />
                     </div>
-                  </div>
-                  <div style="display: flex; margin-right: 4px;">
-                    {#each members.slice(0, 3) as m, i (m.id)}
-                      <div style="margin-left: {i === 0 ? 0 : -8}px;">
-                        <Avatar name={m.nama_lengkap} size="sm" />
+                    <div class="row-body">
+                      <div class="row-title">{k.nama_keluarga}</div>
+                      <div class="row-sub">
+                        {members.length} anggota{k.alamat ? ` · ${k.alamat}` : ''}
                       </div>
-                    {/each}
-                  </div>
-                </button>
+                    </div>
+                  </button>
+                  <button class="icon-btn" type="button" onclick={() => openEdit(k)} aria-label="Ubah">
+                    <Icon name="edit" size={18} />
+                  </button>
+                  {#if confirmDeleteId === k.id}
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      style="color: var(--danger); background: var(--danger-soft);"
+                      onclick={() => { $deleteMut.mutate(k.id); confirmDeleteId = null; }}
+                      aria-label="Konfirmasi hapus"
+                    >
+                      <Icon name="check" size={18} />
+                    </button>
+                  {:else}
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      style="color: var(--danger);"
+                      onclick={() => (confirmDeleteId = k.id)}
+                      aria-label="Hapus"
+                    >
+                      <Icon name="trash" size={18} />
+                    </button>
+                  {/if}
+                </div>
               {/each}
             {/if}
           </div>
