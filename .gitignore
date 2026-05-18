@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+local.db
+local.db-*
+tmp/
+bin/
+*.log
+.DS_Store
+backend/local.db*
+backend/tmp/
+backend/bin/
+frontend/dist/
+frontend/node_modules/
+.svelte-kit/
+.claude/

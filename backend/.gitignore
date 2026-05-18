@@ -1,0 +1,7 @@
+tmp/
+bin/
+.env
+local.db
+local.db-shm
+local.db-wal
+*.log
