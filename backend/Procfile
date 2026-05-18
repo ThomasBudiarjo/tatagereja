@@ -1,2 +1,0 @@
-release: ./bin/atlas migrate apply --env prod
-web: ./bin/server
