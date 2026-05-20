@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 )
@@ -9,15 +8,28 @@ import (
 type Config struct {
 	Port         string
 	AppEnv       string
-	DatabaseURL  string
+	DatabasePath string
 	LogLevel     string
 	CookieSecure bool
+
+	ReplicaBucket          string
+	ReplicaPath            string
+	ReplicaEndpoint        string
+	ReplicaAccessKeyID     string
+	ReplicaSecretAccessKey string
+}
+
+// ReplicaConfigured returns true when all required replica fields are set.
+func (c Config) ReplicaConfigured() bool {
+	return c.ReplicaBucket != "" &&
+		c.ReplicaAccessKeyID != "" &&
+		c.ReplicaSecretAccessKey != ""
 }
 
 func Load() (Config, error) {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "tatagereja.db"
 	}
 	env := os.Getenv("APP_ENV")
 	if env == "" {
@@ -27,12 +39,22 @@ func Load() (Config, error) {
 	if port == "" {
 		port = "8080"
 	}
+	replicaPath := os.Getenv("REPLICA_PATH")
+	if replicaPath == "" {
+		replicaPath = "tatagereja"
+	}
 	return Config{
 		Port:         port,
 		AppEnv:       env,
-		DatabaseURL:  dbURL,
+		DatabasePath: dbPath,
 		LogLevel:     os.Getenv("LOG_LEVEL"),
 		CookieSecure: env == "production",
+
+		ReplicaBucket:          os.Getenv("REPLICA_BUCKET"),
+		ReplicaPath:            replicaPath,
+		ReplicaEndpoint:        os.Getenv("REPLICA_ENDPOINT"),
+		ReplicaAccessKeyID:     os.Getenv("REPLICA_ACCESS_KEY_ID"),
+		ReplicaSecretAccessKey: os.Getenv("REPLICA_SECRET_ACCESS_KEY"),
 	}, nil
 }
 

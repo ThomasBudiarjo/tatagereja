@@ -12,6 +12,7 @@ import (
 
 	"github.com/thomasbudiarjo/tatagereja/backend/internal/config"
 	"github.com/thomasbudiarjo/tatagereja/backend/internal/db"
+	"github.com/thomasbudiarjo/tatagereja/backend/internal/replication"
 	"github.com/thomasbudiarjo/tatagereja/backend/internal/web"
 )
 
@@ -19,12 +20,29 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	cfg := config.MustLoad()
-	database := db.MustOpen(cfg.DatabaseURL)
+	ctx := context.Background()
+
+	// Restore DB from replica before opening (no-op if replica not configured
+	// or if local file already exists).
+	ls := replication.New(cfg)
+	if err := ls.Restore(ctx); err != nil {
+		log.Fatalf("restore: %v", err)
+	}
+
+	database := db.MustOpen(cfg.DatabasePath)
 	defer database.Close()
 
 	if err := db.Apply(database); err != nil {
 		log.Fatalf("db.Apply: %v", err)
 	}
+
+	// Start Litestream after DB is open and schema applied.
+	// defer ls.Stop() is registered last so it runs first (LIFO),
+	// flushing WAL to S3 before database.Close() cleans up the pool.
+	if err := ls.Start(ctx); err != nil {
+		log.Fatalf("litestream start: %v", err)
+	}
+	defer ls.Stop()
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -47,7 +65,7 @@ func main() {
 	<-stop
 
 	slog.Info("shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	_ = srv.Shutdown(ctx)
+	_ = srv.Shutdown(shutCtx)
 }
