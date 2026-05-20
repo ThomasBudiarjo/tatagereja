@@ -1,0 +1,68 @@
+{{define "kebaktian/jadwal.html"}}
+<div class="mb-4">
+  <a href="/kebaktian/{{.Kebaktian.ID}}" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke detail</a>
+  <h1 class="mt-1 text-xl font-bold text-slate-800">Jadwal Pelayanan</h1>
+  <p class="text-sm text-slate-600">{{.Kebaktian.Nama}} · {{formatDateTime .Kebaktian.WaktuMulai .TZ "Mon, 2 Jan 2006 15:04"}}</p>
+</div>
+
+<form method="POST" action="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="space-y-4">
+  <p class="text-sm text-slate-500">Pilih pelayan untuk setiap peran. Kosongkan jika belum ditentukan.</p>
+
+  <div class="space-y-3 md:hidden">
+    {{range .Slots}}
+    {{$slot := .}}
+    <div class="rounded-xl border border-stone-200 bg-white p-4">
+      <label for="pelayan_{{$slot.ServiceType.ID}}" class="mb-2 block text-sm font-semibold text-slate-800">{{$slot.ServiceType.Nama}}</label>
+      <select id="pelayan_{{$slot.ServiceType.ID}}" name="pelayan_{{$slot.ServiceType.ID}}" class="block w-full min-h-11 rounded-lg border border-stone-300 px-3 text-sm">
+        <option value="">— Belum ditugaskan —</option>
+        {{range $slot.PelayanOptions}}
+        <option value="{{.ID}}" {{if eq $slot.SelectedPelayanID .ID}}selected{{end}}>{{.JemaatNama}}</option>
+        {{end}}
+      </select>
+      {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceType.ID)}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+    </div>
+    {{else}}
+    <p class="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-slate-500">
+      Belum ada tipe pelayanan. <a href="/service-types" class="font-medium underline">Tambah tipe pelayanan</a> terlebih dahulu.
+    </p>
+    {{end}}
+  </div>
+
+  <div class="hidden overflow-hidden rounded-xl border border-stone-200 bg-white md:block">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <tr>
+          <th class="px-4 py-3">Peran</th>
+          <th class="px-4 py-3">Pelayan</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {{range .Slots}}
+        {{$slot := .}}
+        <tr>
+          <td class="px-4 py-3 font-medium text-slate-800">{{$slot.ServiceType.Nama}}</td>
+          <td class="px-4 py-3">
+            <select name="pelayan_{{$slot.ServiceType.ID}}" class="block w-full min-h-11 max-w-md rounded-lg border border-stone-300 px-3 text-sm">
+              <option value="">— Belum ditugaskan —</option>
+              {{range $slot.PelayanOptions}}
+              <option value="{{.ID}}" {{if eq $slot.SelectedPelayanID .ID}}selected{{end}}>{{.JemaatNama}}</option>
+              {{end}}
+            </select>
+            {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceType.ID)}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if .Slots}}
+  <div class="flex flex-col gap-2 sm:flex-row">
+    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700">
+      Simpan Jadwal
+    </button>
+    <a href="/kebaktian/{{.Kebaktian.ID}}" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-stone-200 text-sm font-medium text-slate-700 hover:bg-stone-50">Batal</a>
+  </div>
+  {{end}}
+</form>
+{{end}}

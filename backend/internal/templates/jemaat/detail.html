@@ -1,0 +1,71 @@
+{{define "jemaat/detail.html"}}
+<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <div>
+    <a href="/jemaat" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke daftar</a>
+    <h1 class="mt-1 text-xl font-bold text-slate-800">{{.Jemaat.NamaLengkap}}</h1>
+    {{if .Jemaat.NamaPanggilan.Valid}}<p class="text-sm text-slate-500">{{derefString .Jemaat.NamaPanggilan}}</p>{{end}}
+    {{if eq .Jemaat.IsActive 0}}<span class="mt-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Nonaktif</span>{{end}}
+  </div>
+  <div class="flex gap-2">
+    <a href="/jemaat/{{.Jemaat.ID}}/edit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-stone-50">Ubah</a>
+    <form method="POST" action="/jemaat/{{.Jemaat.ID}}">
+      <input type="hidden" name="_method" value="DELETE">
+      <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-medium text-red-700 hover:bg-red-50"
+        onclick="return confirm('Hapus jemaat ini?')">Hapus</button>
+    </form>
+  </div>
+</div>
+
+<dl class="grid gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-2 md:p-6">
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Jenis kelamin</dt>
+    <dd class="mt-1 text-sm text-slate-800">
+      {{if .Jemaat.JenisKelamin.Valid}}{{if eq (derefString .Jemaat.JenisKelamin) "L"}}Laki-laki{{else if eq (derefString .Jemaat.JenisKelamin) "P"}}Perempuan{{else}}{{derefString .Jemaat.JenisKelamin}}{{end}}{{else}}—{{end}}
+    </dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Tanggal lahir</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.TanggalLahir.Valid}}{{derefString .Jemaat.TanggalLahir}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Tempat lahir</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.TempatLahir.Valid}}{{derefString .Jemaat.TempatLahir}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Status pernikahan</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.StatusPernikahan.Valid}}{{derefString .Jemaat.StatusPernikahan}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Telepon</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.NomorTelepon.Valid}}{{derefString .Jemaat.NomorTelepon}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Email</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.Email.Valid}}{{derefString .Jemaat.Email}}{{else}}—{{end}}</dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Alamat</dt>
+    <dd class="mt-1 whitespace-pre-wrap text-sm text-slate-800">{{if .Jemaat.Alamat.Valid}}{{derefString .Jemaat.Alamat}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Tanggal baptis</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.TanggalBaptis.Valid}}{{derefString .Jemaat.TanggalBaptis}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Tanggal sidi</dt>
+    <dd class="mt-1 text-sm text-slate-800">{{if .Jemaat.TanggalSidi.Valid}}{{derefString .Jemaat.TanggalSidi}}{{else}}—{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Keluarga</dt>
+    <dd class="mt-1 text-sm text-slate-800">
+      {{if .KeluargaNama}}
+        <a href="/keluarga/{{nullInt64 .Jemaat.KeluargaID}}" class="text-slate-800 underline hover:text-slate-600">{{.KeluargaNama}}</a>
+      {{else}}—{{end}}
+    </dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Catatan</dt>
+    <dd class="mt-1 whitespace-pre-wrap text-sm text-slate-800">{{if .Jemaat.Catatan.Valid}}{{derefString .Jemaat.Catatan}}{{else}}—{{end}}</dd>
+  </div>
+</dl>
+{{end}}

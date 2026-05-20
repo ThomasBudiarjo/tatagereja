@@ -41,7 +41,8 @@ Tata Gereja helps a church manage:
 **Operational model:**
 
 - **One user per church account.** The user IS the church for MVP. No multi-admin, no self-signup. Owner manually provisions accounts.
-- **Multiple users on one shared SQLite Cloud database.** Every domain row is scoped by `user_id`. Data MUST NEVER leak between users.
+- **Multiple users on one shared local SQLite file.** Every domain row is scoped by `user_id`. Data MUST NEVER leak between users.
+- **Embedded Litestream** replicates the SQLite file to object storage (S3 in production, local `file://` replica in development). Heroku Eco dynos have ephemeral disks — restore from replica on boot, replicate continuously while running.
 - **No SLA.** Hobby project. Disclosed in README and in-app.
 - **Deployed to Heroku Eco Dyno.** Single Go binary serves HTML, CSS, JS.
 
@@ -50,10 +51,13 @@ Tata Gereja helps a church manage:
 ## 2. Architecture & Stack
 
 ```
-Browser (HTMX) ──HTTP── Go HTTP Server (Chi) ──database/sql── SQLite Cloud
-                          - html/template
-                          - Session cookie auth
-                          - sqlc-generated queries
+Browser (HTMX) ──HTTP── Go HTTP Server (Chi) ──database/sql── local SQLite file
+                          │                                    (modernc.org/sqlite)
+                          ├── embedded Litestream Store
+                          │       └── replicate ──► S3 (prod) / file:// (dev)
+                          ├── html/template
+                          ├── Session cookie auth
+                          └── sqlc-generated queries
 ```
 
 One binary, one port, same origin. No CORS.
@@ -64,9 +68,10 @@ One binary, one port, same origin. No CORS.
 | Router | `chi/v5` |
 | Rendering | `html/template` + HTMX 2.x (CDN) |
 | Styling | Tailwind CSS (CDN) |
-| Database | SQLite Cloud |
-| DB driver (prod) | `github.com/sqlitecloud/sqlitecloud-go` |
-| DB driver (tests) | `modernc.org/sqlite` (in-memory) |
+| Database | Local SQLite file (`SQLITE_PATH`) |
+| Replication | Embedded `github.com/benbjohnson/litestream` |
+| Replica storage | S3 (production), `file://` (development) |
+| DB driver | `modernc.org/sqlite` everywhere (prod, tests) |
 | DB queries | sqlc |
 | Auth | DB-backed opaque session token + bcrypt |
 | Validation | Manual (stdlib `strings`, `time`, `net/mail`, `strconv`) |
@@ -78,7 +83,8 @@ One binary, one port, same origin. No CORS.
 
 - **HTMX over SPA:** zero JS build step. One binary, one process, same origin.
 - **Tailwind CDN:** zero npm. Acceptable for hobby-scale traffic.
-- **SQLite Cloud over local file:** Heroku Eco dynos have ephemeral disks. SQLite Cloud persists data while keeping SQLite SQL dialect.
+- **Local SQLite + embedded Litestream:** one file, standard SQL, no hosted DB vendor. Litestream restores from S3 on dyno boot and replicates WAL changes in the background. Pin Litestream to a specific version — its library API is not semver-stable yet.
+- **`modernc.org/sqlite` only:** Litestream uses this driver internally; mixing drivers causes lock conflicts on Linux/macOS.
 - **DB sessions over JWT:** simpler. Logout = `DELETE FROM sessions WHERE token=?`.
 - **Manual validation, stdlib nullable types:** fewer dependencies for ~50 fields total.
 
@@ -96,7 +102,8 @@ tatagereja/
 │   │   ├── config/config.go
 │   │   ├── db/
 │   │   │   ├── schema.sql        # SINGLE SOURCE OF TRUTH
-│   │   │   ├── conn.go           # Open + Apply schema
+│   │   │   ├── conn.go           # Open SQLite + embedded Litestream
+│   │   │   ├── litestream.go     # restore, Store lifecycle, sync helpers
 │   │   │   ├── queries/          # one .sql file per entity
 │   │   │   │   ├── auth.sql
 │   │   │   │   ├── jemaat.sql
@@ -362,6 +369,33 @@ sql:
 
 Nullable `TEXT`/`INTEGER` columns map to stdlib `sql.NullString` / `sql.NullInt64`. No third-party null types.
 
+### 4.8 Litestream persistence
+
+**Problem:** Heroku Eco dyno filesystem is ephemeral. Local SQLite alone loses data on restart/redeploy.
+
+**Solution:** Embedded Litestream in the same process as the web server.
+
+**Boot sequence (`internal/db/litestream.go`):**
+
+1. Ensure parent dir of `SQLITE_PATH` exists.
+2. If the SQLite file is missing, restore from `LITESTREAM_REPLICA_URL` via `replica.Restore()`. If no backup exists yet (`ErrNoSnapshots` / `ErrTxNotAvailable`), start with an empty file.
+3. Create `litestream.DB`, attach replica client from URL, configure compaction levels (L0 + at least L1).
+4. `store.Open(ctx)` — starts background monitoring and replication.
+5. Open `database/sql` pool against the same path using DSN params for PRAGMAs (not `Exec("PRAGMA ...")` — pool connections need DSN-level settings).
+6. `Apply(db)` — idempotent schema sync.
+
+**Shutdown sequence (order matters):**
+
+1. `srv.Shutdown(ctx)`
+2. `database.Close()` — drain the app's connection pool
+3. `store.Close(ctx)` — final sync and Litestream teardown
+
+**Development:** `LITESTREAM_REPLICA_URL=file://./data/replica` — replica files live beside the DB under `backend/data/` (gitignored).
+
+**Production (Heroku):** `SQLITE_PATH=/tmp/tatagereja.db`, `LITESTREAM_REPLICA_URL=s3://<bucket>/tatagereja`. Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (e.g. `ap-southeast-1`) in Heroku config. Use a dedicated IAM user scoped to one bucket prefix.
+
+**`cmd/seed-admin` on Heroku:** one-off dynos also have ephemeral `/tmp`. The CLI MUST use the same restore → mutate → `SyncAndWait` → close path so writes reach S3 before the dyno exits.
+
 ---
 
 ## 5. Backend
@@ -377,14 +411,14 @@ go mod init github.com/<owner>/tatagereja/backend
 
 ```go
 require (
-    github.com/go-chi/chi/v5                      v5.x
-    github.com/sqlitecloud/sqlitecloud-go         v1.x  // production
-    modernc.org/sqlite                            v1.x  // tests only
-    golang.org/x/crypto                           v0.x  // bcrypt
+    github.com/benbjohnson/litestream              v0.5.x  // pin exact version
+    github.com/go-chi/chi/v5                       v5.x
+    modernc.org/sqlite                             v1.x    // prod + tests
+    golang.org/x/crypto                            v0.x    // bcrypt
 )
 ```
 
-That's it. No validator, no null-type library, no CORS.
+That's it. No validator, no null-type library, no CORS, no hosted SQLite vendor.
 
 ### 5.3 `cmd/server/main.go` (sketch)
 
@@ -393,8 +427,10 @@ func main() {
     slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
     cfg := config.MustLoad()
-    database := db.MustOpen(cfg.DatabaseURL)
+    database, store, err := db.Open(context.Background(), cfg)
+    if err != nil { log.Fatal(err) }
     defer database.Close()
+    defer store.Close(context.Background())
     if err := db.Apply(database); err != nil { log.Fatal(err) }
 
     srv := &http.Server{
@@ -418,29 +454,99 @@ func main() {
 
 ### 5.4 `internal/config/config.go`
 
-Env vars: `PORT` (default 8080), `APP_ENV` (`development`|`production`), `DATABASE_URL` (required), `LOG_LEVEL`. Session TTL hardcoded to 7 days. `CookieSecure` is true when `APP_ENV=production`.
+Env vars:
 
-### 5.5 `internal/db/conn.go`
+| Var | Default | Notes |
+|-----|---------|-------|
+| `PORT` | `8080` | |
+| `APP_ENV` | `development` | `development` \| `production` |
+| `SQLITE_PATH` | `./data/tatagereja.db` | Use `/tmp/tatagereja.db` on Heroku |
+| `LITESTREAM_REPLICA_URL` | `file://./data/replica` | Prod: `s3://bucket/tatagereja` |
+| `AWS_ACCESS_KEY_ID` | — | Required for S3 replica |
+| `AWS_SECRET_ACCESS_KEY` | — | Required for S3 replica |
+| `AWS_REGION` | `ap-southeast-1` | |
+| `LOG_LEVEL` | `info` | |
+
+Session TTL hardcoded to 7 days. `CookieSecure` is true when `APP_ENV=production`.
+
+### 5.5 `internal/db/conn.go` + `litestream.go`
+
+`Open(ctx, cfg)` returns `(*sql.DB, *litestream.Store, error)`.
 
 ```go
 package db
 
 import (
+    "context"
     "database/sql"
-    _ "github.com/sqlitecloud/sqlitecloud-go"
+    "errors"
+    "fmt"
+    "os"
+    "path/filepath"
+    "time"
+
+    "github.com/benbjohnson/litestream"
+    _ "modernc.org/sqlite"
 )
 
-func Open(url string) (*sql.DB, error) {
-    d, err := sql.Open("sqlitecloud", url)
-    if err != nil { return nil, err }
-    if _, err := d.Exec("PRAGMA foreign_keys = ON"); err != nil { return nil, err }
+func Open(ctx context.Context, cfg *config.Config) (*sql.DB, *litestream.Store, error) {
+    path := cfg.SQLitePath
+    if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+        return nil, nil, fmt.Errorf("mkdir sqlite dir: %w", err)
+    }
+
+    if _, err := os.Stat(path); os.IsNotExist(err) {
+        if err := restoreFromReplica(ctx, path, cfg.LitestreamReplicaURL); err != nil &&
+            !errors.Is(err, litestream.ErrNoSnapshots) &&
+            !errors.Is(err, litestream.ErrTxNotAvailable) {
+            return nil, nil, fmt.Errorf("restore from replica: %w", err)
+        }
+    }
+
+    lsDB := litestream.NewDB(path)
+    client, err := litestream.NewReplicaClientFromURL(cfg.LitestreamReplicaURL)
+    if err != nil {
+        return nil, nil, fmt.Errorf("replica client: %w", err)
+    }
+    replica := litestream.NewReplicaWithClient(lsDB, client)
+    lsDB.Replica = replica
+
+    levels := litestream.CompactionLevels{
+        {Level: 0},
+        {Level: 1, Interval: 10 * time.Second},
+    }
+    store := litestream.NewStore([]*litestream.DB{lsDB}, levels)
+    if err := store.Open(ctx); err != nil {
+        return nil, nil, fmt.Errorf("litestream store open: %w", err)
+    }
+
+    dsn := fmt.Sprintf(
+        "file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(wal)",
+        path,
+    )
+    d, err := sql.Open("sqlite", dsn)
+    if err != nil {
+        _ = store.Close(ctx)
+        return nil, nil, err
+    }
     d.SetMaxOpenConns(5)
     d.SetMaxIdleConns(2)
-    return d, nil
+    return d, store, nil
+}
+
+func restoreFromReplica(ctx context.Context, destPath, replicaURL string) error {
+    client, err := litestream.NewReplicaClientFromURL(replicaURL)
+    if err != nil { return err }
+    replica := litestream.NewReplicaWithClient(nil, client)
+    opt := litestream.NewRestoreOptions()
+    opt.OutputPath = destPath
+    return replica.Restore(ctx, opt)
 }
 ```
 
-`Apply(db)` and the embedded `schema.sql` live in the same file (see §4.4).
+`Apply(db)` and the embedded `schema.sql` live in `conn.go` (see §4.4).
+
+`SyncAndClose(ctx, store)` helper for `seed-admin`: call `store.SyncAndWait(ctx)` (via the wrapped `litestream.DB`) before `store.Close`.
 
 ### 5.6 `internal/web/router.go`
 
@@ -562,13 +668,13 @@ Form fields named `pelayan_<service_type_id>`. Handler reads them in a loop.
 CLI to create/reset a user — one user = one church. Used for initial deploy and password resets.
 
 ```bash
-DATABASE_URL=sqlitecloud://... go run ./cmd/seed-admin \
+go run ./cmd/seed-admin \
     --email=admin@example.com --password=... \
     --display-name="Pak Budi" --church-name="GKI Demo" \
     --timezone="Asia/Jakarta"
 ```
 
-Behavior: open DB, `Apply` schema, bcrypt-hash password, `INSERT` user (or `UPDATE` if email exists — acts as password reset).
+Uses the same env vars as the server (`SQLITE_PATH`, `LITESTREAM_REPLICA_URL`, AWS creds). Behavior: restore if needed → `Apply` schema → bcrypt-hash password → `INSERT` user (or `UPDATE` if email exists — acts as password reset) → `SyncAndWait` → close store so replica is up to date.
 
 ---
 
@@ -852,8 +958,14 @@ tmp_dir = "tmp"
 ```
 PORT=8080
 APP_ENV=development
-DATABASE_URL=sqlitecloud://apikey@host.sqlite.cloud:8860/tatagereja_dev
+SQLITE_PATH=./data/tatagereja.db
+LITESTREAM_REPLICA_URL=file://./data/replica
 LOG_LEVEL=debug
+# For S3 replica (production):
+# LITESTREAM_REPLICA_URL=s3://your-bucket/tatagereja
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_REGION=ap-southeast-1
 ```
 
 ### `Procfile`
@@ -869,21 +981,34 @@ git clone https://github.com/<owner>/tatagereja
 cd tatagereja
 make setup
 cp backend/.env.example backend/.env
-# fill DATABASE_URL with your SQLite Cloud connection string
+# defaults use local file replica under backend/data/ — no cloud setup needed
 make seed-admin
 make dev
 # open http://localhost:8080
 ```
 
+Add `backend/data/` to `.gitignore` (SQLite file + local Litestream replica).
+
 ### Heroku deploy
 
-`make build` then `git push heroku <branch>:main`. Set `DATABASE_URL` and `APP_ENV=production` in Heroku config. Schema applies on boot — no separate migrate step.
+`make build` then `git push heroku <branch>:main`. Set Heroku config:
+
+```
+APP_ENV=production
+SQLITE_PATH=/tmp/tatagereja.db
+LITESTREAM_REPLICA_URL=s3://<bucket>/tatagereja
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=ap-southeast-1
+```
+
+Schema applies on boot — no separate migrate step. On first deploy the S3 prefix is empty; the app creates a fresh DB and Litestream begins replicating. Run `heroku run make seed-admin` once to create the admin user (uses restore/sync path so the user persists across dyno restarts).
 
 ---
 
 ## 11. Testing
 
-Tests use **in-memory SQLite** via `modernc.org/sqlite` (driver name `"sqlite"`). Same SQL dialect as SQLite Cloud; sqlc code works unchanged.
+Tests use **in-memory SQLite** via `modernc.org/sqlite` (`:memory:`). Same driver and SQL dialect as production; sqlc code works unchanged. Tests skip Litestream — no replication needed.
 
 `tests/testutil.go`:
 
@@ -927,7 +1052,7 @@ func TestJemaat_CrossUserReturns404(t *testing.T) {
 ## 12. MVP Phases
 
 **Phase 0 — Foundation**
-Repo scaffold, `Procfile`, `LICENSE`, `Makefile`, `schema.sql`, sqlc working, schema applies on boot, `/health`, login page + session auth, base layout. Done when owner runs `make dev`, logs in, sees empty nav.
+Repo scaffold, `Procfile`, `LICENSE`, `Makefile`, `schema.sql`, sqlc working, embedded Litestream (file replica for dev), schema applies on boot, `/health`, login page + session auth, base layout. Done when owner runs `make dev`, logs in, sees empty nav, and restarting the server preserves data via the local replica.
 
 **Phase 1 — Jemaat + Keluarga CRUD**
 Backend queries + handlers, templates (list/form/detail), search + pagination, cross-user isolation tests. Done when owner adds 50 jemaat across 10 keluarga.
@@ -965,7 +1090,9 @@ Print-friendly schedule, CSV export, birthday widget, recurring kebaktian. Defer
 1. SQLite-standard SQL only.
 2. `schema.sql` is the single source of truth.
 3. Schema applied idempotently on every boot.
-4. Tests use in-memory `modernc.org/sqlite`; prod uses SQLite Cloud.
+4. Production uses `modernc.org/sqlite` + embedded Litestream; tests use in-memory `modernc.org/sqlite` without Litestream.
+5. PRAGMAs via DSN params, not `Exec("PRAGMA ...")` on the pool.
+6. Shutdown order: HTTP server → `database.Close()` → `store.Close()`.
 
 ### Code quality
 1. `go test ./...` green before merge.

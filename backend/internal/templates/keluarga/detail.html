@@ -1,0 +1,61 @@
+{{define "keluarga/detail.html"}}
+<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <div>
+    <a href="/keluarga" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke daftar</a>
+    <h1 class="mt-1 text-xl font-bold text-slate-800">{{.Keluarga.NamaKeluarga}}</h1>
+  </div>
+  <div class="flex gap-2">
+    <a href="/keluarga/{{.Keluarga.ID}}/edit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-stone-50">Ubah</a>
+    <form method="POST" action="/keluarga/{{.Keluarga.ID}}">
+      <input type="hidden" name="_method" value="DELETE">
+      <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-medium text-red-700 hover:bg-red-50"
+        onclick="return confirm('Hapus keluarga ini?')">Hapus</button>
+    </form>
+  </div>
+</div>
+
+<dl class="mb-6 grid gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-2 md:p-6">
+  <div class="sm:col-span-2">
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Alamat</dt>
+    <dd class="mt-1 whitespace-pre-wrap text-sm text-slate-800">{{if .Keluarga.Alamat.Valid}}{{derefString .Keluarga.Alamat}}{{else}}—{{end}}</dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Catatan</dt>
+    <dd class="mt-1 whitespace-pre-wrap text-sm text-slate-800">{{if .Keluarga.Catatan.Valid}}{{derefString .Keluarga.Catatan}}{{else}}—{{end}}</dd>
+  </div>
+</dl>
+
+<h2 class="mb-3 text-lg font-semibold text-slate-800">Anggota keluarga</h2>
+
+<div class="space-y-3 md:hidden">
+  {{range .Members}}
+  <a href="/jemaat/{{.ID}}" class="block rounded-xl border border-stone-200 bg-white p-4 font-medium text-slate-800 shadow-sm hover:bg-stone-50">
+    {{.NamaLengkap}}
+    {{if .NamaPanggilan.Valid}}<span class="font-normal text-slate-500"> ({{derefString .NamaPanggilan}})</span>{{end}}
+  </a>
+  {{else}}
+  <p class="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-slate-500">Belum ada anggota.</p>
+  {{end}}
+</div>
+
+<div class="hidden overflow-hidden rounded-xl border border-stone-200 bg-white md:block">
+  <table class="w-full text-left text-sm">
+    <thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-4 py-3">Nama</th>
+        <th class="px-4 py-3">Telepon</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {{range .Members}}
+      <tr class="hover:bg-stone-50">
+        <td class="px-4 py-3"><a href="/jemaat/{{.ID}}" class="font-medium text-slate-800 hover:underline">{{.NamaLengkap}}</a></td>
+        <td class="px-4 py-3 text-slate-600">{{if .NomorTelepon.Valid}}{{derefString .NomorTelepon}}{{else}}—{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="2" class="px-4 py-8 text-center text-slate-500">Belum ada anggota.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

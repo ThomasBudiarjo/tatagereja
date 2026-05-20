@@ -1,0 +1,5 @@
+backend/data/
+backend/bin/
+backend/tmp/
+backend/.env
+*.db

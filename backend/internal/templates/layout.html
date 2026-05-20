@@ -1,0 +1,82 @@
+{{define "flash"}}
+<div class="mx-4 mt-4 rounded-lg border px-4 py-3 text-sm md:mx-6 {{if eq .Kind `error`}}border-red-200 bg-red-50 text-red-800{{else if eq .Kind `success`}}border-emerald-200 bg-emerald-50 text-emerald-800{{else}}border-slate-200 bg-slate-50 text-slate-800{{end}}" role="status">
+  {{.Message}}
+</div>
+{{end}}
+
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{if .Data.Title}}{{.Data.Title}} — {{end}}Tata Gereja</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-screen bg-stone-50 text-slate-800 antialiased">
+  <div class="flex min-h-screen">
+    <!-- Desktop sidebar -->
+    <aside class="hidden w-56 shrink-0 flex-col border-r border-stone-200 bg-white md:flex">
+      <div class="border-b border-stone-200 px-4 py-5">
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Tata Gereja</p>
+        <p class="mt-1 truncate text-sm font-semibold text-slate-800">{{.Data.User.ChurchName}}</p>
+        <p class="truncate text-xs text-slate-500">{{.Data.User.DisplayName}}</p>
+      </div>
+      <nav class="flex-1 space-y-1 px-3 py-4 text-sm">
+        <a href="/jemaat" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Jemaat</a>
+        <a href="/keluarga" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Keluarga</a>
+        <a href="/pelayan" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Pelayan</a>
+        <a href="/service-types" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Tipe Pelayanan</a>
+        <a href="/kebaktian" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Kebaktian</a>
+      </nav>
+      <div class="border-t border-stone-200 p-3">
+        <form method="POST" action="/logout">
+          <button type="submit" class="flex min-h-11 w-full items-center justify-center rounded-lg border border-stone-200 px-3 text-sm font-medium text-slate-600 hover:bg-stone-50">
+            Keluar
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
+      <header class="border-b border-stone-200 bg-white px-4 py-3 md:hidden">
+        <p class="text-sm font-semibold text-slate-800">{{.Data.User.ChurchName}}</p>
+        <p class="text-xs text-slate-500">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+      </header>
+
+      {{with .Data.Flash}}{{if .Message}}{{template "flash" .}}{{end}}{{end}}
+
+      <main class="flex-1 px-4 py-4 md:px-6 md:py-6">
+        {{.Body}}
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile bottom nav -->
+  <nav class="fixed inset-x-0 bottom-0 z-40 flex border-t border-stone-200 bg-white md:hidden" aria-label="Navigasi utama">
+    <a href="/jemaat" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
+      <span class="text-base leading-none" aria-hidden="true">👥</span>
+      Jemaat
+    </a>
+    <a href="/keluarga" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
+      <span class="text-base leading-none" aria-hidden="true">🏠</span>
+      Keluarga
+    </a>
+    <a href="/pelayan" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
+      <span class="text-base leading-none" aria-hidden="true">🙋</span>
+      Pelayan
+    </a>
+    <a href="/service-types" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
+      <span class="text-base leading-none" aria-hidden="true">📋</span>
+      Tipe
+    </a>
+    <a href="/kebaktian" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
+      <span class="text-base leading-none" aria-hidden="true">⛪</span>
+      Kebaktian
+    </a>
+  </nav>
+</body>
+</html>
+{{end}}
