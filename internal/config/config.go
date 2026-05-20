@@ -20,6 +20,8 @@ type Config struct {
 	AWSRegion            string
 	AWSEndpointURL       string
 	LogLevel             string
+	TurnstileSiteKey     string
+	TurnstileSecretKey   string
 }
 
 func MustLoad() *Config {
@@ -33,6 +35,8 @@ func MustLoad() *Config {
 		AWSRegion:            envOr("AWS_REGION", "auto"),
 		AWSEndpointURL:       os.Getenv("AWS_ENDPOINT_URL"),
 		LogLevel:             envOr("LOG_LEVEL", "info"),
+		TurnstileSiteKey:     os.Getenv("TURNSTILE_SITE_KEY"),
+		TurnstileSecretKey:   os.Getenv("TURNSTILE_SECRET_KEY"),
 	}
 	cfg.applyAWSEnv()
 	cfg.configureLogging()

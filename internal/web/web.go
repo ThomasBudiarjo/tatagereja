@@ -218,6 +218,12 @@ func MaxLen(v string, n int, field string, errs map[string]string) {
 	}
 }
 
+func MinLen(v string, n int, field string, errs map[string]string) {
+	if len([]rune(v)) < n {
+		errs[field] = fmt.Sprintf("Minimal %d karakter", n)
+	}
+}
+
 func ValidEmail(v, field string, errs map[string]string) {
 	if strings.TrimSpace(v) == "" {
 		return
