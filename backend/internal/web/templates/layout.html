@@ -1,0 +1,71 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tata Gereja</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+</head>
+<body class="h-full">
+
+{{if eq .Page "login"}}
+  {{template "login" .Data}}
+{{else}}
+<div class="min-h-full flex flex-col md:flex-row">
+
+  {{/* Desktop sidebar */}}
+  <nav class="hidden md:flex md:flex-col md:w-56 md:min-h-screen bg-indigo-700 text-white px-4 py-6 shrink-0">
+    <div class="text-xl font-bold mb-8 px-2">Tata Gereja</div>
+    {{with .Data.User}}
+    <div class="text-xs text-indigo-200 px-2 mb-6">{{.ChurchName}}</div>
+    {{end}}
+    <ul class="space-y-1 flex-1">
+      <li><a href="/jemaat" class="block px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm">Jemaat</a></li>
+      <li><a href="/keluarga" class="block px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm">Keluarga</a></li>
+      <li><a href="/pelayan" class="block px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm">Pelayan</a></li>
+      <li><a href="/service-types" class="block px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm">Tipe Pelayanan</a></li>
+      <li><a href="/kebaktian" class="block px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm">Kebaktian</a></li>
+    </ul>
+    <form method="POST" action="/logout" class="mt-4">
+      <button type="submit" class="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm text-indigo-200">Keluar</button>
+    </form>
+  </nav>
+
+  {{/* Main content */}}
+  <div class="flex-1 flex flex-col pb-16 md:pb-0">
+    {{/* Flash */}}
+    {{with .Data.Flash}}
+    <div class="{{if eq .Kind "success"}}bg-green-50 border-green-400 text-green-800{{else if eq .Kind "error"}}bg-red-50 border-red-400 text-red-800{{else}}bg-blue-50 border-blue-400 text-blue-800{{end}} border-l-4 p-3 m-4 rounded text-sm">
+      {{.Message}}
+    </div>
+    {{end}}
+
+    <main class="flex-1 px-4 py-6 max-w-5xl w-full mx-auto">
+      {{template "content" .Data.Data}}
+    </main>
+  </div>
+
+  {{/* Mobile bottom nav */}}
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 z-10">
+    <a href="/jemaat" class="flex flex-col items-center text-xs text-gray-600 min-w-11 min-h-11 justify-center">
+      <span>👥</span><span>Jemaat</span>
+    </a>
+    <a href="/keluarga" class="flex flex-col items-center text-xs text-gray-600 min-w-11 min-h-11 justify-center">
+      <span>🏠</span><span>Keluarga</span>
+    </a>
+    <a href="/pelayan" class="flex flex-col items-center text-xs text-gray-600 min-w-11 min-h-11 justify-center">
+      <span>🙋</span><span>Pelayan</span>
+    </a>
+    <a href="/kebaktian" class="flex flex-col items-center text-xs text-gray-600 min-w-11 min-h-11 justify-center">
+      <span>📅</span><span>Kebaktian</span>
+    </a>
+  </nav>
+
+</div>
+{{end}}
+
+</body>
+</html>
+{{end}}

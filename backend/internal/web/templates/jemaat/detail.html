@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/jemaat" class="text-gray-400 hover:text-gray-600 text-sm">← Jemaat</a>
+</div>
+
+<div class="bg-white border border-gray-200 rounded-xl p-6 mb-4">
+  <div class="flex items-start justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{.Jemaat.NamaLengkap}}</h1>
+      {{if .Jemaat.NamaPanggilan.Valid}}<p class="text-gray-500">{{.Jemaat.NamaPanggilan.String}}</p>{{end}}
+    </div>
+    <div class="flex gap-2">
+      <a href="/jemaat/{{.Jemaat.ID}}/edit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">Edit</a>
+      <form method="POST" action="/jemaat/{{.Jemaat.ID}}/delete" onsubmit="return confirm('Nonaktifkan jemaat ini?')">
+        <button type="submit" class="text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg">Hapus</button>
+      </form>
+    </div>
+  </div>
+
+  <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+    {{if .Jemaat.JenisKelamin.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Jenis Kelamin</dt><dd>{{.Jemaat.JenisKelamin.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.TanggalLahir.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Tanggal Lahir</dt><dd>{{.Jemaat.TanggalLahir.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.TempatLahir.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Tempat Lahir</dt><dd>{{.Jemaat.TempatLahir.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.StatusPernikahan.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Status Pernikahan</dt><dd>{{.Jemaat.StatusPernikahan.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.NomorTelepon.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Telepon</dt><dd>{{.Jemaat.NomorTelepon.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.Email.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Email</dt><dd>{{.Jemaat.Email.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.Alamat.Valid}}
+    <div class="md:col-span-2"><dt class="text-gray-500 mb-0.5">Alamat</dt><dd>{{.Jemaat.Alamat.String}}</dd></div>
+    {{end}}
+    {{if .Keluarga}}
+    <div><dt class="text-gray-500 mb-0.5">Keluarga</dt>
+      <dd><a href="/keluarga/{{.Keluarga.ID}}" class="text-indigo-600 hover:underline">{{.Keluarga.NamaKeluarga}}</a></dd>
+    </div>
+    {{end}}
+    {{if .Jemaat.TanggalBaptis.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Tanggal Baptis</dt><dd>{{.Jemaat.TanggalBaptis.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.TanggalSidi.Valid}}
+    <div><dt class="text-gray-500 mb-0.5">Tanggal Sidi</dt><dd>{{.Jemaat.TanggalSidi.String}}</dd></div>
+    {{end}}
+    {{if .Jemaat.Catatan.Valid}}
+    <div class="md:col-span-2"><dt class="text-gray-500 mb-0.5">Catatan</dt><dd class="whitespace-pre-wrap">{{.Jemaat.Catatan.String}}</dd></div>
+    {{end}}
+  </dl>
+</div>
+{{end}}

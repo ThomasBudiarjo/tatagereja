@@ -1,0 +1,121 @@
+{{define "content"}}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/jemaat" class="text-gray-400 hover:text-gray-600 text-sm">← Jemaat</a>
+</div>
+<h1 class="text-xl font-bold text-gray-900 mb-6">{{if .IsNew}}Tambah Jemaat{{else}}Edit Jemaat{{end}}</h1>
+
+<div id="form-container">
+{{if .IsNew}}
+<form method="POST" action="/jemaat" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+{{else}}
+<form method="POST" action="/jemaat/{{.ID}}" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+  <input type="hidden" name="_method" value="PUT">
+{{end}}
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
+    <input name="nama_lengkap" value="{{.Form.NamaLengkap}}"
+           class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 {{if index .Errors "NamaLengkap"}}border-red-400{{else}}border-gray-300{{end}}">
+    {{with index .Errors "NamaLengkap"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Panggilan</label>
+    <input name="nama_panggilan" value="{{.Form.NamaPanggilan}}"
+           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+      <select name="jenis_kelamin" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">— Pilih —</option>
+        <option value="L" {{if eq .Form.JenisKelamin "L"}}selected{{end}}>Laki-laki</option>
+        <option value="P" {{if eq .Form.JenisKelamin "P"}}selected{{end}}>Perempuan</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Status Pernikahan</label>
+      <select name="status_pernikahan" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">— Pilih —</option>
+        <option value="belum_menikah" {{if eq .Form.StatusPernikahan "belum_menikah"}}selected{{end}}>Belum Menikah</option>
+        <option value="menikah" {{if eq .Form.StatusPernikahan "menikah"}}selected{{end}}>Menikah</option>
+        <option value="cerai" {{if eq .Form.StatusPernikahan "cerai"}}selected{{end}}>Cerai</option>
+        <option value="duda" {{if eq .Form.StatusPernikahan "duda"}}selected{{end}}>Duda</option>
+        <option value="janda" {{if eq .Form.StatusPernikahan "janda"}}selected{{end}}>Janda</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+      <input name="tanggal_lahir" type="date" value="{{.Form.TanggalLahir}}"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      {{with index .Errors "TanggalLahir"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Tempat Lahir</label>
+      <input name="tempat_lahir" value="{{.Form.TempatLahir}}"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Nomor Telepon</label>
+    <input name="nomor_telepon" value="{{.Form.NomorTelepon}}"
+           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+    <input name="email" type="email" value="{{.Form.Email}}"
+           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 {{if index .Errors "Email"}}border-red-400{{end}}">
+    {{with index .Errors "Email"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+    <textarea name="alamat" rows="2"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{{.Form.Alamat}}</textarea>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Keluarga</label>
+    <select name="keluarga_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">— Tidak ada —</option>
+      {{range .Keluargas}}
+      <option value="{{.ID}}" {{if eq (printf "%d" .ID) $.Form.KeluargaID}}selected{{end}}>{{.NamaKeluarga}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Baptis</label>
+      <input name="tanggal_baptis" type="date" value="{{.Form.TanggalBaptis}}"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      {{with index .Errors "TanggalBaptis"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Sidi</label>
+      <input name="tanggal_sidi" type="date" value="{{.Form.TanggalSidi}}"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      {{with index .Errors "TanggalSidi"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+    <textarea name="catatan" rows="3"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{{.Form.Catatan}}</textarea>
+    {{with index .Errors "Catatan"}}<p class="text-xs text-red-600 mt-1">{{.}}</p>{{end}}
+  </div>
+
+  <div class="flex gap-3 pt-2">
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2 rounded-lg">Simpan</button>
+    <a href="/jemaat" class="text-sm text-gray-600 hover:text-gray-900 px-3 py-2">Batal</a>
+  </div>
+</form>
+</div>
+{{end}}

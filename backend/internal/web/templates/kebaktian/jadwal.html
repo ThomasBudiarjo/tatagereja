@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="flex items-center gap-3 mb-4">
+  <a href="/kebaktian/{{.Kebaktian.ID}}" class="text-gray-400 hover:text-gray-600 text-sm">← {{.Kebaktian.Nama}}</a>
+</div>
+<h1 class="text-xl font-bold text-gray-900 mb-1">Jadwal Pelayanan</h1>
+<p class="text-sm text-gray-500 mb-6">{{formatDateTime .Kebaktian.WaktuMulai .Timezone "02 January 2006, 15:04"}}</p>
+
+<form method="POST" action="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3 text-left">Tipe Pelayanan</th>
+        <th class="px-4 py-3 text-left">Pelayan</th>
+        <th class="px-4 py-3 text-left hidden md:table-cell">Catatan</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{range .ServiceTypes}}
+      {{$stID := .ID}}
+      {{$slot := index $.JadwalMap $stID}}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{.Nama}}</td>
+        <td class="px-4 py-3">
+          <select name="pelayan_{{.ID}}"
+                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">— Kosong —</option>
+            {{range $.Pelayans}}
+            <option value="{{.ID}}" {{if and $slot.PelayanID.Valid (eq $slot.PelayanID.Int64 .ID)}}selected{{end}}>
+              {{.JemaatNama}}
+            </option>
+            {{end}}
+          </select>
+        </td>
+        <td class="px-4 py-3 hidden md:table-cell">
+          <input name="catatan_{{.ID}}" type="text"
+                 value="{{if $slot.Catatan.Valid}}{{$slot.Catatan.String}}{{end}}"
+                 placeholder="Catatan..."
+                 class="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <div class="px-4 py-4 border-t border-gray-100 flex gap-3">
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2 rounded-lg">Simpan Jadwal</button>
+    <a href="/kebaktian/{{.Kebaktian.ID}}" class="text-sm text-gray-600 px-3 py-2">Batal</a>
+  </div>
+</form>
+{{end}}
