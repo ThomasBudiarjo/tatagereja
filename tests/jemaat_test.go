@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 func TestJemaat_CRUD(t *testing.T) {

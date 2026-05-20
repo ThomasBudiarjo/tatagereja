@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/tatagereja/tatagereja/backend/internal/auth"
-	"github.com/tatagereja/tatagereja/backend/internal/config"
-	"github.com/tatagereja/tatagereja/backend/internal/db"
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/auth"
+	"github.com/tatagereja/tatagereja/internal/config"
+	"github.com/tatagereja/tatagereja/internal/db"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 func main() {

@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/tatagereja/tatagereja/backend/internal/config"
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/config"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 const CookieName = "tatagereja_session"

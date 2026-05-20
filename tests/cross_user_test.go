@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 func TestJemaat_CrossUserReturns404(t *testing.T) {

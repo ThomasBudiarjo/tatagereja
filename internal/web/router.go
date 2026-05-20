@@ -10,8 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/tatagereja/tatagereja/backend/internal/config"
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/config"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {

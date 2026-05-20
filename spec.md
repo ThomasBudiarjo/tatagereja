@@ -94,50 +94,48 @@ One binary, one port, same origin. No CORS.
 
 ```
 tatagereja/
-├── backend/
-│   ├── cmd/
-│   │   ├── server/main.go
-│   │   └── seed-admin/main.go
-│   ├── internal/
-│   │   ├── config/config.go
-│   │   ├── db/
-│   │   │   ├── schema.sql        # SINGLE SOURCE OF TRUTH
-│   │   │   ├── conn.go           # Open SQLite + embedded Litestream
-│   │   │   ├── litestream.go     # restore, Store lifecycle, sync helpers
-│   │   │   ├── queries/          # one .sql file per entity
-│   │   │   │   ├── auth.sql
-│   │   │   │   ├── jemaat.sql
-│   │   │   │   ├── keluarga.sql
-│   │   │   │   ├── pelayan.sql
-│   │   │   │   ├── servicetypes.sql
-│   │   │   │   ├── kebaktian.sql
-│   │   │   │   └── jadwal.sql
-│   │   │   └── sqlc/             # GENERATED — do not edit
-│   │   ├── auth/auth.go          # password, session, cookie, handlers
-│   │   ├── web/
-│   │   │   ├── web.go            # renderer, flash, pagination, validation helpers
-│   │   │   ├── middleware.go     # logging, RequireAuth
-│   │   │   ├── router.go
-│   │   │   ├── jemaat.go
-│   │   │   ├── keluarga.go
-│   │   │   ├── pelayan.go
-│   │   │   ├── servicetypes.go
-│   │   │   ├── kebaktian.go
-│   │   │   └── jadwal.go
-│   │   └── templates/            # embedded; layout.html + per-entity folders
-│   ├── tests/
-│   │   ├── cross_user_test.go    # CRITICAL: 404 across users
-│   │   ├── jemaat_test.go
-│   │   ├── jadwal_test.go
-│   │   └── testutil.go
-│   ├── sqlc.yaml
-│   ├── .air.toml
-│   ├── go.mod
-│   ├── go.sum
-│   ├── .env.example
-│   └── .gitignore
-├── Procfile                       # web: ./bin/server
+├── cmd/
+│   ├── server/main.go
+│   └── seed-admin/main.go
+├── internal/
+│   ├── config/config.go
+│   ├── db/
+│   │   ├── schema.sql            # SINGLE SOURCE OF TRUTH
+│   │   ├── conn.go               # Open SQLite + embedded Litestream
+│   │   ├── litestream.go         # restore, Store lifecycle, sync helpers
+│   │   ├── queries/              # one .sql file per entity
+│   │   │   ├── auth.sql
+│   │   │   ├── jemaat.sql
+│   │   │   ├── keluarga.sql
+│   │   │   ├── pelayan.sql
+│   │   │   ├── servicetypes.sql
+│   │   │   ├── kebaktian.sql
+│   │   │   └── jadwal.sql
+│   │   └── sqlc/                 # GENERATED — do not edit
+│   ├── auth/auth.go              # password, session, cookie, handlers
+│   ├── web/
+│   │   ├── web.go                # renderer, flash, pagination, validation helpers
+│   │   ├── middleware.go         # logging, RequireAuth
+│   │   ├── router.go
+│   │   ├── jemaat.go
+│   │   ├── keluarga.go
+│   │   ├── pelayan.go
+│   │   ├── servicetypes.go
+│   │   ├── kebaktian.go
+│   │   └── jadwal.go
+│   └── templates/                # embedded; layout.html + per-entity folders
+├── tests/
+│   ├── cross_user_test.go        # CRITICAL: 404 across users
+│   ├── jemaat_test.go
+│   ├── jadwal_test.go
+│   └── testutil.go
+├── sqlc.yaml
+├── .air.toml
+├── go.mod                         # +heroku install ./cmd/server ./cmd/seed-admin
+├── go.sum
+├── .env.example
 ├── .gitignore
+├── Procfile                       # web: bin/server
 ├── LICENSE                        # MIT
 ├── Makefile
 └── README.md
@@ -151,7 +149,7 @@ Handlers live in `internal/web/` as one file per entity. Queries live in `intern
 
 ### 4.1 Source of truth
 
-`backend/internal/db/schema.sql` is THE source of truth:
+`internal/db/schema.sql` is THE source of truth:
 
 - Input to sqlc.
 - Input to the boot-time sync (`Apply(db)`).
@@ -390,7 +388,7 @@ Nullable `TEXT`/`INTEGER` columns map to stdlib `sql.NullString` / `sql.NullInt6
 2. `database.Close()` — drain the app's connection pool
 3. `store.Close(ctx)` — final sync and Litestream teardown
 
-**Development:** `LITESTREAM_REPLICA_URL=file://./data/replica` — replica files live beside the DB under `backend/data/` (gitignored).
+**Development:** `LITESTREAM_REPLICA_URL=file://./data/replica` — replica files live beside the DB under `data/` (gitignored).
 
 **Production (Heroku):** `SQLITE_PATH=/tmp/tatagereja.db`, `LITESTREAM_REPLICA_URL=s3://<bucket>/tatagereja`. Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (e.g. `ap-southeast-1`) in Heroku config. Use a dedicated IAM user scoped to one bucket prefix.
 
@@ -920,7 +918,7 @@ Server-side only, hand-written using stdlib (`strings.TrimSpace`, `net/mail.Pars
 
 ## 10. Development & Deployment
 
-Contributors need: Go 1.23+, `sqlc`, `air`. No Node.
+Contributors need: Go 1.24+. `sqlc` and `air` are wired as `go tool` dev dependencies in `go.mod` — no global installs. No Node.
 
 ### Makefile
 
@@ -928,14 +926,14 @@ Contributors need: Go 1.23+, `sqlc`, `air`. No Node.
 .PHONY: help setup dev build test lint sqlc seed-admin clean
 help:
 	@echo "setup | dev | build | test | lint | sqlc | seed-admin | clean"
-setup:       ; cd backend && go mod download
-dev:         ; cd backend && air
-build:       ; cd backend && go build -o bin/server ./cmd/server
-test:        ; cd backend && go test -race -cover ./...
-lint:        ; cd backend && golangci-lint run
-sqlc:        ; cd backend && sqlc generate
-seed-admin:  ; cd backend && go run ./cmd/seed-admin
-clean:       ; rm -rf backend/bin backend/tmp
+setup:       ; go mod download
+dev:         ; go tool air
+build:       ; go build -o bin/server ./cmd/server
+test:        ; go test -race -cover ./...
+lint:        ; golangci-lint run
+sqlc:        ; go tool sqlc generate
+seed-admin:  ; go run ./cmd/seed-admin
+clean:       ; rm -rf bin tmp data
 ```
 
 ### `.air.toml`
@@ -980,14 +978,14 @@ web: bin/server
 git clone https://github.com/<owner>/tatagereja
 cd tatagereja
 make setup
-cp backend/.env.example backend/.env
-# defaults use local file replica under backend/data/ — no cloud setup needed
+cp .env.example .env
+# defaults use local file replica under data/ — no cloud setup needed
 make seed-admin
 make dev
 # open http://localhost:8080
 ```
 
-Add `backend/data/` to `.gitignore` (SQLite file + local Litestream replica).
+Add `data/` to `.gitignore` (SQLite file + local Litestream replica).
 
 ### Heroku deploy
 

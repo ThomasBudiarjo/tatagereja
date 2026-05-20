@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/benbjohnson/litestream"
-	"github.com/tatagereja/tatagereja/backend/internal/config"
+	"github.com/tatagereja/tatagereja/internal/config"
 	_ "modernc.org/sqlite"
 )
 

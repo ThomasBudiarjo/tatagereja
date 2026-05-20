@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tatagereja/tatagereja/backend/internal/auth"
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/auth"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
 type ctxKey int

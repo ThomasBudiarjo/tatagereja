@@ -2,18 +2,18 @@
 help:
 	@echo "setup | dev | build | test | lint | sqlc | seed-admin | clean"
 setup:
-	cd backend && go mod download
+	go mod download
 dev:
-	cd backend && air
+	go tool air
 build:
-	cd backend && go build -o bin/server ./cmd/server
+	go build -o bin/server ./cmd/server
 test:
-	cd backend && go test -race -cover ./...
+	go test -race -cover ./...
 lint:
-	cd backend && golangci-lint run
+	golangci-lint run
 sqlc:
-	cd backend && sqlc generate
+	go tool sqlc generate
 seed-admin:
-	cd backend && go run ./cmd/seed-admin --email=admin@example.com --password=changeme --display-name="Admin" --church-name="GKI Demo"
+	go run ./cmd/seed-admin --email=admin@example.com --password=changeme --display-name="Admin" --church-name="GKI Demo"
 clean:
-	rm -rf backend/bin backend/tmp backend/data
+	rm -rf bin tmp data

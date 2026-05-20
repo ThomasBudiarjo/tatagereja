@@ -18,8 +18,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/tatagereja/tatagereja/backend/internal/db/sqlc"
-	"github.com/tatagereja/tatagereja/backend/internal/templates"
+	"github.com/tatagereja/tatagereja/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/templates"
 )
 
 const (

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tatagereja/tatagereja/backend/internal/config"
-	"github.com/tatagereja/tatagereja/backend/internal/db"
-	"github.com/tatagereja/tatagereja/backend/internal/web"
+	"github.com/tatagereja/tatagereja/internal/config"
+	"github.com/tatagereja/tatagereja/internal/db"
+	"github.com/tatagereja/tatagereja/internal/web"
 )
 
 func main() {

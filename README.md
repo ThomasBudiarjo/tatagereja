@@ -14,7 +14,7 @@ Open-source church management web app for small Indonesian Protestant churches. 
 
 ```bash
 make setup
-cp backend/.env.example backend/.env
+cp .env.example .env
 make seed-admin   # default: admin@example.com / changeme
 make dev
 # http://localhost:8080
@@ -23,7 +23,7 @@ make dev
 Override seed credentials:
 
 ```bash
-cd backend && go run ./cmd/seed-admin \
+go run ./cmd/seed-admin \
   --email=you@church.org --password=secret \
   --display-name="Pak Budi" --church-name="GKI Demo"
 ```
@@ -42,7 +42,7 @@ AWS_REGION=auto
 AWS_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
 ```
 
-Deploy: `git push heroku main` (Heroku builds via root `go.mod`). After first deploy:
+Deploy: `git push heroku main` (Heroku builds `./cmd/server` and `./cmd/seed-admin` per the `+heroku install` directive in `go.mod`). After first deploy:
 
 ```bash
 heroku run bin/seed-admin -- --email=admin@example.com --password=changeme \
