@@ -1,0 +1,54 @@
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Kebaktian</h1>
+  <a href="/kebaktian/new" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Tambah</a>
+</div>
+
+<form method="GET" action="/kebaktian" class="flex gap-2 mb-4 flex-wrap">
+  <input name="from" type="date" value="{{.From}}"
+         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+  <input name="to" type="date" value="{{.To}}"
+         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+  <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg">Filter</button>
+  {{if .From}}<a href="/kebaktian" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg">Reset</a>{{end}}
+</form>
+
+<div class="space-y-3 md:hidden">
+  {{range .Items}}
+  <a href="/kebaktian/{{.ID}}" class="block bg-white border border-gray-200 rounded-xl p-4 hover:border-indigo-300">
+    <div class="font-medium">{{.Nama}}</div>
+    <div class="text-sm text-gray-400">{{formatDateTime .WaktuMulai $.Timezone "02 Jan 2006, 15:04"}}</div>
+    {{if .Lokasi.Valid}}<div class="text-sm text-gray-500">{{.Lokasi.String}}</div>{{end}}
+  </a>
+  {{else}}<p class="text-center text-gray-400 py-8">Belum ada kebaktian.</p>{{end}}
+</div>
+
+<div class="hidden md:block">
+  <table class="w-full bg-white border border-gray-200 rounded-xl overflow-hidden text-sm">
+    <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3 text-left">Nama</th>
+        <th class="px-4 py-3 text-left">Waktu</th>
+        <th class="px-4 py-3 text-left">Lokasi</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{range .Items}}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 font-medium"><a href="/kebaktian/{{.ID}}" class="hover:text-indigo-600">{{.Nama}}</a></td>
+        <td class="px-4 py-3 text-gray-500">{{formatDateTime .WaktuMulai $.Timezone "02 Jan 2006, 15:04"}}</td>
+        <td class="px-4 py-3 text-gray-500">{{if .Lokasi.Valid}}{{.Lokasi.String}}{{end}}</td>
+        <td class="px-4 py-3 text-right">
+          <a href="/kebaktian/{{.ID}}/jadwal" class="text-indigo-600 hover:underline mr-3">Jadwal</a>
+          <a href="/kebaktian/{{.ID}}/edit" class="text-indigo-600 hover:underline mr-3">Edit</a>
+          <form method="POST" action="/kebaktian/{{.ID}}/delete" class="inline" onsubmit="return confirm('Hapus kebaktian ini?')">
+            <button type="submit" class="text-red-500 hover:underline">Hapus</button>
+          </form>
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">Belum ada kebaktian.</td></tr>{{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

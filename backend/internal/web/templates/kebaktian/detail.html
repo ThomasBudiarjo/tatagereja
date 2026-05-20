@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/kebaktian" class="text-gray-400 hover:text-gray-600 text-sm">← Kebaktian</a>
+</div>
+
+<div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+  <div class="flex items-start justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{.Kebaktian.Nama}}</h1>
+      <p class="text-gray-500 text-sm mt-1">{{formatDateTime .Kebaktian.WaktuMulai .Timezone "02 January 2006, 15:04 MST"}}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg">Jadwal</a>
+      <a href="/kebaktian/{{.Kebaktian.ID}}/edit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">Edit</a>
+      <form method="POST" action="/kebaktian/{{.Kebaktian.ID}}/delete" onsubmit="return confirm('Hapus kebaktian ini?')">
+        <button type="submit" class="text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg">Hapus</button>
+      </form>
+    </div>
+  </div>
+
+  <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+    {{if .Kebaktian.Lokasi.Valid}}<div><dt class="text-gray-500 mb-0.5">Lokasi</dt><dd>{{.Kebaktian.Lokasi.String}}</dd></div>{{end}}
+    {{if .Kebaktian.Pengkhotbah.Valid}}<div><dt class="text-gray-500 mb-0.5">Pengkhotbah</dt><dd>{{.Kebaktian.Pengkhotbah.String}}</dd></div>{{end}}
+    {{if .Kebaktian.Tema.Valid}}<div class="md:col-span-2"><dt class="text-gray-500 mb-0.5">Tema</dt><dd>{{.Kebaktian.Tema.String}}</dd></div>{{end}}
+    {{if .Kebaktian.Catatan.Valid}}<div class="md:col-span-2"><dt class="text-gray-500 mb-0.5">Catatan</dt><dd>{{.Kebaktian.Catatan.String}}</dd></div>{{end}}
+  </dl>
+</div>
+
+{{if .Jadwal}}
+<h2 class="text-lg font-semibold text-gray-800 mb-3">Jadwal Pelayanan</h2>
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3 text-left">Tipe Pelayanan</th>
+        <th class="px-4 py-3 text-left">Pelayan</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{range .Jadwal}}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{.ServiceTypeNama}}</td>
+        <td class="px-4 py-3 text-gray-500">{{if .PelayanNama.Valid}}{{.PelayanNama.String}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}
