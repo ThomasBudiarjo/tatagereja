@@ -1,6 +1,0 @@
-backend/bin/
-backend/tmp/
-backend/.env
-*.exe
-*.test
-.DS_Store
