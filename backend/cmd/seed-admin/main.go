@@ -24,7 +24,7 @@ func main() {
 	}
 
 	cfg := config.MustLoad()
-	database := db.MustOpen(cfg.DatabaseURL)
+	database := db.MustOpen(cfg.DatabasePath)
 	defer database.Close()
 
 	if err := db.Apply(database); err != nil {

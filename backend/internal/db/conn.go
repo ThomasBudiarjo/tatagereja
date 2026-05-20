@@ -6,27 +6,26 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/sqlitecloud/sqlitecloud-go"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql
 var schemaSQL string
 
-func Open(url string) (*sql.DB, error) {
-	d, err := sql.Open("sqlitecloud", url)
+func Open(path string) (*sql.DB, error) {
+	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)"
+	d, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("db.Open: %w", err)
 	}
-	if _, err := d.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		return nil, fmt.Errorf("db.Open pragma: %w", err)
-	}
-	d.SetMaxOpenConns(5)
-	d.SetMaxIdleConns(2)
+	// Litestream requires a single writer; WAL allows concurrent reads.
+	d.SetMaxOpenConns(1)
+	d.SetMaxIdleConns(1)
 	return d, nil
 }
 
-func MustOpen(url string) *sql.DB {
-	d, err := Open(url)
+func MustOpen(path string) *sql.DB {
+	d, err := Open(path)
 	if err != nil {
 		log.Fatalf("db.MustOpen: %v", err)
 	}
