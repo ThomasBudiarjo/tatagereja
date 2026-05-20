@@ -971,7 +971,7 @@ LOG_LEVEL=debug
 ### `Procfile`
 
 ```
-web: ./bin/server
+web: bin/server
 ```
 
 ### First-run for contributors
@@ -991,7 +991,7 @@ Add `backend/data/` to `.gitignore` (SQLite file + local Litestream replica).
 
 ### Heroku deploy
 
-`make build` then `git push heroku <branch>:main`. Set Heroku config:
+`git push heroku <branch>:main` (root `go.mod` + `// +heroku install` build `bin/server`). Set Heroku config:
 
 ```
 APP_ENV=production
@@ -1002,7 +1002,7 @@ AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=ap-southeast-1
 ```
 
-Schema applies on boot — no separate migrate step. On first deploy the S3 prefix is empty; the app creates a fresh DB and Litestream begins replicating. Run `heroku run make seed-admin` once to create the admin user (uses restore/sync path so the user persists across dyno restarts).
+Schema applies on boot — no separate migrate step. On first deploy the S3 prefix is empty; the app creates a fresh DB and Litestream begins replicating. Run `heroku run bin/seed-admin -- --email=... --password=... --display-name=... --church-name=...` once to create the admin user (uses restore/sync path so the user persists across dyno restarts).
 
 ---
 

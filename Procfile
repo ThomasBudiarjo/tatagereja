@@ -1,1 +1,1 @@
-web: cd backend && ./bin/server
+web: bin/server

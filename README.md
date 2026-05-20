@@ -42,7 +42,12 @@ AWS_REGION=auto
 AWS_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
 ```
 
-Deploy: `make build && git push heroku main`. Run `heroku run make seed-admin` once after first deploy.
+Deploy: `git push heroku main` (Heroku builds via root `go.mod`). After first deploy:
+
+```bash
+heroku run bin/seed-admin -- --email=admin@example.com --password=changeme \
+  --display-name=Admin --church-name="GKI Demo"
+```
 
 ## Commands
 
