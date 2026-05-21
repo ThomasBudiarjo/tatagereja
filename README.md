@@ -6,7 +6,7 @@ Open-source church management web app for small Indonesian Protestant churches. 
 
 ## Stack
 
-- Go + Chi + HTMX + Tailwind CDN
+- Go + Chi + HTMX + Tailwind CSS 4 browser CDN + daisyUI 5 CDN
 - SQLite (`modernc.org/sqlite`) with embedded [Litestream](https://litestream.io) replication
 - sqlc for type-safe queries
 

@@ -40,6 +40,7 @@ type Renderer struct {
 type layoutData struct {
 	Data any
 	Body template.HTML
+	Path string
 }
 
 func NewRenderer() *Renderer {
@@ -50,6 +51,7 @@ func NewRenderer() *Renderer {
 		"sub":            sub,
 		"derefString":    derefString,
 		"nullInt64":      nullInt64,
+		"hasPrefix":      strings.HasPrefix,
 	}
 	tmpl := template.New("").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(templates.FS, "*.html", "**/*.html")
@@ -68,6 +70,7 @@ func (r *Renderer) Page(w http.ResponseWriter, req *http.Request, name string, d
 	return r.tmpl.ExecuteTemplate(w, "layout", layoutData{
 		Data: data,
 		Body: template.HTML(buf.String()),
+		Path: req.URL.Path,
 	})
 }
 

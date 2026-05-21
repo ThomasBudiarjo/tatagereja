@@ -1,80 +1,89 @@
+{{define "assets"}}
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+{{end}}
+
 {{define "flash"}}
-<div class="mx-4 mt-4 rounded-lg border px-4 py-3 text-sm md:mx-6 {{if eq .Kind `error`}}border-red-200 bg-red-50 text-red-800{{else if eq .Kind `success`}}border-emerald-200 bg-emerald-50 text-emerald-800{{else}}border-slate-200 bg-slate-50 text-slate-800{{end}}" role="status">
-  {{.Message}}
+<div class="mx-4 mt-4 md:mx-6" role="status">
+  <div class="alert {{if eq .Kind `error`}}alert-error{{else if eq .Kind `success`}}alert-success{{else}}alert-info{{end}} alert-soft shadow-sm">
+    <span>{{.Message}}</span>
+  </div>
 </div>
 {{end}}
 
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="silk">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{if .Data.Title}}{{.Data.Title}} — {{end}}Tata Gereja</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{{if .Data.Title}}{{.Data.Title}} - {{end}}Tata Gereja</title>
+  {{template "assets" .}}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
-<body class="min-h-screen bg-stone-50 text-slate-800 antialiased">
+<body class="min-h-screen bg-base-200 text-base-content antialiased">
   <div class="flex min-h-screen">
-    <!-- Desktop sidebar -->
-    <aside class="hidden w-56 shrink-0 flex-col border-r border-stone-200 bg-white md:flex">
-      <div class="border-b border-stone-200 px-4 py-5">
-        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Tata Gereja</p>
-        <p class="mt-1 truncate text-sm font-semibold text-slate-800">{{.Data.User.ChurchName}}</p>
-        <p class="truncate text-xs text-slate-500">{{.Data.User.DisplayName}}</p>
+    <aside class="hidden w-64 shrink-0 border-r border-base-300 bg-base-100 md:flex md:flex-col">
+      <div class="border-b border-base-300 px-5 py-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-primary">Tata Gereja</p>
+        <p class="mt-2 truncate text-base font-bold">{{.Data.User.ChurchName}}</p>
+        <p class="truncate text-sm text-base-content/60">{{.Data.User.DisplayName}}</p>
       </div>
-      <nav class="flex-1 space-y-1 px-3 py-4 text-sm">
-        <a href="/jemaat" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Jemaat</a>
-        <a href="/keluarga" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Keluarga</a>
-        <a href="/pelayan" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Pelayan</a>
-        <a href="/service-types" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Tipe Pelayanan</a>
-        <a href="/kebaktian" class="flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-stone-100">Kebaktian</a>
-      </nav>
-      <div class="border-t border-stone-200 p-3">
+      <ul class="menu menu-md flex-1 gap-1 p-3">
+        <li><a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}menu-active{{end}}">Jemaat</a></li>
+        <li><a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}menu-active{{end}}">Keluarga</a></li>
+        <li><a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}menu-active{{end}}">Pelayan</a></li>
+        <li><a href="/service-types" class="{{if hasPrefix .Path `/service-types`}}menu-active{{end}}">Tipe Pelayanan</a></li>
+        <li><a href="/kebaktian" class="{{if hasPrefix .Path `/kebaktian`}}menu-active{{end}}">Kebaktian</a></li>
+      </ul>
+      <div class="border-t border-base-300 p-3">
         <form method="POST" action="/logout">
-          <button type="submit" class="flex min-h-11 w-full items-center justify-center rounded-lg border border-stone-200 px-3 text-sm font-medium text-slate-600 hover:bg-stone-50">
-            Keluar
-          </button>
+          <button type="submit" class="btn btn-ghost btn-block">Keluar</button>
         </form>
       </div>
     </aside>
 
-    <!-- Main -->
     <div class="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-      <header class="border-b border-stone-200 bg-white px-4 py-3 md:hidden">
-        <p class="text-sm font-semibold text-slate-800">{{.Data.User.ChurchName}}</p>
-        <p class="text-xs text-slate-500">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+      <header class="navbar border-b border-base-300 bg-base-100 px-4 md:hidden">
+        <div class="min-w-0 flex-1">
+          <div>
+            <p class="truncate text-sm font-bold">{{.Data.User.ChurchName}}</p>
+            <p class="truncate text-xs text-base-content/60">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+          </div>
+        </div>
       </header>
 
       {{with .Data.Flash}}{{if .Message}}{{template "flash" .}}{{end}}{{end}}
 
-      <main class="flex-1 px-4 py-4 md:px-6 md:py-6">
-        {{.Body}}
+      <main class="flex-1 px-4 py-5 md:px-8 md:py-8">
+        <div class="mx-auto w-full max-w-7xl">
+          {{.Body}}
+        </div>
       </main>
     </div>
   </div>
 
-  <!-- Mobile bottom nav -->
-  <nav class="fixed inset-x-0 bottom-0 z-40 flex border-t border-stone-200 bg-white md:hidden" aria-label="Navigasi utama">
-    <a href="/jemaat" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
-      <span class="text-base leading-none" aria-hidden="true">👥</span>
-      Jemaat
+  <nav class="dock dock-md border-t border-base-300 bg-base-100 md:hidden" aria-label="Navigasi utama">
+    <a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}dock-active{{end}}">
+      <span class="text-lg leading-none" aria-hidden="true">👥</span>
+      <span class="dock-label">Jemaat</span>
     </a>
-    <a href="/keluarga" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
-      <span class="text-base leading-none" aria-hidden="true">🏠</span>
-      Keluarga
+    <a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}dock-active{{end}}">
+      <span class="text-lg leading-none" aria-hidden="true">⌂</span>
+      <span class="dock-label">Keluarga</span>
     </a>
-    <a href="/pelayan" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
-      <span class="text-base leading-none" aria-hidden="true">🙋</span>
-      Pelayan
+    <a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}dock-active{{end}}">
+      <span class="text-lg leading-none" aria-hidden="true">✋</span>
+      <span class="dock-label">Pelayan</span>
     </a>
-    <a href="/service-types" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
-      <span class="text-base leading-none" aria-hidden="true">📋</span>
-      Tipe
+    <a href="/service-types" class="{{if hasPrefix .Path `/service-types`}}dock-active{{end}}">
+      <span class="text-lg leading-none" aria-hidden="true">☷</span>
+      <span class="dock-label">Tipe</span>
     </a>
-    <a href="/kebaktian" class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center px-1 text-[10px] font-medium text-slate-600">
-      <span class="text-base leading-none" aria-hidden="true">⛪</span>
-      Kebaktian
+    <a href="/kebaktian" class="{{if hasPrefix .Path `/kebaktian`}}dock-active{{end}}">
+      <span class="text-lg leading-none" aria-hidden="true">✦</span>
+      <span class="dock-label">Kebaktian</span>
     </a>
   </nav>
 </body>

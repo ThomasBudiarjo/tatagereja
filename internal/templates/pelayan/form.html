@@ -1,58 +1,60 @@
 {{define "pelayan/form.html"}}
-<div class="mb-4">
-  <a href="/pelayan" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke daftar</a>
-  <h1 class="mt-1 text-xl font-bold text-slate-800">{{if .IsNew}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
+<div class="mb-5">
+  <a href="/pelayan" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
+  <h1 class="mt-2 text-2xl font-bold">{{if .IsNew}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
 </div>
 
 <div id="form-container">
 <form method="POST" action="{{if .IsNew}}/pelayan{{else}}/pelayan/{{.Form.ID}}{{end}}"
   {{if not .IsNew}}hx-post="/pelayan/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
-  class="max-w-xl space-y-4 rounded-xl border border-stone-200 bg-white p-4 md:p-6">
+  class="card card-border max-w-2xl bg-base-100 shadow-sm">
+  <div class="card-body gap-5 p-4 md:p-6">
 
   {{if not .IsNew}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
   <div>
-    <label for="jemaat_id" class="mb-1 block text-sm font-medium text-slate-700">Jemaat <span class="text-red-600">*</span></label>
+    <label for="jemaat_id" class="label pb-1">Jemaat <span class="text-error">*</span></label>
     <select id="jemaat_id" name="jemaat_id" required
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "JemaatID"}}border-red-500{{else}}border-stone-300{{end}}">
-      <option value="">— Pilih jemaat —</option>
+      class="select w-full {{if index .Errors "JemaatID"}}select-error{{end}}">
+      <option value="">Pilih jemaat</option>
       {{range .JemaatOptions}}
       <option value="{{.ID}}" {{if eq $.Form.JemaatID .ID}}selected{{end}}>{{.NamaLengkap}}</option>
       {{end}}
     </select>
-    {{with index .Errors "JemaatID"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+    {{with index .Errors "JemaatID"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <fieldset>
-    <legend class="mb-2 text-sm font-medium text-slate-700">Tipe pelayanan</legend>
-    {{with index .Errors "ServiceTypeIDs"}}<p class="mb-2 text-xs text-red-600">{{.}}</p>{{end}}
+    <legend class="mb-2 text-sm font-semibold text-base-content">Tipe pelayanan</legend>
+    {{with index .Errors "ServiceTypeIDs"}}<p class="mb-2 text-xs text-error">{{.}}</p>{{end}}
     <div class="space-y-2">
       {{range .ServiceTypes}}
-      <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-stone-200 px-3 hover:bg-stone-50">
+      <label class="flex min-h-12 cursor-pointer items-center gap-3 rounded-box border border-base-300 bg-base-100 px-3 transition hover:bg-base-200">
         <input type="checkbox" name="service_type_ids" value="{{.ID}}"
           {{if index $.Form.ServiceTypeIDs .ID}}checked{{end}}
-          class="h-5 w-5 rounded border-stone-300 text-slate-800">
-        <span class="text-sm text-slate-800">{{.Nama}}</span>
-        {{if .Deskripsi.Valid}}<span class="text-xs text-slate-500">— {{derefString .Deskripsi}}</span>{{end}}
+          class="checkbox checkbox-primary">
+        <span class="text-sm">{{.Nama}}</span>
+        {{if .Deskripsi.Valid}}<span class="text-xs text-base-content/60">- {{derefString .Deskripsi}}</span>{{end}}
       </label>
       {{else}}
-      <p class="text-sm text-slate-500">Belum ada tipe pelayanan. <a href="/service-types" class="underline">Tambah dulu</a>.</p>
+      <p class="text-sm text-base-content/60">Belum ada tipe pelayanan. <a href="/service-types" class="link link-primary">Tambah dulu</a>.</p>
       {{end}}
     </div>
   </fieldset>
 
   <div>
-    <label for="catatan" class="mb-1 block text-sm font-medium text-slate-700">Catatan</label>
+    <label for="catatan" class="label pb-1">Catatan</label>
     <textarea id="catatan" name="catatan" rows="3" maxlength="2000"
-      class="block w-full rounded-lg border px-3 py-2 text-sm {{if index .Errors "Catatan"}}border-red-500{{else}}border-stone-300{{end}}">{{.Form.Catatan}}</textarea>
-    {{with index .Errors "Catatan"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="textarea w-full {{if index .Errors "Catatan"}}textarea-error{{end}}">{{.Form.Catatan}}</textarea>
+    {{with index .Errors "Catatan"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
-  <div class="flex flex-col gap-2 border-t border-stone-100 pt-4 sm:flex-row">
-    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700">Simpan</button>
-    <a href="/pelayan" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-stone-200 text-sm font-medium text-slate-700 hover:bg-stone-50">Batal</a>
+  <div class="card-actions grid gap-2 border-t border-base-300 pt-4 sm:grid-cols-2">
+    <button type="submit" class="btn btn-primary">Simpan</button>
+    <a href="/pelayan" class="btn btn-outline">Batal</a>
+  </div>
   </div>
 </form>
 </div>
