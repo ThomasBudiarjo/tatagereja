@@ -1,38 +1,40 @@
 {{define "pelayan/detail.html"}}
-<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
-    <a href="/pelayan" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke daftar</a>
-    <h1 class="mt-1 text-xl font-bold text-slate-800">{{.JemaatNama}}</h1>
-    <p class="text-sm text-slate-500">Pelayan</p>
+    <a href="/pelayan" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
+    <h1 class="mt-2 text-2xl font-bold">{{.JemaatNama}}</h1>
+    <p class="text-sm text-base-content/60">Pelayan</p>
   </div>
   <div class="flex gap-2">
-    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-stone-50">Ubah</a>
+    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="btn btn-outline">Ubah</a>
     <form method="POST" action="/pelayan/{{.Pelayan.ID}}">
       <input type="hidden" name="_method" value="DELETE">
-      <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-medium text-red-700 hover:bg-red-50"
+      <button type="submit" class="btn btn-error btn-outline"
         onclick="return confirm('Hapus pelayan ini?')">Hapus</button>
     </form>
   </div>
 </div>
 
-<dl class="rounded-xl border border-stone-200 bg-white p-4 md:p-6">
-  <div class="mb-4">
-    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Jemaat</dt>
-    <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="text-sm font-medium text-slate-800 underline hover:text-slate-600">{{.JemaatNama}}</a></dd>
-  </div>
-  <div class="mb-4">
-    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Tipe pelayanan</dt>
-    <dd class="mt-2 flex flex-wrap gap-2">
-      {{range .ServiceTypeNames}}
-      <span class="rounded-full bg-stone-100 px-3 py-1 text-sm text-slate-700">{{.}}</span>
-      {{else}}
-      <span class="text-sm text-slate-500">Belum ada tipe pelayanan.</span>
-      {{end}}
-    </dd>
-  </div>
-  <div>
-    <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Catatan</dt>
-    <dd class="mt-1 whitespace-pre-wrap text-sm text-slate-800">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}—{{end}}</dd>
+<dl class="card card-border bg-base-100 shadow-sm">
+  <div class="card-body p-4 md:p-6">
+    <div class="mb-4">
+      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Jemaat</dt>
+      <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="link link-primary text-sm font-medium">{{.JemaatNama}}</a></dd>
+    </div>
+    <div class="mb-4">
+      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Tipe pelayanan</dt>
+      <dd class="mt-2 flex flex-wrap gap-2">
+        {{range .ServiceTypeNames}}
+        <span class="badge badge-primary badge-soft">{{.}}</span>
+        {{else}}
+        <span class="text-sm text-base-content/60">Belum ada tipe pelayanan.</span>
+        {{end}}
+      </dd>
+    </div>
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Catatan</dt>
+      <dd class="mt-1 whitespace-pre-wrap text-sm">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}-{{end}}</dd>
+    </div>
   </div>
 </dl>
 {{end}}

@@ -144,7 +144,11 @@ func serviceTypeEditFragment(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			WriteServerError(w, err)
 			return
 		}
-		if err := rdr.Fragment(w, r, "servicetypes/edit_row.html", serviceTypeEditPage{
+		tmpl := "servicetypes/edit_row.html"
+		if r.URL.Query().Get("view") == "mobile" {
+			tmpl = "servicetypes/edit_row_mobile.html"
+		}
+		if err := rdr.Fragment(w, r, tmpl, serviceTypeEditPage{
 			User: user, ID: id, Form: serviceTypeForm{
 				Nama: st.Nama, Deskripsi: derefString(st.Deskripsi),
 				Urutan: strconv.FormatInt(st.Urutan, 10),
@@ -168,10 +172,16 @@ func serviceTypeUpdate(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			return
 		}
 		form, params, errs := parseServiceTypeForm(r)
+		editTmpl := "servicetypes/edit_row.html"
+		rowTmpl := "servicetypes/row.html"
+		if r.FormValue("view") == "mobile" {
+			editTmpl = "servicetypes/edit_row_mobile.html"
+			rowTmpl = "servicetypes/row_mobile.html"
+		}
 		if len(errs) > 0 {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			user, _ := LoadUser(r.Context(), q, r)
-			_ = rdr.Fragment(w, r, "servicetypes/edit_row.html", serviceTypeEditPage{
+			_ = rdr.Fragment(w, r, editTmpl, serviceTypeEditPage{
 				User: user, ID: id, Errors: errs, Form: form,
 			})
 			return
@@ -189,7 +199,7 @@ func serviceTypeUpdate(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 				w.WriteHeader(http.StatusUnprocessableEntity)
 				errs["Nama"] = "Nama sudah digunakan"
 				user, _ := LoadUser(r.Context(), q, r)
-				_ = rdr.Fragment(w, r, "servicetypes/edit_row.html", serviceTypeEditPage{
+				_ = rdr.Fragment(w, r, editTmpl, serviceTypeEditPage{
 					User: user, ID: id, Errors: errs, Form: form,
 				})
 				return
@@ -199,7 +209,7 @@ func serviceTypeUpdate(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 		}
 		if IsHTMX(r) {
 			user, _ := LoadUser(r.Context(), q, r)
-			_ = rdr.Fragment(w, r, "servicetypes/row.html", serviceTypeRowPage{User: user, ServiceType: row})
+			_ = rdr.Fragment(w, r, rowTmpl, serviceTypeRowPage{User: user, ServiceType: row})
 			return
 		}
 		RedirectWithFlash(w, r, "/service-types", "Jenis pelayanan berhasil diperbarui", "success")

@@ -1,63 +1,65 @@
 {{define "kebaktian/form.html"}}
-<div class="mb-4">
-  <a href="/kebaktian" class="text-sm text-slate-500 hover:text-slate-700">← Kembali ke daftar</a>
-  <h1 class="mt-1 text-xl font-bold text-slate-800">{{if .IsNew}}Tambah Kebaktian{{else}}Ubah Kebaktian{{end}}</h1>
+<div class="mb-5">
+  <a href="/kebaktian" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
+  <h1 class="mt-2 text-2xl font-bold">{{if .IsNew}}Tambah Kebaktian{{else}}Ubah Kebaktian{{end}}</h1>
 </div>
 
 <div id="form-container">
 <form method="POST" action="{{if .IsNew}}/kebaktian{{else}}/kebaktian/{{.Form.ID}}{{end}}"
   {{if not .IsNew}}hx-post="/kebaktian/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
-  class="max-w-xl space-y-4 rounded-xl border border-stone-200 bg-white p-4 md:p-6">
+  class="card card-border max-w-2xl bg-base-100 shadow-sm">
+  <div class="card-body gap-4 p-4 md:p-6">
 
   {{if not .IsNew}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
   <div>
-    <label for="nama" class="mb-1 block text-sm font-medium text-slate-700">Nama kebaktian <span class="text-red-600">*</span></label>
+    <label for="nama" class="label pb-1">Nama kebaktian <span class="text-error">*</span></label>
     <input type="text" id="nama" name="nama" value="{{.Form.Nama}}" required maxlength="200"
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "Nama"}}border-red-500{{else}}border-stone-300{{end}}">
-    {{with index .Errors "Nama"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="input w-full {{if index .Errors "Nama"}}input-error{{end}}">
+    {{with index .Errors "Nama"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="waktu_mulai" class="mb-1 block text-sm font-medium text-slate-700">Waktu mulai <span class="text-red-600">*</span></label>
+    <label for="waktu_mulai" class="label pb-1">Waktu mulai <span class="text-error">*</span></label>
     <input type="datetime-local" id="waktu_mulai" name="waktu_mulai" value="{{toLocalInput .Form.WaktuMulai .TZ}}" required
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "WaktuMulai"}}border-red-500{{else}}border-stone-300{{end}}">
-    {{with index .Errors "WaktuMulai"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="input w-full {{if index .Errors "WaktuMulai"}}input-error{{end}}">
+    {{with index .Errors "WaktuMulai"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="lokasi" class="mb-1 block text-sm font-medium text-slate-700">Lokasi</label>
+    <label for="lokasi" class="label pb-1">Lokasi</label>
     <input type="text" id="lokasi" name="lokasi" value="{{.Form.Lokasi}}" maxlength="200"
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "Lokasi"}}border-red-500{{else}}border-stone-300{{end}}">
-    {{with index .Errors "Lokasi"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="input w-full {{if index .Errors "Lokasi"}}input-error{{end}}">
+    {{with index .Errors "Lokasi"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="tema" class="mb-1 block text-sm font-medium text-slate-700">Tema</label>
+    <label for="tema" class="label pb-1">Tema</label>
     <input type="text" id="tema" name="tema" value="{{.Form.Tema}}" maxlength="300"
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "Tema"}}border-red-500{{else}}border-stone-300{{end}}">
-    {{with index .Errors "Tema"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="input w-full {{if index .Errors "Tema"}}input-error{{end}}">
+    {{with index .Errors "Tema"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="pengkhotbah" class="mb-1 block text-sm font-medium text-slate-700">Pengkhotbah</label>
+    <label for="pengkhotbah" class="label pb-1">Pengkhotbah</label>
     <input type="text" id="pengkhotbah" name="pengkhotbah" value="{{.Form.Pengkhotbah}}" maxlength="200"
-      class="block w-full min-h-11 rounded-lg border px-3 text-sm {{if index .Errors "Pengkhotbah"}}border-red-500{{else}}border-stone-300{{end}}">
-    {{with index .Errors "Pengkhotbah"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="input w-full {{if index .Errors "Pengkhotbah"}}input-error{{end}}">
+    {{with index .Errors "Pengkhotbah"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="catatan" class="mb-1 block text-sm font-medium text-slate-700">Catatan</label>
+    <label for="catatan" class="label pb-1">Catatan</label>
     <textarea id="catatan" name="catatan" rows="3" maxlength="2000"
-      class="block w-full rounded-lg border px-3 py-2 text-sm {{if index .Errors "Catatan"}}border-red-500{{else}}border-stone-300{{end}}">{{.Form.Catatan}}</textarea>
-    {{with index .Errors "Catatan"}}<p class="mt-1 text-xs text-red-600">{{.}}</p>{{end}}
+      class="textarea w-full {{if index .Errors "Catatan"}}textarea-error{{end}}">{{.Form.Catatan}}</textarea>
+    {{with index .Errors "Catatan"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
   </div>
 
-  <div class="flex flex-col gap-2 border-t border-stone-100 pt-4 sm:flex-row">
-    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700">Simpan</button>
-    <a href="/kebaktian" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-stone-200 text-sm font-medium text-slate-700 hover:bg-stone-50">Batal</a>
+  <div class="card-actions grid gap-2 border-t border-base-300 pt-4 sm:grid-cols-2">
+    <button type="submit" class="btn btn-primary">Simpan</button>
+    <a href="/kebaktian" class="btn btn-outline">Batal</a>
+  </div>
   </div>
 </form>
 </div>
