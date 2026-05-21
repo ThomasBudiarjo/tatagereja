@@ -1,44 +1,56 @@
 {{define "keluarga/form.html"}}
 <div class="mb-5">
-  <a href="/keluarga" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-  <h1 class="mt-2 text-2xl font-bold">{{if .IsNew}}Tambah Keluarga{{else}}Ubah Keluarga{{end}}</h1>
+  <a href="/keluarga" class="text-[13px] text-slate-400 hover:text-slate-600 transition-colors">Kembali ke daftar</a>
+  <h1 class="mt-2 text-[20px] font-bold text-slate-900 tracking-tight">{{if .IsNew}}Tambah Keluarga{{else}}Ubah Keluarga{{end}}</h1>
 </div>
 
 <div id="form-container">
 <form method="POST" action="{{if .IsNew}}/keluarga{{else}}/keluarga/{{.Form.ID}}{{end}}"
   {{if not .IsNew}}hx-post="/keluarga/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
-  class="card card-border max-w-2xl bg-base-100 shadow-sm">
-  <div class="card-body gap-4 p-4 md:p-6">
+  class="max-w-2xl bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 space-y-4">
 
   {{if not .IsNew}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
   <div>
-    <label for="nama_keluarga" class="label pb-1">Nama keluarga <span class="text-error">*</span></label>
+    <label for="nama_keluarga" class="block text-xs font-semibold text-slate-700 mb-1.5">Nama keluarga <span class="text-rose-500">*</span></label>
     <input type="text" id="nama_keluarga" name="nama_keluarga" value="{{.Form.NamaKeluarga}}" required maxlength="200"
-      class="input w-full {{if index .Errors "NamaKeluarga"}}input-error{{end}}">
-    {{with index .Errors "NamaKeluarga"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
+      class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `NamaKeluarga`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-slate-200 focus:border-slate-800 focus:ring-slate-900/10{{end}}">
+    {{with index .Errors "NamaKeluarga"}}
+    <p class="mt-1.5 text-xs font-medium text-rose-500 flex items-center gap-1">
+      <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+      {{.}}
+    </p>
+    {{end}}
   </div>
 
   <div>
-    <label for="alamat" class="label pb-1">Alamat</label>
+    <label for="alamat" class="block text-xs font-semibold text-slate-700 mb-1.5">Alamat</label>
     <textarea id="alamat" name="alamat" rows="2" maxlength="500"
-      class="textarea w-full {{if index .Errors "Alamat"}}textarea-error{{end}}">{{.Form.Alamat}}</textarea>
-    {{with index .Errors "Alamat"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
+      class="w-full px-3.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-slate-800 focus:ring-slate-900/10 {{if index .Errors `Alamat`}}border-rose-300{{end}}">{{.Form.Alamat}}</textarea>
+    {{with index .Errors "Alamat"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
   </div>
 
   <div>
-    <label for="catatan" class="label pb-1">Catatan</label>
+    <label for="catatan" class="block text-xs font-semibold text-slate-700 mb-1.5">Catatan</label>
     <textarea id="catatan" name="catatan" rows="3" maxlength="2000"
-      class="textarea w-full {{if index .Errors "Catatan"}}textarea-error{{end}}">{{.Form.Catatan}}</textarea>
-    {{with index .Errors "Catatan"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
+      class="w-full px-3.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-slate-800 focus:ring-slate-900/10 {{if index .Errors `Catatan`}}border-rose-300{{end}}">{{.Form.Catatan}}</textarea>
+    {{with index .Errors "Catatan"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
   </div>
 
-  <div class="card-actions grid gap-2 border-t border-base-300 pt-4 sm:grid-cols-2">
-    <button type="submit" class="btn btn-primary">Simpan</button>
-    <a href="/keluarga" class="btn btn-outline">Batal</a>
-  </div>
+  <div class="grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-2">
+    <button type="submit" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm cursor-pointer">
+      <span class="htmx-indicator-hidden inline-flex items-center gap-1">Simpan</span>
+      <span class="htmx-indicator inline-flex items-center gap-1">
+        <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        Menyimpan
+      </span>
+    </button>
+    <a href="/keluarga" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 focus-visible:border-slate-800">Batal</a>
   </div>
 </form>
 </div>

@@ -1,72 +1,71 @@
 {{define "kebaktian/detail.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
-    <a href="/kebaktian" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-    <h1 class="mt-2 text-2xl font-bold">{{.Kebaktian.Nama}}</h1>
-    <p class="mt-1 text-sm text-base-content/70">{{formatDateTime .Kebaktian.WaktuMulai .TZ "Monday, 2 January 2006 15:04"}}</p>
+    <a href="/kebaktian" class="text-[13px] text-slate-400 hover:text-slate-600 transition-colors">Kembali ke daftar</a>
+    <h1 class="mt-2 text-[20px] font-bold text-slate-900 tracking-tight">{{.Kebaktian.Nama}}</h1>
+    <p class="mt-1 text-[13px] text-slate-500">{{formatDateTime .Kebaktian.WaktuMulai .TZ "Monday, 2 January 2006 15:04"}}</p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <a href="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="btn btn-primary">Jadwal Pelayanan</a>
-    <a href="/kebaktian/{{.Kebaktian.ID}}/edit" class="btn btn-outline">Ubah</a>
+    <a href="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm">Jadwal Pelayanan</a>
+    <a href="/kebaktian/{{.Kebaktian.ID}}/edit" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 focus-visible:border-slate-800">Ubah</a>
     <form method="POST" action="/kebaktian/{{.Kebaktian.ID}}">
       <input type="hidden" name="_method" value="DELETE">
-      <button type="submit" class="btn btn-error btn-outline"
+      <button type="submit" class="py-1.5 px-4 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center cursor-pointer"
         onclick="return confirm('Hapus kebaktian ini? Jadwal pelayanan ikut terhapus.')">Hapus</button>
     </form>
   </div>
 </div>
 
-<dl class="card card-border mb-6 bg-base-100 shadow-sm">
-  <div class="card-body grid gap-4 p-4 sm:grid-cols-2 md:p-6">
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Lokasi</dt>
-      <dd class="mt-1 text-sm">{{if .Kebaktian.Lokasi.Valid}}{{derefString .Kebaktian.Lokasi}}{{else}}-{{end}}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Pengkhotbah</dt>
-      <dd class="mt-1 text-sm">{{if .Kebaktian.Pengkhotbah.Valid}}{{derefString .Kebaktian.Pengkhotbah}}{{else}}-{{end}}</dd>
-    </div>
-    <div class="sm:col-span-2">
-      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Tema</dt>
-      <dd class="mt-1 text-sm">{{if .Kebaktian.Tema.Valid}}{{derefString .Kebaktian.Tema}}{{else}}-{{end}}</dd>
-    </div>
-    <div class="sm:col-span-2">
-      <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Catatan</dt>
-      <dd class="mt-1 whitespace-pre-wrap text-sm">{{if .Kebaktian.Catatan.Valid}}{{derefString .Kebaktian.Catatan}}{{else}}-{{end}}</dd>
-    </div>
+<dl class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 grid gap-4 sm:grid-cols-2 mb-6">
+  <div>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Lokasi</dt>
+    <dd class="mt-1 text-sm text-slate-700">{{if .Kebaktian.Lokasi.Valid}}{{derefString .Kebaktian.Lokasi}}{{else}}-{{end}}</dd>
+  </div>
+  <div>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Pengkhotbah</dt>
+    <dd class="mt-1 text-sm text-slate-700">{{if .Kebaktian.Pengkhotbah.Valid}}{{derefString .Kebaktian.Pengkhotbah}}{{else}}-{{end}}</dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tema</dt>
+    <dd class="mt-1 text-sm text-slate-700">{{if .Kebaktian.Tema.Valid}}{{derefString .Kebaktian.Tema}}{{else}}-{{end}}</dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</dt>
+    <dd class="mt-1 text-sm whitespace-pre-wrap text-slate-700">{{if .Kebaktian.Catatan.Valid}}{{derefString .Kebaktian.Catatan}}{{else}}-{{end}}</dd>
   </div>
 </dl>
 
 {{if .Jadwal}}
-<h2 class="mb-3 text-lg font-semibold">Jadwal pelayanan</h2>
+<h2 class="text-sm font-semibold text-slate-900 mb-3">Jadwal pelayanan</h2>
 <div class="space-y-2 md:hidden">
   {{range .Jadwal}}
-  <div class="card card-border bg-base-100">
-    <div class="card-body gap-1 px-4 py-3">
-      <p class="text-sm font-medium">{{.ServiceTypeNama}}</p>
-      <p class="text-sm text-base-content/70">{{if .PelayanNama.Valid}}{{derefString .PelayanNama}}{{else}}<span class="text-warning">Belum ditugaskan</span>{{end}}</p>
-    </div>
+  <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] px-4 py-3">
+    <p class="text-sm font-medium text-slate-900">{{.ServiceTypeNama}}</p>
+    <p class="text-[13px] text-slate-500">{{if .PelayanNama.Valid}}{{derefString .PelayanNama}}{{else}}<span class="text-amber-500">Belum ditugaskan</span>{{end}}</p>
   </div>
   {{end}}
 </div>
-<div class="hidden overflow-x-auto rounded-box border border-base-300 bg-base-100 md:block">
-  <table class="table table-zebra">
+<div class="hidden overflow-x-auto bg-white rounded-2xl border border-slate-100 md:block">
+  <table class="w-full">
     <thead>
-      <tr><th>Peran</th><th>Pelayan</th></tr>
+      <tr class="bg-slate-50/50 border-b border-slate-100">
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Peran</th>
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Pelayan</th>
+      </tr>
     </thead>
     <tbody>
       {{range .Jadwal}}
-      <tr>
-        <td class="font-medium text-base-content">{{.ServiceTypeNama}}</td>
-        <td class="text-base-content/70">{{if .PelayanNama.Valid}}{{derefString .PelayanNama}}{{else}}<span class="text-warning">Belum ditugaskan</span>{{end}}</td>
+      <tr class="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+        <td class="px-5 py-3 text-sm font-medium text-slate-900">{{.ServiceTypeNama}}</td>
+        <td class="px-5 py-3 text-[13px] text-slate-500">{{if .PelayanNama.Valid}}{{derefString .PelayanNama}}{{else}}<span class="text-amber-500">Belum ditugaskan</span>{{end}}</td>
       </tr>
       {{end}}
     </tbody>
   </table>
 </div>
 {{else}}
-<div class="alert alert-info alert-soft">
-  <span><a href="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="link link-primary font-medium">Atur jadwal pelayanan</a> untuk kebaktian ini.</span>
+<div class="p-3.5 rounded-lg text-sm bg-blue-50 text-blue-600 border border-blue-100">
+  <span class="font-medium"><a href="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="text-slate-800 hover:text-black font-semibold hover:underline transition-colors">Atur jadwal pelayanan</a> untuk kebaktian ini.</span>
 </div>
 {{end}}
 {{end}}

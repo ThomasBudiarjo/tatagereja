@@ -9,13 +9,17 @@
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
+  .dock-active { color: #1e1e20 !important; }
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline-flex; }
+  .htmx-request .htmx-indicator-hidden { display: none; }
 </style>
 {{end}}
 
 {{define "flash"}}
 <div class="mx-4 mt-4 md:mx-6" role="status">
-  <div class="alert {{if eq .Kind `error`}}alert-error{{else if eq .Kind `success`}}alert-success{{else}}alert-info{{end}} alert-soft shadow-sm">
-    <span>{{.Message}}</span>
+  <div class="p-3.5 rounded-lg text-sm {{if eq .Kind `error`}}bg-rose-50 text-rose-600 border border-rose-100{{else if eq .Kind `success`}}bg-emerald-50 text-emerald-600 border border-emerald-100{{else}}bg-blue-50 text-blue-600 border border-blue-100{{end}}">
+    <span class="font-medium">{{.Message}}</span>
   </div>
 </div>
 {{end}}
@@ -30,35 +34,45 @@
   {{template "assets" .}}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
-<body class="min-h-screen bg-base-200 text-base-content antialiased">
+<body class="min-h-screen bg-[#f6f7fb] text-slate-900 antialiased">
   <div class="flex min-h-screen">
-    <aside class="hidden w-64 shrink-0 border-r border-base-300 bg-base-100 md:flex md:flex-col">
-      <div class="border-b border-base-300 px-5 py-6">
-        <p class="text-xs font-semibold uppercase tracking-wide text-primary">Tata Gereja</p>
-        <p class="mt-2 truncate text-base font-bold">{{.Data.User.ChurchName}}</p>
-        <p class="truncate text-sm text-base-content/60">{{.Data.User.DisplayName}}</p>
+    <!-- Desktop sidebar -->
+    <aside class="hidden w-56 shrink-0 border-r border-slate-100 bg-white md:flex md:flex-col">
+      <div class="border-b border-slate-100 bg-slate-50/60 px-5 py-5">
+        <div class="flex items-center gap-1.5 mb-3 text-slate-400 select-none">
+          <span class="text-[10px]">Presented to you by</span>
+          <span class="flex items-center gap-1 font-bold text-slate-500 tracking-tight">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M12 8v8"/>
+            </svg>
+            <span class="text-[11px]">tatagereja</span>
+          </span>
+        </div>
+        <p class="truncate text-sm font-semibold text-slate-900">{{.Data.User.ChurchName}}</p>
+        <p class="truncate text-[12px] text-slate-400 mt-0.5">{{.Data.User.DisplayName}}</p>
       </div>
-      <ul class="menu menu-md flex-1 gap-1 p-3">
-        <li><a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}menu-active{{end}}">Jemaat</a></li>
-        <li><a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}menu-active{{end}}">Keluarga</a></li>
-        <li><a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}menu-active{{end}}">Pelayan</a></li>
-        <li><a href="/service-types" class="{{if hasPrefix .Path `/service-types`}}menu-active{{end}}">Tipe Pelayanan</a></li>
-        <li><a href="/kebaktian" class="{{if hasPrefix .Path `/kebaktian`}}menu-active{{end}}">Kebaktian</a></li>
-      </ul>
-      <div class="border-t border-base-300 p-3">
+      <nav class="flex-1 px-3 py-4 space-y-0.5">
+        <a href="/jemaat" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/jemaat`}}text-indigo-700 bg-indigo-50{{else}}text-slate-500 hover:text-slate-700 hover:bg-slate-50{{end}}">Jemaat</a>
+        <a href="/keluarga" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/keluarga`}}text-indigo-700 bg-indigo-50{{else}}text-slate-500 hover:text-slate-700 hover:bg-slate-50{{end}}">Keluarga</a>
+        <a href="/pelayan" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/pelayan`}}text-indigo-700 bg-indigo-50{{else}}text-slate-500 hover:text-slate-700 hover:bg-slate-50{{end}}">Pelayan</a>
+        <a href="/service-types" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/service-types`}}text-indigo-700 bg-indigo-50{{else}}text-slate-500 hover:text-slate-700 hover:bg-slate-50{{end}}">Tipe Pelayanan</a>
+        <a href="/kebaktian" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/kebaktian`}}text-indigo-700 bg-indigo-50{{else}}text-slate-500 hover:text-slate-700 hover:bg-slate-50{{end}}">Kebaktian</a>
+      </nav>
+      <div class="border-t border-slate-100 p-3">
         <form method="POST" action="/logout">
-          <button type="submit" class="btn btn-ghost btn-block">Keluar</button>
+          <button type="submit" class="w-full py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-[13px] transition-all cursor-pointer">Keluar</button>
         </form>
       </div>
     </aside>
 
+    <!-- Main content area -->
     <div class="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-      <header class="navbar border-b border-base-300 bg-base-100 px-4 md:hidden">
+      <!-- Mobile header -->
+      <header class="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 md:hidden">
         <div class="min-w-0 flex-1">
-          <div>
-            <p class="truncate text-sm font-bold">{{.Data.User.ChurchName}}</p>
-            <p class="truncate text-xs text-base-content/60">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
-          </div>
+          <p class="truncate text-sm font-semibold text-slate-900">{{.Data.User.ChurchName}}</p>
+          <p class="truncate text-[12px] text-slate-400">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
         </div>
       </header>
 
@@ -72,26 +86,27 @@
     </div>
   </div>
 
-  <nav class="dock dock-md border-t border-base-300 bg-base-100 md:hidden" aria-label="Navigasi utama">
-    <a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">👥</span>
-      <span class="dock-label">Jemaat</span>
+  <!-- Mobile dock navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 border-t border-slate-100 bg-white flex items-center justify-around py-2 px-1 md:hidden z-10" aria-label="Navigasi utama" style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));">
+    <a href="/jemaat" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/jemaat`}}text-slate-900{{else}}text-slate-400{{end}}"{{if hasPrefix .Path `/jemaat`}} aria-current="page"{{end}}>
+      <span class="text-base leading-none select-none">👥</span>
+      <span class="text-[10px] font-medium">Jemaat</span>
     </a>
-    <a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">⌂</span>
-      <span class="dock-label">Keluarga</span>
+    <a href="/keluarga" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/keluarga`}}text-slate-900{{else}}text-slate-400{{end}}"{{if hasPrefix .Path `/keluarga`}} aria-current="page"{{end}}>
+      <span class="text-base leading-none select-none">⌂</span>
+      <span class="text-[10px] font-medium">Keluarga</span>
     </a>
-    <a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">✋</span>
-      <span class="dock-label">Pelayan</span>
+    <a href="/pelayan" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/pelayan`}}text-slate-900{{else}}text-slate-400{{end}}"{{if hasPrefix .Path `/pelayan`}} aria-current="page"{{end}}>
+      <span class="text-base leading-none select-none">✋</span>
+      <span class="text-[10px] font-medium">Pelayan</span>
     </a>
-    <a href="/service-types" class="{{if hasPrefix .Path `/service-types`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">☷</span>
-      <span class="dock-label">Tipe</span>
+    <a href="/service-types" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/service-types`}}text-slate-900{{else}}text-slate-400{{end}}"{{if hasPrefix .Path `/service-types`}} aria-current="page"{{end}}>
+      <span class="text-base leading-none select-none">☷</span>
+      <span class="text-[10px] font-medium">Tipe</span>
     </a>
-    <a href="/kebaktian" class="{{if hasPrefix .Path `/kebaktian`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">✦</span>
-      <span class="dock-label">Kebaktian</span>
+    <a href="/kebaktian" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/kebaktian`}}text-slate-900{{else}}text-slate-400{{end}}"{{if hasPrefix .Path `/kebaktian`}} aria-current="page"{{end}}>
+      <span class="text-base leading-none select-none">✦</span>
+      <span class="text-[10px] font-medium">Kebaktian</span>
     </a>
   </nav>
 </body>

@@ -1,66 +1,70 @@
 {{define "pelayan/list.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
-    <h1 class="text-2xl font-bold">Pelayan</h1>
-    <p class="text-sm text-base-content/60">Jemaat yang melayani dan peran pelayanan mereka.</p>
+    <h1 class="text-[20px] font-bold text-slate-900 tracking-tight">Pelayan</h1>
+    <p class="mt-1 text-[13px] text-slate-500">Jemaat yang melayani dan peran pelayanan mereka.</p>
   </div>
-  <a href="/pelayan/new" class="btn btn-primary">
+  <a href="/pelayan/new" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
     Tambah Pelayan
   </a>
 </div>
 
 <div class="space-y-3 md:hidden">
   {{range .Items}}
-  <article id="row-{{.ID}}" class="card card-border bg-base-100 shadow-sm">
-    <div class="card-body gap-3 p-4">
-      <div>
-        <a href="/pelayan/{{.ID}}" class="link link-hover font-semibold text-base-content">{{.JemaatNama}}</a>
-        {{if .ServiceTypes}}<p class="mt-1 text-sm text-base-content/70">{{.ServiceTypes}}</p>{{end}}
-      </div>
-      <div class="card-actions grid grid-cols-2 gap-2">
-        <a href="/pelayan/{{.ID}}/edit" class="btn btn-outline">Ubah</a>
-        <form method="POST" action="/pelayan/{{.ID}}"
-          hx-delete="/pelayan/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus pelayan ini?">
-          <input type="hidden" name="_method" value="DELETE">
-          <button type="submit" class="btn btn-error btn-outline w-full">Hapus</button>
-        </form>
-      </div>
+  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
+    <a href="/pelayan/{{.ID}}" class="block">
+      <p class="font-semibold text-slate-900 text-sm">{{.JemaatNama}}</p>
+      {{if .ServiceTypes}}<p class="mt-1 text-[13px] text-slate-500">{{.ServiceTypes}}</p>{{end}}
+    </a>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <a href="/pelayan/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
+      <form method="POST" action="/pelayan/{{.ID}}"
+        hx-delete="/pelayan/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus pelayan ini?">
+        <input type="hidden" name="_method" value="DELETE">
+        <button type="submit" class="w-full py-2.5 px-3 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-[13px] transition-all cursor-pointer">Hapus</button>
+      </form>
     </div>
   </article>
   {{else}}
-  <div class="card card-dash bg-base-100">
-    <div class="card-body items-center text-center text-sm text-base-content/60">Belum ada pelayan.</div>
+  <div class="bg-white rounded-2xl border border-slate-100 p-8 text-center">
+    <div class="text-3xl mb-3 opacity-40">✋</div>
+    <p class="text-[13px] text-slate-500 font-medium">Belum ada pelayan</p>
+    <p class="text-[12px] text-slate-400 mt-1">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
   </div>
   {{end}}
 </div>
 
-<div class="hidden overflow-x-auto rounded-box border border-base-300 bg-base-100 md:block">
-  <table class="table table-zebra">
+<div class="hidden overflow-x-auto bg-white rounded-2xl border border-slate-100 md:block">
+  <table class="w-full">
     <thead>
-      <tr>
-        <th>Jemaat</th>
-        <th>Tipe pelayanan</th>
-        <th class="text-right">Aksi</th>
+      <tr class="bg-slate-50/50 border-b border-slate-100">
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jemaat</th>
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipe pelayanan</th>
+        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Aksi</th>
       </tr>
     </thead>
     <tbody>
       {{range .Items}}
-      <tr id="row-{{.ID}}">
-        <td><a href="/pelayan/{{.ID}}" class="link link-hover font-medium text-base-content">{{.JemaatNama}}</a></td>
-        <td class="text-base-content/70">{{if .ServiceTypes}}{{.ServiceTypes}}{{else}}-{{end}}</td>
-        <td>
+      <tr id="row-{{.ID}}" class="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+        <td class="px-5 py-3"><a href="/pelayan/{{.ID}}" class="text-sm font-medium text-slate-900 hover:text-black hover:underline transition-colors">{{.JemaatNama}}</a></td>
+        <td class="px-5 py-3 text-[13px] text-slate-500">{{if .ServiceTypes}}{{.ServiceTypes}}{{else}}-{{end}}</td>
+        <td class="px-5 py-3">
           <div class="flex justify-end gap-2">
-            <a href="/pelayan/{{.ID}}/edit" class="btn btn-ghost btn-sm">Ubah</a>
+            <a href="/pelayan/{{.ID}}/edit" class="text-[13px] text-slate-500 hover:text-slate-800 font-medium transition-colors">Ubah</a>
             <form method="POST" action="/pelayan/{{.ID}}"
               hx-delete="/pelayan/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus pelayan ini?">
               <input type="hidden" name="_method" value="DELETE">
-              <button type="submit" class="btn btn-error btn-ghost btn-sm">Hapus</button>
+              <button type="submit" class="text-[13px] text-rose-500 hover:text-rose-700 font-medium transition-colors cursor-pointer">Hapus</button>
             </form>
           </div>
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="3" class="py-10 text-center text-base-content/60">Belum ada pelayan.</td></tr>
+      <tr><td colspan="3" class="px-5 py-10 text-center">
+        <div class="text-3xl mb-2 opacity-40">✋</div>
+        <p class="text-[13px] text-slate-500 font-medium">Belum ada pelayan</p>
+        <p class="text-[12px] text-slate-400 mt-0.5">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
+      </td></tr>
       {{end}}
     </tbody>
   </table>
