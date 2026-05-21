@@ -1,13 +1,13 @@
 {{define "jemaat/detail.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
-    <a href="/jemaat" class="text-[13px] text-slate-400 hover:text-slate-600 transition-colors">Kembali ke daftar</a>
-    <h1 class="mt-2 text-[20px] font-bold text-slate-900 tracking-tight">{{.Jemaat.NamaLengkap}}</h1>
-    {{if .Jemaat.NamaPanggilan.Valid}}<p class="text-[13px] text-slate-500">{{derefString .Jemaat.NamaPanggilan}}</p>{{end}}
+    <a href="/jemaat" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke daftar</a>
+    <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">{{.Jemaat.NamaLengkap}}</h1>
+    {{if .Jemaat.NamaPanggilan.Valid}}<p class="text-[13px] text-[#6b6e68]">{{derefString .Jemaat.NamaPanggilan}}</p>{{end}}
     {{if eq .Jemaat.IsActive 0}}<span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 mt-2">Nonaktif</span>{{end}}
   </div>
   <div class="flex gap-2">
-    <a href="/jemaat/{{.Jemaat.ID}}/edit" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 focus-visible:border-slate-800">Ubah</a>
+    <a href="/jemaat/{{.Jemaat.ID}}/edit" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Ubah</a>
     <form method="POST" action="/jemaat/{{.Jemaat.ID}}">
       <input type="hidden" name="_method" value="DELETE">
       <button type="submit" class="py-1.5 px-4 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center cursor-pointer"
@@ -16,56 +16,56 @@
   </div>
 </div>
 
-<dl class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 grid gap-4 sm:grid-cols-2">
+<dl class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 grid gap-4 sm:grid-cols-2">
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jenis kelamin</dt>
-    <dd class="mt-1 text-sm text-slate-700">
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Jenis kelamin</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">
       {{if .Jemaat.JenisKelamin.Valid}}{{if eq (derefString .Jemaat.JenisKelamin) "L"}}Laki-laki{{else if eq (derefString .Jemaat.JenisKelamin) "P"}}Perempuan{{else}}{{derefString .Jemaat.JenisKelamin}}{{end}}{{else}}-{{end}}
     </dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal lahir</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.TanggalLahir.Valid}}{{derefString .Jemaat.TanggalLahir}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tanggal lahir</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.TanggalLahir.Valid}}{{derefString .Jemaat.TanggalLahir}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tempat lahir</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.TempatLahir.Valid}}{{derefString .Jemaat.TempatLahir}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tempat lahir</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.TempatLahir.Valid}}{{derefString .Jemaat.TempatLahir}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status pernikahan</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.StatusPernikahan.Valid}}{{derefString .Jemaat.StatusPernikahan}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Status pernikahan</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.StatusPernikahan.Valid}}{{derefString .Jemaat.StatusPernikahan}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Telepon</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.NomorTelepon.Valid}}{{derefString .Jemaat.NomorTelepon}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Telepon</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.NomorTelepon.Valid}}{{derefString .Jemaat.NomorTelepon}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Email</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.Email.Valid}}{{derefString .Jemaat.Email}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Email</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.Email.Valid}}{{derefString .Jemaat.Email}}{{else}}-{{end}}</dd>
   </div>
   <div class="sm:col-span-2">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alamat</dt>
-    <dd class="mt-1 text-sm whitespace-pre-wrap text-slate-700">{{if .Jemaat.Alamat.Valid}}{{derefString .Jemaat.Alamat}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Alamat</dt>
+    <dd class="mt-1 text-sm whitespace-pre-wrap text-[#3d4039]">{{if .Jemaat.Alamat.Valid}}{{derefString .Jemaat.Alamat}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal baptis</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.TanggalBaptis.Valid}}{{derefString .Jemaat.TanggalBaptis}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tanggal baptis</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.TanggalBaptis.Valid}}{{derefString .Jemaat.TanggalBaptis}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal sidi</dt>
-    <dd class="mt-1 text-sm text-slate-700">{{if .Jemaat.TanggalSidi.Valid}}{{derefString .Jemaat.TanggalSidi}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tanggal sidi</dt>
+    <dd class="mt-1 text-sm text-[#3d4039]">{{if .Jemaat.TanggalSidi.Valid}}{{derefString .Jemaat.TanggalSidi}}{{else}}-{{end}}</dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Keluarga</dt>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Keluarga</dt>
     <dd class="mt-1">
       {{if .KeluargaNama}}
-        <a href="/keluarga/{{nullInt64 .Jemaat.KeluargaID}}" class="text-sm font-medium text-slate-800 hover:text-black hover:underline transition-colors">{{.KeluargaNama}}</a>
-      {{else}}<span class="text-sm text-slate-400">-</span>{{end}}
+        <a href="/keluarga/{{nullInt64 .Jemaat.KeluargaID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.KeluargaNama}}</a>
+      {{else}}<span class="text-sm text-[#8a8d87]">-</span>{{end}}
     </dd>
   </div>
   <div class="sm:col-span-2">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</dt>
-    <dd class="mt-1 text-sm whitespace-pre-wrap text-slate-700">{{if .Jemaat.Catatan.Valid}}{{derefString .Jemaat.Catatan}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Catatan</dt>
+    <dd class="mt-1 text-sm whitespace-pre-wrap text-[#3d4039]">{{if .Jemaat.Catatan.Valid}}{{derefString .Jemaat.Catatan}}{{else}}-{{end}}</dd>
   </div>
 </dl>
 {{end}}

@@ -1,32 +1,32 @@
 {{define "jemaat/list.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
-    <h1 class="text-[20px] font-bold text-slate-900 tracking-tight">Jemaat</h1>
-    <p class="mt-1 text-[13px] text-slate-500">Data anggota jemaat dan kontak utama.</p>
+    <h1 class="text-[20px] font-bold text-[#2d2d30] tracking-tight">Jemaat</h1>
+    <p class="mt-1 text-[13px] text-[#6b6e68]">Data anggota jemaat dan kontak utama.</p>
   </div>
-  <a href="/jemaat/new" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+  <a href="/jemaat/new" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546] focus-visible:ring-offset-2">
     Tambah Jemaat
   </a>
 </div>
 
 <form method="GET" action="/jemaat" class="mb-5 flex w-full max-w-xl gap-2">
   <input type="search" name="q" value="{{.Query}}" placeholder="Cari nama..."
-    class="flex-1 px-3.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-slate-800 focus:ring-slate-900/10">
-  <button type="submit" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all shadow-sm cursor-pointer">
+    class="flex-1 px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
+  <button type="submit" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all shadow-sm cursor-pointer">
     Cari
   </button>
 </form>
 
 <div class="space-y-3 md:hidden">
   {{range .Items}}
-  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
+  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
     <a href="/jemaat/{{.ID}}" class="block">
-      <p class="font-semibold text-slate-900 text-sm">{{.NamaLengkap}}</p>
-      {{if .NamaPanggilan.Valid}}<p class="text-[13px] text-slate-500">{{derefString .NamaPanggilan}}</p>{{end}}
-      {{if .NomorTelepon.Valid}}<p class="mt-1 text-[13px] text-slate-400">{{derefString .NomorTelepon}}</p>{{end}}
+      <p class="font-semibold text-[#2d2d30] text-sm">{{.NamaLengkap}}</p>
+      {{if .NamaPanggilan.Valid}}<p class="text-[13px] text-[#6b6e68]">{{derefString .NamaPanggilan}}</p>{{end}}
+      {{if .NomorTelepon.Valid}}<p class="mt-1 text-[13px] text-[#8a8d87]">{{derefString .NomorTelepon}}</p>{{end}}
     </a>
     <div class="grid grid-cols-2 gap-2 mt-3">
-      <a href="/jemaat/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
+      <a href="/jemaat/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
       <form method="POST" action="/jemaat/{{.ID}}"
         hx-delete="/jemaat/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus jemaat ini?">
         <input type="hidden" name="_method" value="DELETE">
@@ -35,36 +35,36 @@
     </div>
   </article>
   {{else}}
-  <div class="bg-white rounded-2xl border border-slate-100 p-8 text-center">
+  <div class="bg-white rounded-2xl border border-[#e5e6e2] p-8 text-center">
     <div class="text-3xl mb-3 opacity-40">👥</div>
-    <p class="text-[13px] text-slate-500 font-medium">Belum ada jemaat</p>
-    <p class="text-[12px] text-slate-400 mt-1">Tambahkan anggota jemaat pertama Anda.</p>
+    <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada jemaat</p>
+    <p class="text-[12px] text-[#8a8d87] mt-1">Tambahkan anggota jemaat pertama Anda.</p>
   </div>
   {{end}}
 </div>
 
-<div class="hidden overflow-x-auto bg-white rounded-2xl border border-slate-100 md:block">
+<div class="hidden overflow-x-auto bg-white rounded-2xl border border-[#e5e6e2] md:block">
   <table class="w-full">
     <thead>
-      <tr class="bg-slate-50/50 border-b border-slate-100">
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nama</th>
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Telepon</th>
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Email</th>
-        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Aksi</th>
+      <tr class="bg-[#f0f2ee]/50 border-b border-[#e5e6e2]">
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Nama</th>
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Telepon</th>
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Email</th>
+        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Aksi</th>
       </tr>
     </thead>
     <tbody>
       {{range .Items}}
-      <tr id="row-{{.ID}}" class="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+      <tr id="row-{{.ID}}" class="border-b border-[#f0f2ee] hover:bg-[#f0f2ee]/30 transition-colors">
         <td class="px-5 py-3">
-          <a href="/jemaat/{{.ID}}" class="text-sm font-medium text-slate-900 hover:text-black hover:underline transition-colors">{{.NamaLengkap}}</a>
-          {{if .NamaPanggilan.Valid}}<span class="text-[13px] text-slate-400"> ({{derefString .NamaPanggilan}})</span>{{end}}
+          <a href="/jemaat/{{.ID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.NamaLengkap}}</a>
+          {{if .NamaPanggilan.Valid}}<span class="text-[13px] text-[#8a8d87]"> ({{derefString .NamaPanggilan}})</span>{{end}}
         </td>
-        <td class="px-5 py-3 text-[13px] text-slate-500">{{if .NomorTelepon.Valid}}{{derefString .NomorTelepon}}{{else}}-{{end}}</td>
-        <td class="px-5 py-3 text-[13px] text-slate-500">{{if .Email.Valid}}{{derefString .Email}}{{else}}-{{end}}</td>
+        <td class="px-5 py-3 text-[13px] text-[#6b6e68]">{{if .NomorTelepon.Valid}}{{derefString .NomorTelepon}}{{else}}-{{end}}</td>
+        <td class="px-5 py-3 text-[13px] text-[#6b6e68]">{{if .Email.Valid}}{{derefString .Email}}{{else}}-{{end}}</td>
         <td class="px-5 py-3">
           <div class="flex justify-end gap-2">
-            <a href="/jemaat/{{.ID}}/edit" class="text-[13px] text-slate-500 hover:text-slate-800 font-medium transition-colors">Ubah</a>
+            <a href="/jemaat/{{.ID}}/edit" class="text-[13px] text-[#6b6e68] hover:text-[#2d2d30] font-medium transition-colors">Ubah</a>
             <form method="POST" action="/jemaat/{{.ID}}"
               hx-delete="/jemaat/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus jemaat ini?">
               <input type="hidden" name="_method" value="DELETE">
@@ -76,8 +76,8 @@
       {{else}}
       <tr><td colspan="4" class="px-5 py-10 text-center">
         <div class="text-3xl mb-2 opacity-40">👥</div>
-        <p class="text-[13px] text-slate-500 font-medium">Belum ada jemaat</p>
-        <p class="text-[12px] text-slate-400 mt-0.5">Tambahkan anggota jemaat pertama Anda.</p>
+        <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada jemaat</p>
+        <p class="text-[12px] text-[#8a8d87] mt-0.5">Tambahkan anggota jemaat pertama Anda.</p>
       </td></tr>
       {{end}}
     </tbody>
@@ -87,10 +87,10 @@
 {{if gt .Total .Limit}}
 <nav class="mt-5 flex items-center justify-between" aria-label="Halaman">
   {{if gt .Offset 0}}
-  <a href="/jemaat?q={{.Query}}&limit={{.Limit}}&offset={{sub .Offset .Limit}}" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center">Sebelumnya</a>
+  <a href="/jemaat?q={{.Query}}&limit={{.Limit}}&offset={{sub .Offset .Limit}}" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center">Sebelumnya</a>
   {{else}}<span></span>{{end}}
   {{if lt (add .Offset .Limit) .Total}}
-  <a href="/jemaat?q={{.Query}}&limit={{.Limit}}&offset={{add .Offset .Limit}}" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center">Berikutnya</a>
+  <a href="/jemaat?q={{.Query}}&limit={{.Limit}}&offset={{add .Offset .Limit}}" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center">Berikutnya</a>
   {{end}}
 </nav>
 {{end}}

@@ -1,23 +1,23 @@
 {{define "keluarga/list.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
-    <h1 class="text-[20px] font-bold text-slate-900 tracking-tight">Keluarga</h1>
-    <p class="mt-1 text-[13px] text-slate-500">Kelompok keluarga dan anggota terkait.</p>
+    <h1 class="text-[20px] font-bold text-[#2d2d30] tracking-tight">Keluarga</h1>
+    <p class="mt-1 text-[13px] text-[#6b6e68]">Kelompok keluarga dan anggota terkait.</p>
   </div>
-  <a href="/keluarga/new" class="py-1.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+  <a href="/keluarga/new" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546] focus-visible:ring-offset-2">
     Tambah Keluarga
   </a>
 </div>
 
 <div class="space-y-3 md:hidden">
   {{range .Items}}
-  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
+  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
     <a href="/keluarga/{{.ID}}" class="block">
-      <p class="font-semibold text-slate-900 text-sm">{{.NamaKeluarga}}</p>
-      {{if .Alamat.Valid}}<p class="mt-1 line-clamp-2 text-[13px] text-slate-500">{{derefString .Alamat}}</p>{{end}}
+      <p class="font-semibold text-[#2d2d30] text-sm">{{.NamaKeluarga}}</p>
+      {{if .Alamat.Valid}}<p class="mt-1 line-clamp-2 text-[13px] text-[#6b6e68]">{{derefString .Alamat}}</p>{{end}}
     </a>
     <div class="grid grid-cols-2 gap-2 mt-3">
-      <a href="/keluarga/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
+      <a href="/keluarga/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
       <form method="POST" action="/keluarga/{{.ID}}"
         hx-delete="/keluarga/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus keluarga ini?">
         <input type="hidden" name="_method" value="DELETE">
@@ -26,31 +26,31 @@
     </div>
   </article>
   {{else}}
-  <div class="bg-white rounded-2xl border border-slate-100 p-8 text-center">
+  <div class="bg-white rounded-2xl border border-[#e5e6e2] p-8 text-center">
     <div class="text-3xl mb-3 opacity-40">⌂</div>
-    <p class="text-[13px] text-slate-500 font-medium">Belum ada keluarga</p>
-    <p class="text-[12px] text-slate-400 mt-1">Tambahkan kelompok keluarga pertama Anda.</p>
+    <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada keluarga</p>
+    <p class="text-[12px] text-[#8a8d87] mt-1">Tambahkan kelompok keluarga pertama Anda.</p>
   </div>
   {{end}}
 </div>
 
-<div class="hidden overflow-x-auto bg-white rounded-2xl border border-slate-100 md:block">
+<div class="hidden overflow-x-auto bg-white rounded-2xl border border-[#e5e6e2] md:block">
   <table class="w-full">
     <thead>
-      <tr class="bg-slate-50/50 border-b border-slate-100">
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nama keluarga</th>
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alamat</th>
-        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Aksi</th>
+      <tr class="bg-[#f0f2ee]/50 border-b border-[#e5e6e2]">
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Nama keluarga</th>
+        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Alamat</th>
+        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Aksi</th>
       </tr>
     </thead>
     <tbody>
       {{range .Items}}
-      <tr id="row-{{.ID}}" class="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
-        <td class="px-5 py-3"><a href="/keluarga/{{.ID}}" class="text-sm font-medium text-slate-900 hover:text-black hover:underline transition-colors">{{.NamaKeluarga}}</a></td>
-        <td class="px-5 py-3 text-[13px] text-slate-500">{{if .Alamat.Valid}}{{derefString .Alamat}}{{else}}-{{end}}</td>
+      <tr id="row-{{.ID}}" class="border-b border-[#f0f2ee] hover:bg-[#f0f2ee]/30 transition-colors">
+        <td class="px-5 py-3"><a href="/keluarga/{{.ID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.NamaKeluarga}}</a></td>
+        <td class="px-5 py-3 text-[13px] text-[#6b6e68]">{{if .Alamat.Valid}}{{derefString .Alamat}}{{else}}-{{end}}</td>
         <td class="px-5 py-3">
           <div class="flex justify-end gap-2">
-            <a href="/keluarga/{{.ID}}/edit" class="text-[13px] text-slate-500 hover:text-slate-800 font-medium transition-colors">Ubah</a>
+            <a href="/keluarga/{{.ID}}/edit" class="text-[13px] text-[#6b6e68] hover:text-[#2d2d30] font-medium transition-colors">Ubah</a>
             <form method="POST" action="/keluarga/{{.ID}}"
               hx-delete="/keluarga/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus keluarga ini?">
               <input type="hidden" name="_method" value="DELETE">
@@ -62,8 +62,8 @@
       {{else}}
       <tr><td colspan="3" class="px-5 py-10 text-center">
         <div class="text-3xl mb-2 opacity-40">⌂</div>
-        <p class="text-[13px] text-slate-500 font-medium">Belum ada keluarga</p>
-        <p class="text-[12px] text-slate-400 mt-0.5">Tambahkan kelompok keluarga pertama Anda.</p>
+        <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada keluarga</p>
+        <p class="text-[12px] text-[#8a8d87] mt-0.5">Tambahkan kelompok keluarga pertama Anda.</p>
       </td></tr>
       {{end}}
     </tbody>

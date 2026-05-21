@@ -1,12 +1,12 @@
 {{define "pelayan/detail.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
-    <a href="/pelayan" class="text-[13px] text-slate-400 hover:text-slate-600 transition-colors">Kembali ke daftar</a>
-    <h1 class="mt-2 text-[20px] font-bold text-slate-900 tracking-tight">{{.JemaatNama}}</h1>
-    <p class="text-[13px] text-slate-500">Pelayan</p>
+    <a href="/pelayan" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke daftar</a>
+    <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">{{.JemaatNama}}</h1>
+    <p class="text-[13px] text-[#6b6e68]">Pelayan</p>
   </div>
   <div class="flex gap-2">
-    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="py-1.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 focus-visible:border-slate-800">Ubah</a>
+    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Ubah</a>
     <form method="POST" action="/pelayan/{{.Pelayan.ID}}">
       <input type="hidden" name="_method" value="DELETE">
       <button type="submit" class="py-1.5 px-4 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center cursor-pointer"
@@ -15,24 +15,24 @@
   </div>
 </div>
 
-<dl class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6">
+<dl class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6">
   <div class="mb-4">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jemaat</dt>
-    <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="text-sm font-medium text-slate-800 hover:text-black hover:underline transition-colors">{{.JemaatNama}}</a></dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Jemaat</dt>
+    <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.JemaatNama}}</a></dd>
   </div>
   <div class="mb-4">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipe pelayanan</dt>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tipe pelayanan</dt>
     <dd class="mt-2 flex flex-wrap gap-1.5">
       {{range .ServiceTypeNames}}
-      <span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{.}}</span>
+      <span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#f0f2ee] text-[#5a5d58]">{{.}}</span>
       {{else}}
-      <span class="text-[13px] text-slate-400">Belum ada tipe pelayanan.</span>
+      <span class="text-[13px] text-[#8a8d87]">Belum ada tipe pelayanan.</span>
       {{end}}
     </dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</dt>
-    <dd class="mt-1 text-sm whitespace-pre-wrap text-slate-700">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}-{{end}}</dd>
+    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Catatan</dt>
+    <dd class="mt-1 text-sm whitespace-pre-wrap text-[#3d4039]">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}-{{end}}</dd>
   </div>
 </dl>
 {{end}}
