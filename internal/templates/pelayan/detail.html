@@ -2,7 +2,7 @@
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
     <a href="/pelayan" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-    <h1 class="mt-2 text-2xl font-bold">{{.JemaatNama}}</h1>
+    <h1 class="mt-2 text-3xl font-extrabold tracking-tight">{{.JemaatNama}}</h1>
     <p class="text-sm text-base-content/60">Pelayan</p>
   </div>
   <div class="flex gap-2">
@@ -24,7 +24,7 @@
     <div class="mb-4">
       <dt class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Tipe pelayanan</dt>
       <dd class="mt-2 flex flex-wrap gap-2">
-        {{range .ServiceTypeNames}}
+        {{range .ServiceTypes}}
         <span class="badge badge-primary badge-soft">{{.}}</span>
         {{else}}
         <span class="text-sm text-base-content/60">Belum ada tipe pelayanan.</span>

@@ -24,6 +24,7 @@ type kebaktianListPage struct {
 	Title  string
 	User   sqlc.User
 	Flash  Flash
+	TZ     string
 	Items  []sqlc.Kebaktian
 	From   string
 	To     string
@@ -35,13 +36,16 @@ type kebaktianDetailPage struct {
 	Title     string
 	User      sqlc.User
 	Flash     Flash
+	TZ        string
 	Kebaktian sqlc.Kebaktian
+	Jadwal    []sqlc.ListJadwalByKebaktianRow
 }
 
 type kebaktianFormPage struct {
 	Title       string
 	User        sqlc.User
 	Flash       Flash
+	TZ          string
 	Errors      map[string]string
 	Form        kebaktianForm
 	KebaktianID int64
@@ -100,7 +104,7 @@ func kebaktianList(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			return
 		}
 		if err := rdr.Page(w, r, "kebaktian/list.html", kebaktianListPage{
-			Title: "Kebaktian", User: user, Flash: flash, Items: items,
+			Title: "Kebaktian", User: user, Flash: flash, TZ: user.Timezone, Items: items,
 			From: from, To: to, Limit: limit, Offset: offset,
 		}); err != nil {
 			WriteServerError(w, err)
@@ -260,8 +264,15 @@ func kebaktianDetail(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			WriteServerError(w, err)
 			return
 		}
+		jadwal, err := q.ListJadwalByKebaktian(r.Context(), sqlc.ListJadwalByKebaktianParams{
+			KebaktianID: id, UserID: uid,
+		})
+		if err != nil {
+			WriteServerError(w, err)
+			return
+		}
 		if err := rdr.Page(w, r, "kebaktian/detail.html", kebaktianDetailPage{
-			Title: k.Nama, User: user, Flash: flash, Kebaktian: k,
+			Title: k.Nama, User: user, Flash: flash, TZ: user.Timezone, Kebaktian: k, Jadwal: jadwal,
 		}); err != nil {
 			WriteServerError(w, err)
 		}
@@ -280,7 +291,7 @@ func renderKebaktianForm(w http.ResponseWriter, r *http.Request, q *sqlc.Queries
 		title = "Edit Kebaktian"
 	}
 	if err := rdr.Page(w, r, "kebaktian/form.html", kebaktianFormPage{
-		Title: title, User: user, Flash: flash, Errors: errs, Form: form,
+		Title: title, User: user, Flash: flash, TZ: user.Timezone, Errors: errs, Form: form,
 		KebaktianID: id, IsEdit: isEdit,
 	}); err != nil {
 		WriteServerError(w, err)

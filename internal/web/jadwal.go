@@ -15,9 +15,12 @@ import (
 )
 
 type jadwalSlotForm struct {
-	ServiceTypeID int64
-	PelayanID     string
-	Catatan       string
+	ServiceTypeID     int64
+	ServiceType       sqlc.ServiceType
+	PelayanID         string
+	SelectedPelayanID int64
+	PelayanOptions    []sqlc.ListPelayanForServiceTypeRow
+	Catatan           string
 }
 
 type jadwalEditorPage struct {
@@ -25,6 +28,7 @@ type jadwalEditorPage struct {
 	User          sqlc.User
 	Flash         Flash
 	Errors        map[string]string
+	TZ            string
 	Kebaktian     sqlc.Kebaktian
 	ServiceTypes  []sqlc.ServiceType
 	Slots         []jadwalSlotForm
@@ -81,12 +85,14 @@ func jadwalEditor(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 		slots := make([]jadwalSlotForm, 0, len(st))
 		pelayanByType := map[int64][]sqlc.ListPelayanForServiceTypeRow{}
 		for _, s := range st {
-			slot := jadwalSlotForm{ServiceTypeID: s.ID}
+			slot := jadwalSlotForm{ServiceTypeID: s.ID, ServiceType: s}
 			if j, ok := jadwalByST[s.ID]; ok {
 				slot.PelayanID = nullInt64(j.PelayanID)
 				slot.Catatan = derefString(j.Catatan)
+				if j.PelayanID.Valid {
+					slot.SelectedPelayanID = j.PelayanID.Int64
+				}
 			}
-			slots = append(slots, slot)
 			opts, err := q.ListPelayanForServiceType(r.Context(), sqlc.ListPelayanForServiceTypeParams{
 				UserID: uid, ServiceTypeID: s.ID,
 			})
@@ -94,10 +100,12 @@ func jadwalEditor(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 				WriteServerError(w, err)
 				return
 			}
+			slot.PelayanOptions = opts
+			slots = append(slots, slot)
 			pelayanByType[s.ID] = opts
 		}
 		if err := rdr.Page(w, r, "kebaktian/jadwal.html", jadwalEditorPage{
-			Title: "Jadwal Pelayanan", User: user, Flash: flash, Kebaktian: k,
+			Title: "Jadwal Pelayanan", User: user, Flash: flash, TZ: user.Timezone, Kebaktian: k,
 			ServiceTypes: st, Slots: slots, PelayanByType: pelayanByType, Jadwal: jadwal,
 		}); err != nil {
 			WriteServerError(w, err)

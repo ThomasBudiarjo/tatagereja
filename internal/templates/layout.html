@@ -2,6 +2,42 @@
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  [data-theme="tatagereja"] {
+    color-scheme: light;
+    --color-base-100: #F5EFE0;
+    --color-base-200: #EFE7D2;
+    --color-base-300: #E2D7BA;
+    --color-base-content: #1F2419;
+    --color-primary: #C25A2C;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #2D3F35;
+    --color-secondary-content: #F5EFE0;
+    --color-accent: #6E4FE0;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #2D3F35;
+    --color-neutral-content: #F5EFE0;
+    --color-info: #2D5A8E;
+    --color-info-content: #FFFFFF;
+    --color-success: #2F7A4E;
+    --color-success-content: #FFFFFF;
+    --color-warning: #C25A2C;
+    --color-warning-content: #FFFFFF;
+    --color-error: #B23A3A;
+    --color-error-content: #FFFFFF;
+    --radius-selector: 1rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+  }
+  [data-theme="tatagereja"] body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+</style>
 {{end}}
 
 {{define "flash"}}
@@ -12,9 +48,13 @@
 </div>
 {{end}}
 
+{{define "icon-home"}}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>{{end}}
+{{define "icon-people"}}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.4 2.9-6 6.5-6s6.5 2.6 6.5 6"/><circle cx="17" cy="7.5" r="2.6"/><path d="M15.5 14.2c2.7.4 5 2.6 5 5.8"/></svg>{{end}}
+{{define "icon-calendar"}}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/></svg>{{end}}
+
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="id" data-theme="silk">
+<html lang="id" data-theme="tatagereja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -22,7 +62,7 @@
   {{template "assets" .}}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
-<body class="min-h-screen bg-base-200 text-base-content antialiased">
+<body class="min-h-screen bg-base-100 text-base-content antialiased">
   <div class="flex min-h-screen">
     <aside class="hidden w-64 shrink-0 border-r border-base-300 bg-base-100 md:flex md:flex-col">
       <div class="border-b border-base-300 px-5 py-6">
@@ -31,6 +71,7 @@
         <p class="truncate text-sm text-base-content/60">{{.Data.User.DisplayName}}</p>
       </div>
       <ul class="menu menu-md flex-1 gap-1 p-3">
+        <li><a href="/" class="{{if eq .Path `/`}}menu-active{{end}}">Beranda</a></li>
         <li><a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}menu-active{{end}}">Jemaat</a></li>
         <li><a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}menu-active{{end}}">Keluarga</a></li>
         <li><a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}menu-active{{end}}">Pelayan</a></li>
@@ -44,7 +85,7 @@
       </div>
     </aside>
 
-    <div class="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
+    <div class="flex min-w-0 flex-1 flex-col pb-24 md:pb-0">
       <header class="navbar border-b border-base-300 bg-base-100 px-4 md:hidden">
         <div class="min-w-0 flex-1">
           <div>
@@ -64,26 +105,18 @@
     </div>
   </div>
 
-  <nav class="dock dock-md border-t border-base-300 bg-base-100 md:hidden" aria-label="Navigasi utama">
-    <a href="/jemaat" class="{{if hasPrefix .Path `/jemaat`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">👥</span>
-      <span class="dock-label">Jemaat</span>
+  <nav class="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-3 border-t border-base-300 bg-base-100/95 backdrop-blur md:hidden" aria-label="Navigasi utama">
+    <a href="/" class="flex flex-col items-center justify-center gap-1 py-2.5 {{if eq .Path `/`}}text-primary{{else}}text-base-content/70{{end}}">
+      {{template "icon-home" .}}
+      <span class="text-xs font-medium">Beranda</span>
     </a>
-    <a href="/keluarga" class="{{if hasPrefix .Path `/keluarga`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">⌂</span>
-      <span class="dock-label">Keluarga</span>
+    <a href="/jemaat" class="flex flex-col items-center justify-center gap-1 py-2.5 {{if or (hasPrefix .Path `/jemaat`) (or (hasPrefix .Path `/keluarga`) (hasPrefix .Path `/pelayan`))}}text-primary{{else}}text-base-content/70{{end}}">
+      {{template "icon-people" .}}
+      <span class="text-xs font-medium">Jemaat</span>
     </a>
-    <a href="/pelayan" class="{{if hasPrefix .Path `/pelayan`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">✋</span>
-      <span class="dock-label">Pelayan</span>
-    </a>
-    <a href="/service-types" class="{{if hasPrefix .Path `/service-types`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">☷</span>
-      <span class="dock-label">Tipe</span>
-    </a>
-    <a href="/kebaktian" class="{{if hasPrefix .Path `/kebaktian`}}dock-active{{end}}">
-      <span class="text-lg leading-none" aria-hidden="true">✦</span>
-      <span class="dock-label">Kebaktian</span>
+    <a href="/kebaktian" class="flex flex-col items-center justify-center gap-1 py-2.5 {{if or (hasPrefix .Path `/kebaktian`) (hasPrefix .Path `/service-types`)}}text-primary{{else}}text-base-content/70{{end}}">
+      {{template "icon-calendar" .}}
+      <span class="text-xs font-medium">Jadwal</span>
     </a>
   </nav>
 </body>

@@ -57,10 +57,11 @@ type jemaatListPage struct {
 }
 
 type jemaatDetailPage struct {
-	Title  string
-	User   sqlc.User
-	Flash  Flash
-	Jemaat sqlc.Jemaat
+	Title        string
+	User         sqlc.User
+	Flash        Flash
+	Jemaat       sqlc.Jemaat
+	KeluargaNama string
 }
 
 type jemaatFormPage struct {
@@ -296,11 +297,19 @@ func jemaatDetail(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			WriteServerError(w, err)
 			return
 		}
+		keluargaNama := ""
+		if j.KeluargaID.Valid {
+			k, err := q.GetKeluarga(r.Context(), sqlc.GetKeluargaParams{ID: j.KeluargaID.Int64, UserID: uid})
+			if err == nil {
+				keluargaNama = k.NamaKeluarga
+			}
+		}
 		if err := rdr.Page(w, r, "jemaat/detail.html", jemaatDetailPage{
-			Title:  j.NamaLengkap,
-			User:   user,
-			Flash:  flash,
-			Jemaat: j,
+			Title:        j.NamaLengkap,
+			User:         user,
+			Flash:        flash,
+			Jemaat:       j,
+			KeluargaNama: keluargaNama,
 		}); err != nil {
 			WriteServerError(w, err)
 		}

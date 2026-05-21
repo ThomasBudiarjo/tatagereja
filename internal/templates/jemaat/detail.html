@@ -2,7 +2,7 @@
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
   <div>
     <a href="/jemaat" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-    <h1 class="mt-2 text-2xl font-bold">{{.Jemaat.NamaLengkap}}</h1>
+    <h1 class="mt-2 text-3xl font-extrabold tracking-tight">{{.Jemaat.NamaLengkap}}</h1>
     {{if .Jemaat.NamaPanggilan.Valid}}<p class="text-sm text-base-content/60">{{derefString .Jemaat.NamaPanggilan}}</p>{{end}}
     {{if eq .Jemaat.IsActive 0}}<span class="badge badge-warning badge-soft mt-2">Nonaktif</span>{{end}}
   </div>

@@ -1,16 +1,16 @@
 {{define "kebaktian/form.html"}}
 <div class="mb-5">
   <a href="/kebaktian" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-  <h1 class="mt-2 text-2xl font-bold">{{if .IsNew}}Tambah Kebaktian{{else}}Ubah Kebaktian{{end}}</h1>
+  <h1 class="mt-2 text-3xl font-extrabold tracking-tight">{{if (not .IsEdit)}}Tambah Kebaktian{{else}}Ubah Kebaktian{{end}}</h1>
 </div>
 
 <div id="form-container">
-<form method="POST" action="{{if .IsNew}}/kebaktian{{else}}/kebaktian/{{.Form.ID}}{{end}}"
-  {{if not .IsNew}}hx-post="/kebaktian/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
+<form method="POST" action="{{if (not .IsEdit)}}/kebaktian{{else}}/kebaktian/{{.KebaktianID}}{{end}}"
+  {{if not (not .IsEdit)}}hx-post="/kebaktian/{{.KebaktianID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
   class="card card-border max-w-2xl bg-base-100 shadow-sm">
   <div class="card-body gap-4 p-4 md:p-6">
 
-  {{if not .IsNew}}
+  {{if not (not .IsEdit)}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 

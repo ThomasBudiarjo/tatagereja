@@ -1,22 +1,24 @@
 {{define "login.html"}}
 <!DOCTYPE html>
-<html lang="id" data-theme="silk">
+<html lang="id" data-theme="tatagereja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Masuk - Tata Gereja</title>
   {{template "assets" .}}
 </head>
-<body class="min-h-screen bg-base-200 text-base-content antialiased">
+<body class="min-h-screen bg-base-100 text-base-content antialiased">
   <main class="grid min-h-screen place-items-center px-4 py-8">
     <div class="w-full max-w-md">
-      <div class="mb-8 text-center">
-        <p class="text-sm font-semibold uppercase tracking-wide text-primary">Tata Gereja</p>
-        <h1 class="mt-2 text-3xl font-bold">Masuk ke akun</h1>
-        <p class="mt-2 text-sm text-base-content/60">Kelola jemaat dan jadwal pelayanan.</p>
+      <div class="mb-8">
+        <div class="rounded-3xl bg-secondary px-6 py-8 text-secondary-content shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-content/70">Tata Gereja</p>
+          <h1 class="mt-3 text-3xl font-extrabold tracking-tight">Selamat datang kembali</h1>
+          <p class="mt-2 text-sm text-secondary-content/80">Kelola jemaat dan jadwal pelayanan.</p>
+        </div>
       </div>
 
-      <section class="card card-border bg-base-100 shadow-xl">
+      <section class="card card-border bg-base-100 shadow-sm">
         <div class="card-body gap-5">
           {{with .Flash}}
           <div class="alert {{if eq .Kind `error`}}alert-error{{else if eq .Kind `success`}}alert-success{{else}}alert-info{{end}} alert-soft">

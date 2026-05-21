@@ -33,9 +33,7 @@ func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 
 	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(q))
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/jemaat", http.StatusFound)
-		})
+		mountDashboard(r, q, rdr)
 		mountJemaat(r, q, rdr)
 		mountKeluarga(r, q, rdr)
 		mountPelayan(r, q, database, rdr)

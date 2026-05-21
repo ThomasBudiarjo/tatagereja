@@ -1,16 +1,16 @@
 {{define "pelayan/form.html"}}
 <div class="mb-5">
   <a href="/pelayan" class="link link-hover text-sm text-base-content/60">Kembali ke daftar</a>
-  <h1 class="mt-2 text-2xl font-bold">{{if .IsNew}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
+  <h1 class="mt-2 text-3xl font-extrabold tracking-tight">{{if (not .IsEdit)}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
 </div>
 
 <div id="form-container">
-<form method="POST" action="{{if .IsNew}}/pelayan{{else}}/pelayan/{{.Form.ID}}{{end}}"
-  {{if not .IsNew}}hx-post="/pelayan/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
+<form method="POST" action="{{if (not .IsEdit)}}/pelayan{{else}}/pelayan/{{.PelayanID}}{{end}}"
+  {{if not (not .IsEdit)}}hx-post="/pelayan/{{.PelayanID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
   class="card card-border max-w-2xl bg-base-100 shadow-sm">
   <div class="card-body gap-5 p-4 md:p-6">
 
-  {{if not .IsNew}}
+  {{if not (not .IsEdit)}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
@@ -19,8 +19,8 @@
     <select id="jemaat_id" name="jemaat_id" required
       class="select w-full {{if index .Errors "JemaatID"}}select-error{{end}}">
       <option value="">Pilih jemaat</option>
-      {{range .JemaatOptions}}
-      <option value="{{.ID}}" {{if eq $.Form.JemaatID .ID}}selected{{end}}>{{.NamaLengkap}}</option>
+      {{range .Jemaat}}
+      <option value="{{.ID}}" {{if eq $.Form.JemaatID (printf "%d" .ID)}}selected{{end}}>{{.NamaLengkap}}</option>
       {{end}}
     </select>
     {{with index .Errors "JemaatID"}}<p class="mt-1 text-xs text-error">{{.}}</p>{{end}}
@@ -33,7 +33,7 @@
       {{range .ServiceTypes}}
       <label class="flex min-h-12 cursor-pointer items-center gap-3 rounded-box border border-base-300 bg-base-100 px-3 transition hover:bg-base-200">
         <input type="checkbox" name="service_type_ids" value="{{.ID}}"
-          {{if index $.Form.ServiceTypeIDs .ID}}checked{{end}}
+          {{if containsInt64 $.Form.ServiceTypeIDs .ID}}checked{{end}}
           class="checkbox checkbox-primary">
         <span class="text-sm">{{.Nama}}</span>
         {{if .Deskripsi.Valid}}<span class="text-xs text-base-content/60">- {{derefString .Deskripsi}}</span>{{end}}

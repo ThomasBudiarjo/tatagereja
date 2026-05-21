@@ -1,0 +1,79 @@
+{{define "dashboard.html"}}
+<div class="mb-6">
+  <p class="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/60">{{idDate .TZ "full"}}</p>
+  <h1 class="mt-2 text-4xl font-extrabold leading-tight tracking-tight">
+    {{greeting .TZ}},<br>{{.User.DisplayName}}
+  </h1>
+</div>
+
+<section class="relative mb-6 overflow-hidden rounded-3xl bg-secondary p-6 text-secondary-content shadow-sm">
+  <span class="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-secondary-content/5"></span>
+  <span class="pointer-events-none absolute right-4 top-10 h-32 w-32 rounded-full border border-primary/40"></span>
+
+  <p class="text-xs font-semibold uppercase tracking-[0.2em] text-secondary-content/70">Minggu ini · {{.WeekLabel}}</p>
+  <h2 class="mt-2 text-3xl font-extrabold leading-tight tracking-tight">{{.HeroTema}}</h2>
+
+  <div class="relative mt-6 space-y-3">
+    {{range $i, $svc := .Services}}
+    <a href="/kebaktian/{{$svc.ID}}/jadwal" class="flex items-center gap-4 rounded-2xl bg-secondary-content/10 p-3 transition hover:bg-secondary-content/15">
+      <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-secondary-content/15 leading-none">
+        <span class="text-xl font-extrabold">{{splitHour $svc.WaktuMulai $.TZ}}</span>
+        <span class="text-xs font-medium text-secondary-content/70">{{splitMinute $svc.WaktuMulai $.TZ}}</span>
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-base font-bold">{{if $svc.Nama}}{{$svc.Nama}}{{else}}Ibadah {{romanIndex $i}}{{end}}</p>
+        <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary-content/15">
+          <div class="h-full rounded-full bg-primary" style="width: {{$svc.Pct}}%"></div>
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-1 text-sm text-secondary-content/80">
+        <span class="font-medium">{{$svc.Filled}}/{{$svc.Total}}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="m9 6 6 6-6 6"/></svg>
+      </div>
+    </a>
+    {{else}}
+    <div class="rounded-2xl bg-secondary-content/10 p-6 text-center text-sm text-secondary-content/80">
+      Belum ada kebaktian minggu ini.
+      <a href="/kebaktian/new" class="mt-2 inline-block font-semibold text-primary underline-offset-2 hover:underline">Tambah kebaktian</a>
+    </div>
+    {{end}}
+  </div>
+</section>
+
+<section class="mb-6 grid grid-cols-2 gap-3">
+  <article class="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-[0.15em] text-base-content/60">Total Jemaat</p>
+    <p class="mt-2 text-4xl font-extrabold leading-none">{{.JemaatCount}}</p>
+    <p class="mt-2 text-xs text-base-content/60">{{.PelayanAktifCount}} aktif melayani</p>
+  </article>
+  <article class="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-[0.15em] text-base-content/60">Pelayanan</p>
+    <p class="mt-2 text-4xl font-extrabold leading-none">{{.WeekAssignments}}</p>
+    <p class="mt-2 text-xs text-base-content/60">{{.ServiceTypeCount}} jenis pelayanan</p>
+  </article>
+</section>
+
+<section class="mb-6">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="text-lg font-extrabold tracking-tight">Distribusi Pelayanan</h2>
+    <a href="/service-types" class="text-sm font-semibold text-primary hover:underline">Lihat semua</a>
+  </div>
+
+  <div class="space-y-2 rounded-3xl border border-base-300 bg-base-100 p-3 shadow-sm">
+    {{range .Distribution}}
+    <div class="flex items-center gap-3 rounded-2xl px-2 py-2">
+      <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent">
+        {{slice .Nama 0 1}}{{if gt (len .Nama) 1}}{{slice .Nama 1 2}}{{end}}
+      </span>
+      <p class="w-32 shrink-0 truncate text-sm font-medium">{{.Nama}}</p>
+      <div class="h-2 flex-1 overflow-hidden rounded-full bg-base-200">
+        <div class="h-full rounded-full bg-accent" style="width: {{.Pct}}%"></div>
+      </div>
+      <span class="w-6 shrink-0 text-right text-sm font-semibold tabular-nums">{{.Count}}</span>
+    </div>
+    {{else}}
+    <p class="px-2 py-4 text-center text-sm text-base-content/60">Belum ada tipe pelayanan.</p>
+    {{end}}
+  </div>
+</section>
+{{end}}

@@ -52,6 +52,14 @@ func NewRenderer() *Renderer {
 		"derefString":    derefString,
 		"nullInt64":      nullInt64,
 		"hasPrefix":      strings.HasPrefix,
+		"greeting":       greeting,
+		"idDate":         idDate,
+		"idDateOf":       idDateOf,
+		"splitHour":      splitHour,
+		"splitMinute":    splitMinute,
+		"romanIndex":     romanIndex,
+		"pct":            pct,
+		"containsInt64":  containsInt64,
 	}
 	tmpl := template.New("").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(templates.FS, "*.html", "**/*.html")
@@ -405,4 +413,184 @@ func CompareDates(a, b string) int {
 	ta, _ := time.Parse("2006-01-02", a)
 	tb, _ := time.Parse("2006-01-02", b)
 	return ta.Compare(tb)
+}
+
+var indonesianWeekdays = map[time.Weekday]string{
+	time.Sunday:    "MINGGU",
+	time.Monday:    "SENIN",
+	time.Tuesday:   "SELASA",
+	time.Wednesday: "RABU",
+	time.Thursday:  "KAMIS",
+	time.Friday:    "JUMAT",
+	time.Saturday:  "SABTU",
+}
+
+var indonesianMonths = map[time.Month]string{
+	time.January:   "JANUARI",
+	time.February:  "FEBRUARI",
+	time.March:     "MARET",
+	time.April:     "APRIL",
+	time.May:       "MEI",
+	time.June:      "JUNI",
+	time.July:      "JULI",
+	time.August:    "AGUSTUS",
+	time.September: "SEPTEMBER",
+	time.October:   "OKTOBER",
+	time.November:  "NOVEMBER",
+	time.December:  "DESEMBER",
+}
+
+var indonesianMonthsShort = map[time.Month]string{
+	time.January:   "JAN",
+	time.February:  "FEB",
+	time.March:     "MAR",
+	time.April:     "APR",
+	time.May:       "MEI",
+	time.June:      "JUN",
+	time.July:      "JUL",
+	time.August:    "AGT",
+	time.September: "SEP",
+	time.October:   "OKT",
+	time.November:  "NOV",
+	time.December:  "DES",
+}
+
+func greeting(tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	h := time.Now().In(loc).Hour()
+	switch {
+	case h < 11:
+		return "Selamat pagi"
+	case h < 15:
+		return "Selamat siang"
+	case h < 19:
+		return "Selamat sore"
+	default:
+		return "Selamat malam"
+	}
+}
+
+func idDate(tz, layout string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	return formatIndonesian(time.Now().In(loc), layout)
+}
+
+func idDateOf(utcISO, tz, layout string) string {
+	if utcISO == "" {
+		return ""
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	t, err := time.Parse("2006-01-02T15:04:05.000000Z", utcISO)
+	if err != nil {
+		t, err = time.Parse(time.RFC3339, utcISO)
+		if err != nil {
+			return utcISO
+		}
+	}
+	return formatIndonesian(t.In(loc), layout)
+}
+
+func formatIndonesian(t time.Time, layout string) string {
+	switch layout {
+	case "full":
+		return fmt.Sprintf("%s, %d %s", indonesianWeekdays[t.Weekday()], t.Day(), indonesianMonths[t.Month()])
+	case "short":
+		return fmt.Sprintf("%d %s", t.Day(), indonesianMonthsShort[t.Month()])
+	case "dayMonth":
+		return fmt.Sprintf("%d %s", t.Day(), indonesianMonths[t.Month()])
+	default:
+		return fmt.Sprintf("%s, %d %s %d", indonesianWeekdays[t.Weekday()], t.Day(), indonesianMonths[t.Month()], t.Year())
+	}
+}
+
+func splitHour(utcISO, tz string) string {
+	t, ok := parseUTC(utcISO, tz)
+	if !ok {
+		return "--"
+	}
+	return t.Format("15")
+}
+
+func splitMinute(utcISO, tz string) string {
+	t, ok := parseUTC(utcISO, tz)
+	if !ok {
+		return "--"
+	}
+	return t.Format("04")
+}
+
+func parseUTC(utcISO, tz string) (time.Time, bool) {
+	if utcISO == "" {
+		return time.Time{}, false
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	t, err := time.Parse("2006-01-02T15:04:05.000000Z", utcISO)
+	if err != nil {
+		t, err = time.Parse(time.RFC3339, utcISO)
+		if err != nil {
+			return time.Time{}, false
+		}
+	}
+	return t.In(loc), true
+}
+
+func containsInt64(haystack []int64, needle int64) bool {
+	for _, v := range haystack {
+		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func romanIndex(i int) string {
+	romans := []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
+	if i < 0 || i >= len(romans) {
+		return strconv.Itoa(i + 1)
+	}
+	return romans[i]
+}
+
+func pct(num, den int64) int64 {
+	if den <= 0 {
+		return 0
+	}
+	v := num * 100 / den
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
+}
+
+// WeekRangeUTC returns Monday 00:00 .. Sunday 23:59:59.999999 of the week
+// containing `now`, in the given timezone, expressed as UTC ISO strings.
+func WeekRangeUTC(now time.Time, tz string) (startUTC, endUTC string) {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	local := now.In(loc)
+	wd := int(local.Weekday())
+	// Go: Sunday=0, Monday=1, ..., Saturday=6. We want Monday=0.
+	mondayOffset := (wd + 6) % 7
+	monday := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -mondayOffset)
+	sundayEnd := monday.AddDate(0, 0, 7).Add(-time.Nanosecond)
+	startUTC = monday.UTC().Format("2006-01-02T15:04:05.000000Z")
+	endUTC = sundayEnd.UTC().Format("2006-01-02T15:04:05.000000Z")
+	return startUTC, endUTC
 }
