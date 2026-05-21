@@ -47,6 +47,10 @@ func (c *Config) CookieSecure() bool {
 	return c.AppEnv == "production"
 }
 
+func (c *Config) LitestreamEnabled() bool {
+	return c.AppEnv == "production"
+}
+
 func (c *Config) applyAWSEnv() {
 	if c.AWSAccessKeyID != "" {
 		os.Setenv("AWS_ACCESS_KEY_ID", c.AWSAccessKeyID)

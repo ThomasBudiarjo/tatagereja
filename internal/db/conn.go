@@ -34,22 +34,27 @@ func Open(ctx context.Context, cfg *config.Config) (*sql.DB, *litestream.Store, 
 		return nil, nil, fmt.Errorf("mkdir sqlite dir: %w", err)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := restoreFromReplica(ctx, path, cfg.LitestreamReplicaURL); err != nil &&
-			!errors.Is(err, litestream.ErrNoSnapshots) &&
-			!errors.Is(err, litestream.ErrTxNotAvailable) {
-			return nil, nil, fmt.Errorf("restore from replica: %w", err)
+	var store *litestream.Store
+	if cfg.LitestreamEnabled() {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			if err := restoreFromReplica(ctx, path, cfg.LitestreamReplicaURL); err != nil &&
+				!errors.Is(err, litestream.ErrNoSnapshots) &&
+				!errors.Is(err, litestream.ErrTxNotAvailable) {
+				return nil, nil, fmt.Errorf("restore from replica: %w", err)
+			}
 		}
-	}
 
-	store, err := openLitestreamStore(ctx, path, cfg.LitestreamReplicaURL)
-	if err != nil {
-		return nil, nil, err
+		store, err = openLitestreamStore(ctx, path, cfg.LitestreamReplicaURL)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	database, err := openSQLite(path)
 	if err != nil {
-		_ = store.Close(ctx)
+		if store != nil {
+			_ = store.Close(ctx)
+		}
 		return nil, nil, err
 	}
 
@@ -71,6 +76,9 @@ func openSQLite(path string) (*sql.DB, error) {
 }
 
 func SyncAndClose(ctx context.Context, store *litestream.Store) error {
+	if store == nil {
+		return nil
+	}
 	for _, lsDB := range store.DBs() {
 		if err := lsDB.SyncAndWait(ctx); err != nil {
 			return fmt.Errorf("litestream sync: %w", err)
