@@ -24,9 +24,11 @@ func main() {
 	}
 	defer database.Close()
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		_ = store.Close(shutdownCtx)
+		if store != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			_ = store.Close(shutdownCtx)
+		}
 	}()
 
 	if err := db.Apply(database); err != nil {
