@@ -80,11 +80,12 @@
 
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="id" data-theme="silk">
+<html lang="id" translate="no" data-theme="silk">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f7f7f1">
+  <meta name="google" content="notranslate">
   <title>{{if .Data.Title}}{{.Data.Title}} - {{end}}Tata Gereja</title>
   {{template "assets" .}}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
