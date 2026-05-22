@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/tatagereja/tatagereja/internal/config"
 	"github.com/tatagereja/tatagereja/internal/db/sqlc"
+	"github.com/tatagereja/tatagereja/internal/templates"
 )
 
 func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
@@ -29,6 +31,7 @@ func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 	)
 
 	r.Get("/health", healthHandler(database))
+	r.Handle("/static/*", staticHandler())
 	mountAuthRoutes(r, cfg, q, rdr)
 
 	r.Group(func(r chi.Router) {
@@ -45,6 +48,20 @@ func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 	})
 
 	return r
+}
+
+func staticHandler() http.Handler {
+	fs := http.FileServer(http.FS(templates.StaticFS))
+	stripped := http.StripPrefix("/static/", fs)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/static/")
+		if path == "" || strings.HasSuffix(path, "/") || strings.HasSuffix(path, ".src.css") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		stripped.ServeHTTP(w, r)
+	})
 }
 
 func healthHandler(database *sql.DB) http.HandlerFunc {
