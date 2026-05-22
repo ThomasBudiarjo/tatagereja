@@ -30,6 +30,7 @@ type jadwalEditorPage struct {
 	Slots         []jadwalSlotForm
 	PelayanByType map[int64][]sqlc.ListPelayanForServiceTypeRow
 	Jadwal        []sqlc.ListJadwalByKebaktianRow
+	TZ            string
 }
 
 func mountJadwal(r chi.Router, q *sqlc.Queries, db *sql.DB, rdr *Renderer) {
@@ -98,7 +99,7 @@ func jadwalEditor(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 		}
 		if err := rdr.Page(w, r, "kebaktian/jadwal.html", jadwalEditorPage{
 			Title: "Jadwal Pelayanan", User: user, Flash: flash, Kebaktian: k,
-			ServiceTypes: st, Slots: slots, PelayanByType: pelayanByType, Jadwal: jadwal,
+			ServiceTypes: st, Slots: slots, PelayanByType: pelayanByType, Jadwal: jadwal, TZ: user.Timezone,
 		}); err != nil {
 			WriteServerError(w, err)
 		}
@@ -225,7 +226,7 @@ func renderJadwalEditorWithErrors(w http.ResponseWriter, r *http.Request, q *sql
 	}
 	_ = rdr.Page(w, r, "kebaktian/jadwal.html", jadwalEditorPage{
 		Title: "Jadwal Pelayanan", User: user, Errors: errs, Kebaktian: k,
-		ServiceTypes: st, Slots: slots, PelayanByType: pelayanByType,
+		ServiceTypes: st, Slots: slots, PelayanByType: pelayanByType, TZ: user.Timezone,
 	})
 }
 

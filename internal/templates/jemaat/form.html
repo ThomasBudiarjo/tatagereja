@@ -1,55 +1,58 @@
 {{define "jemaat/form.html"}}
 <div class="mb-5">
-  <a href="/jemaat" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke daftar</a>
-  <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">{{if not .IsEdit}}Tambah Jemaat{{else}}Ubah Jemaat{{end}}</h1>
+  <a href="/jemaat" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink-muted transition-colors">
+    {{template "icon-arrow-left" "h-3.5 w-3.5"}}
+    <span>Kembali ke daftar</span>
+  </a>
+  <h1 class="mt-2 text-xl md:text-2xl font-semibold text-ink tracking-tight">{{if not .IsEdit}}Tambah Jemaat{{else}}Ubah Jemaat{{end}}</h1>
 </div>
 
 <div id="form-container">
 <form method="POST" action="{{if not .IsEdit}}/jemaat{{else}}/jemaat/{{.JemaatID}}{{end}}"
   {{if .IsEdit}}hx-post="/jemaat/{{.JemaatID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
-  class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 space-y-6">
+  class="bg-surface-raised rounded-2xl border border-line shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 md:p-6 space-y-6">
 
   {{if .IsEdit}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
-  <fieldset class="bg-[#f0f2ee]/50 rounded-xl p-4 space-y-4">
-    <legend class="text-xs font-semibold text-[#8a8d87] uppercase tracking-wide px-1">Data pribadi</legend>
+  <fieldset class="bg-surface-muted/50 rounded-xl p-4 md:p-5 space-y-4">
+    <legend class="text-2xs font-semibold text-ink-soft uppercase tracking-wider px-1">Data pribadi</legend>
 
     <div>
-      <label for="nama_lengkap" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Nama lengkap <span class="text-rose-500">*</span></label>
+      <label for="nama_lengkap" class="block text-xs font-semibold text-ink-muted mb-1.5">Nama lengkap <span class="text-rose-500">*</span></label>
       <input type="text" id="nama_lengkap" name="nama_lengkap" value="{{.Form.NamaLengkap}}" required maxlength="200"
-        class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `NamaLengkap`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `NamaLengkap`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
       {{with index .Errors "NamaLengkap"}}
-      <p class="mt-1.5 text-xs font-medium text-rose-500 flex items-center gap-1">
-        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-        {{.}}
+      <p class="mt-1.5 text-xs font-medium text-rose-600 flex items-center gap-1">
+        {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+        <span>{{.}}</span>
       </p>
       {{end}}
     </div>
 
     <div>
-      <label for="nama_panggilan" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Nama panggilan</label>
+      <label for="nama_panggilan" class="block text-xs font-semibold text-ink-muted mb-1.5">Nama panggilan</label>
       <input type="text" id="nama_panggilan" name="nama_panggilan" value="{{.Form.NamaPanggilan}}" maxlength="100"
-        class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-      {{with index .Errors "NamaPanggilan"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+      {{with index .Errors "NamaPanggilan"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="jenis_kelamin" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Jenis kelamin</label>
+        <label for="jenis_kelamin" class="block text-xs font-semibold text-ink-muted mb-1.5">Jenis kelamin</label>
         <select id="jenis_kelamin" name="jenis_kelamin"
-          class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `JenisKelamin`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `JenisKelamin`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
           <option value="">Pilih</option>
           <option value="L" {{if eq .Form.JenisKelamin "L"}}selected{{end}}>Laki-laki</option>
           <option value="P" {{if eq .Form.JenisKelamin "P"}}selected{{end}}>Perempuan</option>
         </select>
-        {{with index .Errors "JenisKelamin"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+        {{with index .Errors "JenisKelamin"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
       <div>
-        <label for="status_pernikahan" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Status pernikahan</label>
+        <label for="status_pernikahan" class="block text-xs font-semibold text-ink-muted mb-1.5">Status pernikahan</label>
         <select id="status_pernikahan" name="status_pernikahan"
-          class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `StatusPernikahan`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `StatusPernikahan`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
           <option value="">Pilih</option>
           <option value="belum_menikah" {{if eq .Form.StatusPernikahan "belum_menikah"}}selected{{end}}>Belum menikah</option>
           <option value="menikah" {{if eq .Form.StatusPernikahan "menikah"}}selected{{end}}>Menikah</option>
@@ -57,97 +60,94 @@
           <option value="duda" {{if eq .Form.StatusPernikahan "duda"}}selected{{end}}>Duda</option>
           <option value="janda" {{if eq .Form.StatusPernikahan "janda"}}selected{{end}}>Janda</option>
         </select>
-        {{with index .Errors "StatusPernikahan"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+        {{with index .Errors "StatusPernikahan"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="tanggal_lahir" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Tanggal lahir</label>
+        <label for="tanggal_lahir" class="block text-xs font-semibold text-ink-muted mb-1.5">Tanggal lahir</label>
         <input type="date" id="tanggal_lahir" name="tanggal_lahir" value="{{.Form.TanggalLahir}}"
-          class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `TanggalLahir`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
-        {{with index .Errors "TanggalLahir"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm font-num transition-all focus:outline-none focus:ring-2 {{if index .Errors `TanggalLahir`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
+        {{with index .Errors "TanggalLahir"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
       <div>
-        <label for="tempat_lahir" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Tempat lahir</label>
+        <label for="tempat_lahir" class="block text-xs font-semibold text-ink-muted mb-1.5">Tempat lahir</label>
         <input type="text" id="tempat_lahir" name="tempat_lahir" value="{{.Form.TempatLahir}}" maxlength="100"
-          class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-        {{with index .Errors "TempatLahir"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+        {{with index .Errors "TempatLahir"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
     </div>
   </fieldset>
 
-  <fieldset class="bg-[#f0f2ee]/50 rounded-xl p-4 space-y-4">
-    <legend class="text-xs font-semibold text-[#8a8d87] uppercase tracking-wide px-1">Kontak</legend>
+  <fieldset class="bg-surface-muted/50 rounded-xl p-4 md:p-5 space-y-4">
+    <legend class="text-2xs font-semibold text-ink-soft uppercase tracking-wider px-1">Kontak</legend>
     <div>
-      <label for="alamat" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Alamat</label>
+      <label for="alamat" class="block text-xs font-semibold text-ink-muted mb-1.5">Alamat</label>
       <textarea id="alamat" name="alamat" rows="2" maxlength="500"
-        class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `Alamat`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">{{.Form.Alamat}}</textarea>
-      {{with index .Errors "Alamat"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `Alamat`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">{{.Form.Alamat}}</textarea>
+      {{with index .Errors "Alamat"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     </div>
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="nomor_telepon" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Nomor telepon</label>
+        <label for="nomor_telepon" class="block text-xs font-semibold text-ink-muted mb-1.5">Nomor telepon</label>
         <input type="tel" id="nomor_telepon" name="nomor_telepon" value="{{.Form.NomorTelepon}}" maxlength="30"
-          class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-        {{with index .Errors "NomorTelepon"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm font-num transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+        {{with index .Errors "NomorTelepon"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
       <div>
-        <label for="email" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Email</label>
+        <label for="email" class="block text-xs font-semibold text-ink-muted mb-1.5">Email</label>
         <input type="email" id="email" name="email" value="{{.Form.Email}}" maxlength="200"
-          class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-        {{with index .Errors "Email"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+        {{with index .Errors "Email"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
     </div>
   </fieldset>
 
-  <fieldset class="bg-[#f0f2ee]/50 rounded-xl p-4 space-y-4">
-    <legend class="text-xs font-semibold text-[#8a8d87] uppercase tracking-wide px-1">Gereja</legend>
+  <fieldset class="bg-surface-muted/50 rounded-xl p-4 md:p-5 space-y-4">
+    <legend class="text-2xs font-semibold text-ink-soft uppercase tracking-wider px-1">Gereja</legend>
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="tanggal_baptis" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Tanggal baptis</label>
+        <label for="tanggal_baptis" class="block text-xs font-semibold text-ink-muted mb-1.5">Tanggal baptis</label>
         <input type="date" id="tanggal_baptis" name="tanggal_baptis" value="{{.Form.TanggalBaptis}}"
-          class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-        {{with index .Errors "TanggalBaptis"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm font-num transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+        {{with index .Errors "TanggalBaptis"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
       <div>
-        <label for="tanggal_sidi" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Tanggal sidi</label>
+        <label for="tanggal_sidi" class="block text-xs font-semibold text-ink-muted mb-1.5">Tanggal sidi</label>
         <input type="date" id="tanggal_sidi" name="tanggal_sidi" value="{{.Form.TanggalSidi}}"
-          class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
-        {{with index .Errors "TanggalSidi"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+          class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm font-num transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
+        {{with index .Errors "TanggalSidi"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
       </div>
     </div>
     <div>
-      <label for="keluarga_id" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Keluarga</label>
+      <label for="keluarga_id" class="block text-xs font-semibold text-ink-muted mb-1.5">Keluarga</label>
       <select id="keluarga_id" name="keluarga_id"
-        class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10 {{if index .Errors `KeluargaID`}}border-rose-300{{end}}">
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15 {{if index .Errors `KeluargaID`}}border-rose-300{{end}}">
         <option value="">Tanpa keluarga</option>
         {{range .Keluarga}}
         <option value="{{.ID}}" {{if eq $.Form.KeluargaID (printf "%d" .ID)}}selected{{end}}>{{.NamaKeluarga}}</option>
         {{end}}
       </select>
-      {{with index .Errors "KeluargaID"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+      {{with index .Errors "KeluargaID"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     </div>
     <div>
-      <label for="catatan" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Catatan</label>
+      <label for="catatan" class="block text-xs font-semibold text-ink-muted mb-1.5">Catatan</label>
       <textarea id="catatan" name="catatan" rows="3" maxlength="2000"
-        class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10 {{if index .Errors `Catatan`}}border-rose-300{{end}}">{{.Form.Catatan}}</textarea>
-      {{with index .Errors "Catatan"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15 {{if index .Errors `Catatan`}}border-rose-300{{end}}">{{.Form.Catatan}}</textarea>
+      {{with index .Errors "Catatan"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     </div>
   </fieldset>
 
-  <div class="grid gap-2 border-t border-[#e5e6e2] pt-4 sm:grid-cols-2">
-    <button type="submit" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm cursor-pointer">
-      <span class="htmx-indicator-hidden inline-flex items-center gap-1">Simpan</span>
-      <span class="htmx-indicator inline-flex items-center gap-1">
-        <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Menyimpan
+  <div class="grid gap-2 border-t border-line pt-5 sm:grid-cols-2">
+    <button type="submit" class="py-2.5 md:py-2 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+      <span class="htmx-indicator-hidden inline-flex items-center gap-1.5">Simpan</span>
+      <span class="htmx-indicator inline-flex items-center gap-1.5">
+        <span class="animate-spin inline-flex">{{template "icon-loader" "h-4 w-4"}}</span>
+        <span>Menyimpan</span>
       </span>
     </button>
-    <a href="/jemaat" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Batal</a>
+    <a href="/jemaat" class="py-2.5 md:py-2 px-4 bg-surface-raised border border-line-strong hover:bg-surface-muted active:scale-[0.98] text-ink font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/15 focus-visible:border-sage-700">Batal</a>
   </div>
 </form>
 </div>

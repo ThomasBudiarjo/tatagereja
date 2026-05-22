@@ -5,125 +5,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f7f7f1">
   <title>Daftar - Tata Gereja</title>
   {{template "assets" .}}
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 
-<body class="min-h-screen bg-[#f5f5f0] text-[#2d2d30] antialiased font-sans">
+<body class="min-h-screen bg-surface text-ink antialiased">
   <main class="relative grid min-h-screen place-items-center px-4 py-12 overflow-hidden">
-    <!-- Premium background graphics and pattern -->
-    <div
-      class="absolute inset-0 z-0 bg-[radial-gradient(#d6d8d2_1px,transparent_1px)] [background-size:16px_16px] opacity-70">
-    </div>
-    <div class="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[#d8e6ce]/40 blur-[120px] z-0">
-    </div>
-    <div class="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-[#eef5e9]/40 blur-[120px] z-0">
-    </div>
+    <div class="absolute inset-0 z-0 bg-[radial-gradient(oklch(0.86_0.01_110)_1px,transparent_1px)] [background-size:18px_18px] opacity-50"></div>
+    <div class="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-sage-100/40 blur-[120px] z-0"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-sage-50/60 blur-[120px] z-0"></div>
 
-    <div
-      class="relative z-10 w-full max-w-[420px] bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_15px_40px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden transition-all duration-300 hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] my-8">
+    <div class="relative z-10 w-full max-w-[420px] bg-surface-raised rounded-2xl border border-line shadow-[0_15px_40px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden transition-shadow duration-300 hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] my-8">
 
-      <!-- Main Content Section -->
       <div class="px-8 pt-9 pb-7">
-        <!-- Branding Header -->
         <div class="flex flex-col items-center mb-6">
-          <h1 class="text-[20px] font-bold text-[#2d2d30] tracking-tight">Daftar akun</h1>
-          <p class="mt-1.5 text-center text-[13px] text-[#6b6e68] font-normal leading-relaxed">
+          <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-50 text-sage-700">
+            {{template "icon-shield-check" "h-6 w-6"}}
+          </div>
+          <h1 class="text-xl font-semibold text-ink tracking-tight">Daftar akun</h1>
+          <p class="mt-1.5 text-center text-sm text-ink-muted leading-relaxed">
             Siapkan data gereja dalam satu ruang kerja.
           </p>
         </div>
 
         {{with index .Errors "_form"}}
-        <div class="mb-5 p-3.5 rounded-lg text-sm bg-rose-50 text-rose-600 border border-rose-100">
-          <span class="font-medium">{{.}}</span>
+        <div class="mb-5 flex items-start gap-2.5 p-3.5 rounded-xl text-sm bg-rose-50 text-rose-700 border border-rose-100">
+          <span class="shrink-0 mt-px">{{template "icon-circle-alert" "h-4 w-4"}}</span>
+          <span class="font-medium leading-snug">{{.}}</span>
         </div>
         {{end}}
 
         <form method="POST" action="/signup" class="space-y-4">
           <div>
-            <label for="email"
-              class="block text-xs font-semibold text-[#3d4039] mb-1.5">Email</label>
+            <label for="email" class="block text-xs font-semibold text-ink-muted mb-1.5">Email</label>
             <input type="email" id="email" name="email" value="{{.Email}}" autocomplete="email" required placeholder="nama@contoh.com"
-              class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `Email`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+              class="w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2 {{if index .Errors `Email`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
             {{with index .Errors "Email"}}
-            <p class="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              {{.}}
+            <p class="mt-1 text-xs font-medium text-rose-600 flex items-center gap-1">
+              {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+              <span>{{.}}</span>
             </p>
             {{end}}
           </div>
 
           <div>
-            <label for="display_name"
-              class="block text-xs font-semibold text-[#3d4039] mb-1.5">Nama</label>
+            <label for="display_name" class="block text-xs font-semibold text-ink-muted mb-1.5">Nama</label>
             <input type="text" id="display_name" name="display_name" value="{{.DisplayName}}" autocomplete="name" required placeholder="Nama Lengkap"
-              class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `DisplayName`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+              class="w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2 {{if index .Errors `DisplayName`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
             {{with index .Errors "DisplayName"}}
-            <p class="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              {{.}}
+            <p class="mt-1 text-xs font-medium text-rose-600 flex items-center gap-1">
+              {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+              <span>{{.}}</span>
             </p>
             {{end}}
           </div>
 
           <div>
-            <label for="church_name"
-              class="block text-xs font-semibold text-[#3d4039] mb-1.5">Nama gereja</label>
+            <label for="church_name" class="block text-xs font-semibold text-ink-muted mb-1.5">Nama gereja</label>
             <input type="text" id="church_name" name="church_name" value="{{.ChurchName}}" autocomplete="organization" required placeholder="Contoh: GKI Batavia"
-              class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `ChurchName`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+              class="w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2 {{if index .Errors `ChurchName`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
             {{with index .Errors "ChurchName"}}
-            <p class="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              {{.}}
+            <p class="mt-1 text-xs font-medium text-rose-600 flex items-center gap-1">
+              {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+              <span>{{.}}</span>
             </p>
             {{end}}
           </div>
 
           <div>
-            <label for="password"
-              class="block text-xs font-semibold text-[#3d4039] mb-1.5">Kata sandi</label>
+            <label for="password" class="block text-xs font-semibold text-ink-muted mb-1.5">Kata sandi</label>
             <input type="password" id="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Minimal 8 karakter"
-              class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `Password`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+              class="w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2 {{if index .Errors `Password`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
             {{with index .Errors "Password"}}
-            <p class="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              {{.}}
+            <p class="mt-1 text-xs font-medium text-rose-600 flex items-center gap-1">
+              {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+              <span>{{.}}</span>
             </p>
             {{else}}
-            <p class="mt-1 text-[11px] text-[#8a8d87]">Minimal 8 karakter.</p>
+            <p class="mt-1 text-2xs text-ink-soft">Minimal 8 karakter.</p>
             {{end}}
           </div>
 
           <div>
-            <label for="password_confirm"
-              class="block text-xs font-semibold text-[#3d4039] mb-1.5">Konfirmasi kata sandi</label>
+            <label for="password_confirm" class="block text-xs font-semibold text-ink-muted mb-1.5">Konfirmasi kata sandi</label>
             <input type="password" id="password_confirm" name="password_confirm" autocomplete="new-password" required placeholder="Ulangi kata sandi"
-              class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `PasswordConfirm`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+              class="w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2 {{if index .Errors `PasswordConfirm`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
             {{with index .Errors "PasswordConfirm"}}
-            <p class="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              {{.}}
+            <p class="mt-1 text-xs font-medium text-rose-600 flex items-center gap-1">
+              {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+              <span>{{.}}</span>
             </p>
             {{end}}
           </div>
@@ -134,32 +106,23 @@
           </div>
           {{end}}
 
-          <button type="submit"
-            class="w-full py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all flex items-center justify-center gap-1 shadow-sm mt-6 cursor-pointer">
-            Daftar <span class="text-[10px] ml-0.5 opacity-80">▸</span>
+          <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all shadow-sm mt-6 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised">
+            <span>Daftar</span>
+            {{template "icon-chevron-right" "h-4 w-4"}}
           </button>
         </form>
       </div>
 
-      <!-- Footer Link Section -->
-      <div class="bg-[#f0f2ee]/75 border-t border-[#e5e6e2] px-8 py-4.5 flex justify-center text-[13px] text-[#6b6e68]">
-        <span class="text-[#6b6e68]">Sudah punya akun?</span>
-        <a href="/login"
-          class="text-[#2d2d30] hover:text-black font-semibold ml-1.5 hover:underline transition-colors">Masuk</a>
+      <div class="bg-surface-muted/75 border-t border-line px-8 py-4 flex justify-center text-sm text-ink-muted">
+        <span>Sudah punya akun?</span>
+        <a href="/login" class="text-ink hover:text-sage-800 font-semibold ml-1.5 hover:underline transition-colors">Masuk</a>
       </div>
 
-      <!-- Secured by tatagereja Branding Section -->
-      <div
-        class="bg-[#f0f2ee]/75 border-t border-[#e5e6e2] px-8 py-3.5 flex items-center justify-center text-[11px] text-[#8a8d87] gap-1.5 select-none">
-        <span>Present to you by</span>
-        <span class="flex items-center gap-1 font-bold text-[#5a5d58] tracking-tight">
-          <svg class="w-3.5 h-3.5 text-[#6b6e68]" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="M12 8v8" />
-            <path d="M9 11h6" />
-          </svg>
-          tatagereja
+      <div class="bg-surface-muted/75 border-t border-line px-8 py-3.5 flex items-center justify-center text-2xs text-ink-soft gap-1.5 select-none">
+        <span>Presented to you by</span>
+        <span class="flex items-center gap-1 font-bold text-ink-muted tracking-tight">
+          {{template "icon-shield-check" "h-3.5 w-3.5"}}
+          <span>tatagereja</span>
         </span>
       </div>
 

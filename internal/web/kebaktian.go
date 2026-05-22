@@ -29,6 +29,7 @@ type kebaktianListPage struct {
 	To     string
 	Limit  int64
 	Offset int64
+	TZ     string
 }
 
 type kebaktianDetailPage struct {
@@ -36,6 +37,7 @@ type kebaktianDetailPage struct {
 	User      sqlc.User
 	Flash     Flash
 	Kebaktian sqlc.Kebaktian
+	TZ        string
 }
 
 type kebaktianFormPage struct {
@@ -46,6 +48,7 @@ type kebaktianFormPage struct {
 	Form        kebaktianForm
 	KebaktianID int64
 	IsEdit      bool
+	TZ          string
 }
 
 func mountKebaktian(r chi.Router, q *sqlc.Queries, rdr *Renderer) {
@@ -101,7 +104,7 @@ func kebaktianList(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 		}
 		if err := rdr.Page(w, r, "kebaktian/list.html", kebaktianListPage{
 			Title: "Kebaktian", User: user, Flash: flash, Items: items,
-			From: from, To: to, Limit: limit, Offset: offset,
+			From: from, To: to, Limit: limit, Offset: offset, TZ: user.Timezone,
 		}); err != nil {
 			WriteServerError(w, err)
 		}
@@ -261,7 +264,7 @@ func kebaktianDetail(q *sqlc.Queries, rdr *Renderer) http.HandlerFunc {
 			return
 		}
 		if err := rdr.Page(w, r, "kebaktian/detail.html", kebaktianDetailPage{
-			Title: k.Nama, User: user, Flash: flash, Kebaktian: k,
+			Title: k.Nama, User: user, Flash: flash, Kebaktian: k, TZ: user.Timezone,
 		}); err != nil {
 			WriteServerError(w, err)
 		}
@@ -281,7 +284,7 @@ func renderKebaktianForm(w http.ResponseWriter, r *http.Request, q *sqlc.Queries
 	}
 	if err := rdr.Page(w, r, "kebaktian/form.html", kebaktianFormPage{
 		Title: title, User: user, Flash: flash, Errors: errs, Form: form,
-		KebaktianID: id, IsEdit: isEdit,
+		KebaktianID: id, IsEdit: isEdit, TZ: user.Timezone,
 	}); err != nil {
 		WriteServerError(w, err)
 	}

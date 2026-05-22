@@ -1,38 +1,47 @@
 {{define "pelayan/detail.html"}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-  <div>
-    <a href="/pelayan" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke daftar</a>
-    <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">{{.JemaatNama}}</h1>
-    <p class="text-[13px] text-[#6b6e68]">Pelayan</p>
+  <div class="min-w-0 flex-1">
+    <a href="/pelayan" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink-muted transition-colors">
+      {{template "icon-arrow-left" "h-3.5 w-3.5"}}
+      <span>Kembali ke daftar</span>
+    </a>
+    <h1 class="mt-2 text-xl md:text-2xl font-semibold text-ink tracking-tight">{{.JemaatNama}}</h1>
+    <p class="text-sm text-ink-muted">Pelayan</p>
   </div>
   <div class="flex gap-2">
-    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Ubah</a>
+    <a href="/pelayan/{{.Pelayan.ID}}/edit" class="inline-flex items-center gap-1.5 py-2 px-4 bg-surface-raised border border-line-strong hover:bg-surface-muted active:scale-[0.98] text-ink font-medium rounded-lg text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/15 focus-visible:border-sage-700">
+      {{template "icon-pencil" "h-3.5 w-3.5"}}
+      <span>Ubah</span>
+    </a>
     <form method="POST" action="/pelayan/{{.Pelayan.ID}}">
       <input type="hidden" name="_method" value="DELETE">
-      <button type="submit" class="py-1.5 px-4 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center cursor-pointer"
-        onclick="return confirm('Hapus pelayan ini?')">Hapus</button>
+      <button type="submit" class="inline-flex items-center gap-1.5 py-2 px-4 bg-surface-raised border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-sm transition-all cursor-pointer"
+        onclick="return confirm('Hapus pelayan ini?')">
+        {{template "icon-trash-2" "h-3.5 w-3.5"}}
+        <span>Hapus</span>
+      </button>
     </form>
   </div>
 </div>
 
-<dl class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6">
-  <div class="mb-4">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Jemaat</dt>
-    <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.JemaatNama}}</a></dd>
+<dl class="bg-surface-raised rounded-2xl border border-line shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 md:p-6 space-y-5">
+  <div>
+    <dt class="text-2xs font-semibold uppercase tracking-wider text-ink-soft">Jemaat</dt>
+    <dd class="mt-1"><a href="/jemaat/{{.Pelayan.JemaatID}}" class="text-base font-medium text-sage-800 hover:underline transition-colors">{{.JemaatNama}}</a></dd>
   </div>
-  <div class="mb-4">
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tipe pelayanan</dt>
+  <div>
+    <dt class="text-2xs font-semibold uppercase tracking-wider text-ink-soft">Tipe pelayanan</dt>
     <dd class="mt-2 flex flex-wrap gap-1.5">
       {{range .ServiceTypeNames}}
-      <span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#f0f2ee] text-[#5a5d58]">{{.}}</span>
+      <span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-sage-50 text-sage-800 border border-sage-100">{{.}}</span>
       {{else}}
-      <span class="text-[13px] text-[#8a8d87]">Belum ada tipe pelayanan.</span>
+      <span class="text-base text-ink-soft">Belum ada tipe pelayanan.</span>
       {{end}}
     </dd>
   </div>
   <div>
-    <dt class="text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Catatan</dt>
-    <dd class="mt-1 text-sm whitespace-pre-wrap text-[#3d4039]">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}-{{end}}</dd>
+    <dt class="text-2xs font-semibold uppercase tracking-wider text-ink-soft">Catatan</dt>
+    <dd class="mt-1 text-base text-ink whitespace-pre-wrap">{{if .Pelayan.Catatan.Valid}}{{derefString .Pelayan.Catatan}}{{else}}<span class="text-ink-soft">—</span>{{end}}</dd>
   </div>
 </dl>
 {{end}}

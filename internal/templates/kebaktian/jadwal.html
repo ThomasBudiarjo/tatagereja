@@ -1,56 +1,65 @@
 {{define "kebaktian/jadwal.html"}}
 <div class="mb-5">
-  <a href="/kebaktian/{{.Kebaktian.ID}}" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke detail</a>
-  <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">Jadwal Pelayanan</h1>
-  <p class="text-[13px] text-[#6b6e68]">{{.Kebaktian.Nama}} - {{formatDateTime .Kebaktian.WaktuMulai .TZ "Mon, 2 Jan 2006 15:04"}}</p>
+  <a href="/kebaktian/{{.Kebaktian.ID}}" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink-muted transition-colors">
+    {{template "icon-arrow-left" "h-3.5 w-3.5"}}
+    <span>Kembali ke detail</span>
+  </a>
+  <h1 class="mt-2 text-xl md:text-2xl font-semibold text-ink tracking-tight">Jadwal Pelayanan</h1>
+  <p class="mt-1 inline-flex items-center gap-1.5 text-sm text-ink-muted font-num">
+    {{template "icon-clock" "h-3.5 w-3.5"}}
+    <span>{{.Kebaktian.Nama}} · {{formatDateTime .Kebaktian.WaktuMulai .TZ "Mon, 2 Jan 2006 15:04"}}</span>
+  </p>
 </div>
 
 <form method="POST" action="/kebaktian/{{.Kebaktian.ID}}/jadwal" class="space-y-5">
-  <p class="text-[13px] text-[#6b6e68]">Pilih pelayan untuk setiap peran. Kosongkan jika belum ditentukan.</p>
+  <p class="text-sm text-ink-muted">Pilih pelayan untuk setiap peran. Kosongkan jika belum ditentukan.</p>
 
   <div class="space-y-3 md:hidden">
-    {{range .Slots}}
-    {{$slot := .}}
-    <div class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
-      <label for="pelayan_{{$slot.ServiceType.ID}}" class="block text-xs font-semibold text-[#3d4039] mb-1.5">{{$slot.ServiceType.Nama}}</label>
-      <select id="pelayan_{{$slot.ServiceType.ID}}" name="pelayan_{{$slot.ServiceType.ID}}"
-        class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
+    {{range $i, $slot := .Slots}}
+    {{$st := index $.ServiceTypes $i}}
+    {{$pelayanOpts := index $.PelayanByType $slot.ServiceTypeID}}
+    <div class="bg-surface-raised rounded-2xl border border-line shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
+      <label for="pelayan_{{$slot.ServiceTypeID}}" class="block text-2xs font-semibold uppercase tracking-wider text-ink-soft mb-2">{{$st.Nama}}</label>
+      <select id="pelayan_{{$slot.ServiceTypeID}}" name="pelayan_{{$slot.ServiceTypeID}}"
+        class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
         <option value="">Belum ditugaskan</option>
-        {{range $slot.PelayanOptions}}
-        <option value="{{.ID}}" {{if eq $slot.SelectedPelayanID .ID}}selected{{end}}>{{.JemaatNama}}</option>
+        {{range $pelayanOpts}}
+        <option value="{{.ID}}" {{if eq $slot.PelayanID (printf "%d" .ID)}}selected{{end}}>{{.JemaatNama}}</option>
         {{end}}
       </select>
-      {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceType.ID)}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+      {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceTypeID)}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     </div>
     {{else}}
-    <div class="p-3.5 rounded-lg text-sm bg-[#eef5e9] text-[#5a7546] border border-[#d4e0ce]">
-      <span class="font-medium">Belum ada tipe pelayanan. <a href="/service-types" class="text-[#2d2d30] hover:text-[#1e1e20] font-semibold hover:underline transition-colors">Tambah tipe pelayanan</a> terlebih dahulu.</span>
+    <div class="flex items-start gap-2.5 p-4 rounded-xl text-sm bg-sage-50 text-sage-800 border border-sage-100">
+      <span class="shrink-0 mt-px">{{template "icon-info" "h-4 w-4"}}</span>
+      <span class="font-medium leading-snug">Belum ada tipe pelayanan. <a href="/service-types" class="font-semibold underline-offset-2 hover:underline">Tambah tipe pelayanan</a> terlebih dahulu.</span>
     </div>
     {{end}}
   </div>
 
-  <div class="hidden overflow-x-auto bg-white rounded-2xl border border-[#e5e6e2] md:block">
+  <div class="hidden overflow-x-auto bg-surface-raised rounded-2xl border border-line md:block">
     <table class="w-full">
       <thead>
-        <tr class="bg-[#f0f2ee]/50 border-b border-[#e5e6e2]">
-          <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Peran</th>
-          <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Pelayan</th>
+        <tr class="bg-surface-muted/50 border-b border-line">
+          <th class="text-left px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-ink-soft">Peran</th>
+          <th class="text-left px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-ink-soft">Pelayan</th>
         </tr>
       </thead>
       <tbody>
-        {{range .Slots}}
-        {{$slot := .}}
-        <tr class="border-b border-[#f0f2ee]">
-          <td class="px-5 py-3 text-sm font-medium text-[#2d2d30]">{{$slot.ServiceType.Nama}}</td>
+        {{range $i, $slot := .Slots}}
+        {{$st := index $.ServiceTypes $i}}
+        {{$pelayanOpts := index $.PelayanByType $slot.ServiceTypeID}}
+        <tr class="border-b border-surface-muted">
+          <td class="px-5 py-3 text-sm font-medium text-ink">{{$st.Nama}}</td>
           <td class="px-5 py-3">
-            <select name="pelayan_{{$slot.ServiceType.ID}}"
-              class="w-full max-w-md px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10">
+            <select name="pelayan_{{$slot.ServiceTypeID}}"
+              class="w-full max-w-md px-3.5 py-2 bg-surface-raised border border-line-strong rounded-lg text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15">
               <option value="">Belum ditugaskan</option>
-              {{range $slot.PelayanOptions}}
-              <option value="{{.ID}}" {{if eq $slot.SelectedPelayanID .ID}}selected{{end}}>{{.JemaatNama}}</option>
+              {{range $pelayanOpts}}
+              <option value="{{.ID}}" {{if eq $slot.PelayanID (printf "%d" .ID)}}selected{{end}}>{{.JemaatNama}}</option>
               {{end}}
             </select>
-            {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceType.ID)}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+            {{with index $.Errors (printf "Pelayan_%d" $slot.ServiceTypeID)}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
           </td>
         </tr>
         {{end}}
@@ -60,17 +69,14 @@
 
   {{if .Slots}}
   <div class="grid gap-2 sm:grid-cols-2">
-    <button type="submit" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm cursor-pointer">
-      <span class="htmx-indicator-hidden inline-flex items-center gap-1">Simpan Jadwal</span>
-      <span class="htmx-indicator inline-flex items-center gap-1">
-        <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Menyimpan
+    <button type="submit" class="py-2.5 md:py-2 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+      <span class="htmx-indicator-hidden inline-flex items-center gap-1.5">Simpan Jadwal</span>
+      <span class="htmx-indicator inline-flex items-center gap-1.5">
+        <span class="animate-spin inline-flex">{{template "icon-loader" "h-4 w-4"}}</span>
+        <span>Menyimpan</span>
       </span>
     </button>
-    <a href="/kebaktian/{{.Kebaktian.ID}}" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Batal</a>
+    <a href="/kebaktian/{{.Kebaktian.ID}}" class="py-2.5 md:py-2 px-4 bg-surface-raised border border-line-strong hover:bg-surface-muted active:scale-[0.98] text-ink font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/15 focus-visible:border-sage-700">Batal</a>
   </div>
   {{end}}
 </form>

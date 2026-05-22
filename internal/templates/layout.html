@@ -1,25 +1,79 @@
 {{define "assets"}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<style type="text/tailwindcss">
+  @theme {
+    /* Cream surface palette — neutrals tinted toward sage (hue ~115) */
+    --color-surface:        oklch(0.972 0.008 110);
+    --color-surface-raised: oklch(0.995 0.003 110);
+    --color-surface-muted:  oklch(0.95  0.008 110);
+    --color-line:           oklch(0.915 0.008 110);
+    --color-line-strong:    oklch(0.86  0.010 110);
+
+    /* Ink — never pure black, tinted slightly warm */
+    --color-ink:            oklch(0.27 0.006 110);
+    --color-ink-muted:      oklch(0.52 0.008 110);
+    --color-ink-soft:       oklch(0.65 0.008 110);
+
+    /* Sage accent — single committed accent ≤10% of surface */
+    --color-sage-50:        oklch(0.965 0.025 138);
+    --color-sage-100:       oklch(0.92  0.045 138);
+    --color-sage-200:       oklch(0.86  0.060 138);
+    --color-sage-600:       oklch(0.50  0.075 138);
+    --color-sage-700:       oklch(0.43  0.075 138);
+    --color-sage-800:       oklch(0.36  0.070 138);
+
+    /* Type scale — replaces every text-[Npx] across templates */
+    --text-2xs:   0.6875rem;   /* 11px */
+    --text-xs:    0.75rem;     /* 12px */
+    --text-sm:    0.8125rem;   /* 13px */
+    --text-base:  0.9375rem;   /* 15px */
+    --text-md:    1rem;        /* 16px — form inputs (prevents iOS zoom) */
+    --text-lg:    1.125rem;    /* 18px */
+    --text-xl:    1.375rem;    /* 22px — mobile page title */
+    --text-2xl:   1.625rem;    /* 26px — desktop page title */
+    --text-3xl:   2rem;        /* 32px — auth screens */
+  }
+</style>
+
 <style>
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv11', 'ss01', 'ss03', 'cv02';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  .dock-active { color: #1e1e20 !important; }
+  .font-num {
+    font-feature-settings: 'tnum', 'cv11';
+    font-variant-numeric: tabular-nums;
+  }
   .htmx-indicator { display: none; }
   .htmx-request .htmx-indicator { display: inline-flex; }
   .htmx-request .htmx-indicator-hidden { display: none; }
+
+  /* Smooth scrolling when the sticky header is offset */
+  html { scroll-padding-top: 5rem; }
 </style>
 {{end}}
 
 {{define "flash"}}
 <div class="mx-4 mt-4 md:mx-6" role="status">
-  <div class="p-3.5 rounded-lg text-sm {{if eq .Kind `error`}}bg-rose-50 text-rose-600 border border-rose-100{{else if eq .Kind `success`}}bg-[#dcf0e2] text-[#3d7a3d] border border-[#c5e0c8]{{else}}bg-[#eef5e9] text-[#5a7546] border border-[#d4e0ce]{{end}}">
-    <span class="font-medium">{{.Message}}</span>
+  <div class="flex items-start gap-2.5 p-3.5 rounded-xl text-sm
+    {{if eq .Kind `error`}}bg-rose-50 text-rose-700 border border-rose-100
+    {{else if eq .Kind `success`}}bg-sage-50 text-sage-800 border border-sage-100
+    {{else}}bg-sage-50 text-sage-700 border border-sage-100{{end}}">
+    <span class="shrink-0 mt-px">
+      {{if eq .Kind `error`}}{{template "icon-circle-alert" "h-4 w-4"}}
+      {{else if eq .Kind `success`}}{{template "icon-circle-check" "h-4 w-4"}}
+      {{else}}{{template "icon-info" "h-4 w-4"}}{{end}}
+    </span>
+    <span class="font-medium leading-snug">{{.Message}}</span>
   </div>
 </div>
 {{end}}
@@ -30,55 +84,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f1">
   <title>{{if .Data.Title}}{{.Data.Title}} - {{end}}Tata Gereja</title>
   {{template "assets" .}}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
-<body class="min-h-screen bg-[#f5f5f0] text-[#2d2d30] antialiased">
+<body class="min-h-screen bg-surface text-ink antialiased">
   <div class="flex min-h-screen">
     <!-- Desktop sidebar -->
-    <aside class="hidden w-56 shrink-0 border-r border-[#e5e6e2] bg-white md:flex md:flex-col">
-      <div class="border-b border-[#e5e6e2] bg-[#f0f2ee]/60 px-5 py-5">
-        <div class="flex items-center gap-1.5 mb-3 text-[#8a8d87] select-none">
-          <span class="text-[10px]">Presented to you by</span>
-          <span class="flex items-center gap-1 font-bold text-[#6b6e68] tracking-tight">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              <path d="M12 8v8"/>
-            </svg>
-            <span class="text-[11px]">tatagereja</span>
+    <aside class="hidden w-60 shrink-0 border-r border-line bg-surface-raised md:flex md:flex-col">
+      <div class="border-b border-line bg-surface-muted/60 px-5 py-5">
+        <div class="flex items-center gap-1.5 mb-3 text-ink-soft select-none">
+          <span class="text-2xs">Presented to you by</span>
+          <span class="flex items-center gap-1 font-bold text-ink-muted tracking-tight">
+            {{template "icon-shield-check" "h-3.5 w-3.5"}}
+            <span class="text-2xs">tatagereja</span>
           </span>
         </div>
-        <p class="truncate text-sm font-semibold text-[#2d2d30]">{{.Data.User.ChurchName}}</p>
-        <p class="truncate text-[12px] text-[#8a8d87] mt-0.5">{{.Data.User.DisplayName}}</p>
+        <p class="truncate text-sm font-semibold text-ink">{{.Data.User.ChurchName}}</p>
+        <p class="truncate text-xs text-ink-soft mt-0.5">{{.Data.User.DisplayName}}</p>
       </div>
       <nav class="flex-1 px-3 py-4 space-y-0.5">
-        <a href="/jemaat" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/jemaat`}}text-[#4a6138] bg-[#eef5e9]{{else}}text-[#6b6e68] hover:text-[#3d4039] hover:bg-[#f0f2ee]{{end}}">Jemaat</a>
-        <a href="/keluarga" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/keluarga`}}text-[#4a6138] bg-[#eef5e9]{{else}}text-[#6b6e68] hover:text-[#3d4039] hover:bg-[#f0f2ee]{{end}}">Keluarga</a>
-        <a href="/pelayan" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/pelayan`}}text-[#4a6138] bg-[#eef5e9]{{else}}text-[#6b6e68] hover:text-[#3d4039] hover:bg-[#f0f2ee]{{end}}">Pelayan</a>
-        <a href="/service-types" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/service-types`}}text-[#4a6138] bg-[#eef5e9]{{else}}text-[#6b6e68] hover:text-[#3d4039] hover:bg-[#f0f2ee]{{end}}">Tipe Pelayanan</a>
-        <a href="/kebaktian" class="block px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {{if hasPrefix .Path `/kebaktian`}}text-[#4a6138] bg-[#eef5e9]{{else}}text-[#6b6e68] hover:text-[#3d4039] hover:bg-[#f0f2ee]{{end}}">Kebaktian</a>
+        <a href="/jemaat" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+          {{template "icon-users" "h-4 w-4"}}
+          <span>Jemaat</span>
+        </a>
+        <a href="/keluarga" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+          {{template "icon-home" "h-4 w-4"}}
+          <span>Keluarga</span>
+        </a>
+        <a href="/pelayan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+          {{template "icon-hand-helping" "h-4 w-4"}}
+          <span>Pelayan</span>
+        </a>
+        <a href="/service-types" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+          {{template "icon-layers" "h-4 w-4"}}
+          <span>Tipe Pelayanan</span>
+        </a>
+        <a href="/kebaktian" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+          {{template "icon-calendar-days" "h-4 w-4"}}
+          <span>Kebaktian</span>
+        </a>
       </nav>
-      <div class="border-t border-[#e5e6e2] p-3">
+      <div class="border-t border-line p-3">
         <form method="POST" action="/logout">
-          <button type="submit" class="w-full py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-[13px] transition-all cursor-pointer">Keluar</button>
+          <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all cursor-pointer">
+            {{template "icon-log-out" "h-3.5 w-3.5"}}
+            <span>Keluar</span>
+          </button>
         </form>
       </div>
     </aside>
 
     <!-- Main content area -->
-    <div class="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-      <!-- Mobile header -->
-      <header class="flex items-center justify-between border-b border-[#e5e6e2] bg-white px-4 py-3 md:hidden">
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-semibold text-[#2d2d30]">{{.Data.User.ChurchName}}</p>
-          <p class="truncate text-[12px] text-[#8a8d87]">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+    <div class="flex min-w-0 flex-1 flex-col pb-24 md:pb-0">
+      <!-- Mobile header (sticky, soft blur) -->
+      <header class="sticky top-0 z-30 border-b border-line bg-surface-raised/85 backdrop-blur-md md:hidden">
+        <div class="flex items-center justify-between px-4 py-3" style="padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));">
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-2xs uppercase tracking-[0.08em] font-semibold text-ink-soft">{{.Data.User.ChurchName}}</p>
+            <p class="truncate text-xl font-semibold tracking-tight text-ink mt-0.5">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+          </div>
         </div>
       </header>
 
       {{with .Data.Flash}}{{if .Message}}{{template "flash" .}}{{end}}{{end}}
 
-      <main class="flex-1 px-4 py-5 md:px-8 md:py-8">
+      <main class="flex-1 px-4 pt-4 pb-6 md:px-8 md:py-8">
         <div class="mx-auto w-full max-w-7xl">
           {{.Body}}
         </div>
@@ -87,27 +159,34 @@
   </div>
 
   <!-- Mobile dock navigation -->
-  <nav class="fixed bottom-0 left-0 right-0 border-t border-[#e5e6e2] bg-white flex items-center justify-around py-2 px-1 md:hidden z-10" aria-label="Navigasi utama" style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));">
-    <a href="/jemaat" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/jemaat`}}text-[#2d2d30]{{else}}text-[#8a8d87]{{end}}"{{if hasPrefix .Path `/jemaat`}} aria-current="page"{{end}}>
-      <span class="text-base leading-none select-none">👥</span>
-      <span class="text-[10px] font-medium">Jemaat</span>
-    </a>
-    <a href="/keluarga" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/keluarga`}}text-[#2d2d30]{{else}}text-[#8a8d87]{{end}}"{{if hasPrefix .Path `/keluarga`}} aria-current="page"{{end}}>
-      <span class="text-base leading-none select-none">⌂</span>
-      <span class="text-[10px] font-medium">Keluarga</span>
-    </a>
-    <a href="/pelayan" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/pelayan`}}text-[#2d2d30]{{else}}text-[#8a8d87]{{end}}"{{if hasPrefix .Path `/pelayan`}} aria-current="page"{{end}}>
-      <span class="text-base leading-none select-none">✋</span>
-      <span class="text-[10px] font-medium">Pelayan</span>
-    </a>
-    <a href="/service-types" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/service-types`}}text-[#2d2d30]{{else}}text-[#8a8d87]{{end}}"{{if hasPrefix .Path `/service-types`}} aria-current="page"{{end}}>
-      <span class="text-base leading-none select-none">☷</span>
-      <span class="text-[10px] font-medium">Tipe</span>
-    </a>
-    <a href="/kebaktian" class="flex flex-col items-center gap-0.5 min-w-0 px-2 py-1 {{if hasPrefix .Path `/kebaktian`}}text-[#2d2d30]{{else}}text-[#8a8d87]{{end}}"{{if hasPrefix .Path `/kebaktian`}} aria-current="page"{{end}}>
-      <span class="text-base leading-none select-none">✦</span>
-      <span class="text-[10px] font-medium">Kebaktian</span>
-    </a>
+  <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface-raised/92 backdrop-blur-md md:hidden" aria-label="Navigasi utama" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+    <div class="flex items-stretch justify-around px-1 pt-1">
+      <a href="/jemaat" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/jemaat`}} aria-current="page"{{end}}>
+        {{if hasPrefix .Path `/jemaat`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+        {{template "icon-users" "h-[22px] w-[22px]"}}
+        <span class="text-2xs font-medium tracking-wide">Jemaat</span>
+      </a>
+      <a href="/keluarga" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/keluarga`}} aria-current="page"{{end}}>
+        {{if hasPrefix .Path `/keluarga`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+        {{template "icon-home" "h-[22px] w-[22px]"}}
+        <span class="text-2xs font-medium tracking-wide">Keluarga</span>
+      </a>
+      <a href="/pelayan" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/pelayan`}} aria-current="page"{{end}}>
+        {{if hasPrefix .Path `/pelayan`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+        {{template "icon-hand-helping" "h-[22px] w-[22px]"}}
+        <span class="text-2xs font-medium tracking-wide">Pelayan</span>
+      </a>
+      <a href="/service-types" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/service-types`}} aria-current="page"{{end}}>
+        {{if hasPrefix .Path `/service-types`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+        {{template "icon-layers" "h-[22px] w-[22px]"}}
+        <span class="text-2xs font-medium tracking-wide">Tipe</span>
+      </a>
+      <a href="/kebaktian" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/kebaktian`}} aria-current="page"{{end}}>
+        {{if hasPrefix .Path `/kebaktian`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+        {{template "icon-calendar-days" "h-[22px] w-[22px]"}}
+        <span class="text-2xs font-medium tracking-wide">Kebaktian</span>
+      </a>
+    </div>
   </nav>
 </body>
 </html>

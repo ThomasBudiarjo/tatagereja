@@ -1,69 +1,74 @@
 {{define "pelayan/form.html"}}
 <div class="mb-5">
-  <a href="/pelayan" class="text-[13px] text-[#8a8d87] hover:text-[#5a5d58] transition-colors">Kembali ke daftar</a>
-  <h1 class="mt-2 text-[20px] font-bold text-[#2d2d30] tracking-tight">{{if .IsNew}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
+  <a href="/pelayan" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink-muted transition-colors">
+    {{template "icon-arrow-left" "h-3.5 w-3.5"}}
+    <span>Kembali ke daftar</span>
+  </a>
+  <h1 class="mt-2 text-xl md:text-2xl font-semibold text-ink tracking-tight">{{if not .IsEdit}}Tambah Pelayan{{else}}Ubah Pelayan{{end}}</h1>
 </div>
 
 <div id="form-container">
-<form method="POST" action="{{if .IsNew}}/pelayan{{else}}/pelayan/{{.Form.ID}}{{end}}"
-  {{if not .IsNew}}hx-post="/pelayan/{{.Form.ID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
-  class="max-w-2xl bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4 md:p-6 space-y-5">
+<form method="POST" action="{{if not .IsEdit}}/pelayan{{else}}/pelayan/{{.PelayanID}}{{end}}"
+  {{if .IsEdit}}hx-post="/pelayan/{{.PelayanID}}" hx-target="#form-container" hx-swap="outerHTML"{{end}}
+  class="max-w-2xl bg-surface-raised rounded-2xl border border-line shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 md:p-6 space-y-5">
 
-  {{if not .IsNew}}
+  {{if .IsEdit}}
   <input type="hidden" name="_method" value="PUT">
   {{end}}
 
   <div>
-    <label for="jemaat_id" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Jemaat <span class="text-rose-500">*</span></label>
+    <label for="jemaat_id" class="block text-xs font-semibold text-ink-muted mb-1.5">Jemaat <span class="text-rose-500">*</span></label>
     <select id="jemaat_id" name="jemaat_id" required
-      class="w-full px-3.5 py-1.5 bg-white border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `JemaatID`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-[#d6d8d2] focus:border-[#4a6138] focus:ring-[#5a7546]/10{{end}}">
+      class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border rounded-lg text-md md:text-sm transition-all focus:outline-none focus:ring-2 {{if index .Errors `JemaatID`}}border-rose-300 focus:border-rose-500 focus:ring-rose-500/20{{else}}border-line-strong focus:border-sage-700 focus:ring-sage-600/15{{end}}">
       <option value="">Pilih jemaat</option>
-      {{range .JemaatOptions}}
-      <option value="{{.ID}}" {{if eq $.Form.JemaatID .ID}}selected{{end}}>{{.NamaLengkap}}</option>
+      {{range .Jemaat}}
+      <option value="{{.ID}}" {{if eq $.Form.JemaatID (printf "%d" .ID)}}selected{{end}}>{{.NamaLengkap}}</option>
       {{end}}
     </select>
-    {{with index .Errors "JemaatID"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+    {{with index .Errors "JemaatID"}}
+    <p class="mt-1.5 text-xs font-medium text-rose-600 flex items-center gap-1">
+      {{template "icon-circle-alert" "h-3.5 w-3.5 shrink-0"}}
+      <span>{{.}}</span>
+    </p>
+    {{end}}
   </div>
 
   <fieldset>
-    <legend class="text-xs font-semibold text-[#8a8d87] uppercase tracking-wide mb-3">Tipe pelayanan</legend>
-    {{with index .Errors "ServiceTypeIDs"}}<p class="mb-2 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+    <legend class="text-2xs font-semibold text-ink-soft uppercase tracking-wider mb-3">Tipe pelayanan</legend>
+    {{with index .Errors "ServiceTypeIDs"}}<p class="mb-2 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
     <div class="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0">
       {{range .ServiceTypes}}
-      <label class="flex items-start gap-3 px-3 py-2 rounded-lg border border-[#d6d8d2] bg-white hover:bg-[#f0f2ee] transition-colors cursor-pointer">
+      <label class="flex items-start gap-3 px-3.5 py-3 md:py-2.5 rounded-lg border border-line-strong bg-surface-raised hover:bg-surface-muted has-[:checked]:bg-sage-50 has-[:checked]:border-sage-200 transition-colors cursor-pointer">
         <input type="checkbox" name="service_type_ids" value="{{.ID}}"
-          {{if index $.Form.ServiceTypeIDs .ID}}checked{{end}}
-          class="mt-0.5 h-4 w-4 rounded border-[#c5c6bf] text-[#5a7546] focus:ring-[#5a7546]/10 cursor-pointer">
-        <div>
-          <span class="text-sm font-medium text-[#3d4039]">{{.Nama}}</span>
-          {{if .Deskripsi.Valid}}<span class="text-[13px] text-[#8a8d87]"> - {{derefString .Deskripsi}}</span>{{end}}
+          {{if index $.Form.ServiceTypeCheck .ID}}checked{{end}}
+          class="mt-0.5 h-4 w-4 rounded border-line-strong text-sage-600 accent-sage-600 focus:ring-sage-600/15 cursor-pointer">
+        <div class="min-w-0">
+          <span class="text-base md:text-sm font-medium text-ink">{{.Nama}}</span>
+          {{if .Deskripsi.Valid}}<span class="block text-sm text-ink-soft">{{derefString .Deskripsi}}</span>{{end}}
         </div>
       </label>
       {{else}}
-      <p class="text-[13px] text-[#6b6e68]">Belum ada tipe pelayanan. <a href="/service-types" class="text-[#2d2d30] hover:text-[#1e1e20] font-medium hover:underline transition-colors">Tambah dulu</a>.</p>
+      <p class="text-sm text-ink-muted">Belum ada tipe pelayanan. <a href="/service-types" class="text-sage-800 hover:underline font-medium transition-colors">Tambah dulu</a>.</p>
       {{end}}
     </div>
   </fieldset>
 
   <div>
-    <label for="catatan" class="block text-xs font-semibold text-[#3d4039] mb-1.5">Catatan</label>
+    <label for="catatan" class="block text-xs font-semibold text-ink-muted mb-1.5">Catatan</label>
     <textarea id="catatan" name="catatan" rows="3" maxlength="2000"
-      class="w-full px-3.5 py-1.5 bg-white border border-[#d6d8d2] rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#4a6138] focus:ring-[#5a7546]/10 {{if index .Errors `Catatan`}}border-rose-300{{end}}">{{.Form.Catatan}}</textarea>
-    {{with index .Errors "Catatan"}}<p class="mt-1.5 text-xs font-medium text-rose-500">{{.}}</p>{{end}}
+      class="w-full px-3.5 py-2.5 md:py-2 bg-surface-raised border border-line-strong rounded-lg text-md md:text-sm transition-all focus:outline-none focus:border-sage-700 focus:ring-2 focus:ring-sage-600/15 {{if index .Errors `Catatan`}}border-rose-300{{end}}">{{.Form.Catatan}}</textarea>
+    {{with index .Errors "Catatan"}}<p class="mt-1.5 text-xs font-medium text-rose-600">{{.}}</p>{{end}}
   </div>
 
-  <div class="grid gap-2 border-t border-[#e5e6e2] pt-4 sm:grid-cols-2">
-    <button type="submit" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm cursor-pointer">
-      <span class="htmx-indicator-hidden inline-flex items-center gap-1">Simpan</span>
-      <span class="htmx-indicator inline-flex items-center gap-1">
-        <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Menyimpan
+  <div class="grid gap-2 border-t border-line pt-5 sm:grid-cols-2">
+    <button type="submit" class="py-2.5 md:py-2 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+      <span class="htmx-indicator-hidden inline-flex items-center gap-1.5">Simpan</span>
+      <span class="htmx-indicator inline-flex items-center gap-1.5">
+        <span class="animate-spin inline-flex">{{template "icon-loader" "h-4 w-4"}}</span>
+        <span>Menyimpan</span>
       </span>
     </button>
-    <a href="/pelayan" class="py-1.5 px-4 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546]/10 focus-visible:border-[#4a6138]">Batal</a>
+    <a href="/pelayan" class="py-2.5 md:py-2 px-4 bg-surface-raised border border-line-strong hover:bg-surface-muted active:scale-[0.98] text-ink font-medium rounded-lg text-sm transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/15 focus-visible:border-sage-700">Batal</a>
   </div>
 </form>
 </div>

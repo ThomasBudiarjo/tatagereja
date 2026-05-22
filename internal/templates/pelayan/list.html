@@ -1,69 +1,83 @@
 {{define "pelayan/list.html"}}
-<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-  <div>
-    <h1 class="text-[20px] font-bold text-[#2d2d30] tracking-tight">Pelayan</h1>
-    <p class="mt-1 text-[13px] text-[#6b6e68]">Jemaat yang melayani dan peran pelayanan mereka.</p>
+<div class="mb-5 flex items-start gap-3">
+  <div class="min-w-0 flex-1">
+    <h1 class="hidden md:block text-2xl font-semibold tracking-tight text-ink">Pelayan</h1>
+    <p class="text-sm text-ink-muted md:mt-1">Jemaat yang melayani dan peran pelayanan mereka.</p>
   </div>
-  <a href="/pelayan/new" class="py-1.5 px-4 bg-[#5a7546] hover:bg-[#4a6138] active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all inline-flex items-center justify-center gap-1 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7546] focus-visible:ring-offset-2">
-    Tambah Pelayan
+  <a href="/pelayan/new" class="inline-flex shrink-0 items-center justify-center gap-1.5 py-2 px-3.5 md:px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600 focus-visible:ring-offset-2 focus-visible:ring-offset-surface">
+    {{template "icon-plus" "h-4 w-4"}}
+    <span>Tambah</span>
+    <span class="hidden md:inline">Pelayan</span>
   </a>
 </div>
 
 <div class="space-y-3 md:hidden">
   {{range .Items}}
-  <article id="row-{{.ID}}" class="bg-white rounded-2xl border border-[#e5e6e2] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-4">
+  <article id="row-{{.ID}}" class="bg-surface-raised rounded-2xl border border-line shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
     <a href="/pelayan/{{.ID}}" class="block">
-      <p class="font-semibold text-[#2d2d30] text-sm">{{.JemaatNama}}</p>
-      {{if .ServiceTypes}}<p class="mt-1 text-[13px] text-[#6b6e68]">{{.ServiceTypes}}</p>{{end}}
+      <p class="font-semibold text-ink text-base leading-tight">{{.JemaatNama}}</p>
+      {{if .ServiceTypes}}<p class="mt-1 text-sm text-ink-muted">{{.ServiceTypes}}</p>{{end}}
     </a>
-    <div class="grid grid-cols-2 gap-2 mt-3">
-      <a href="/pelayan/{{.ID}}/edit" class="py-2.5 px-3 bg-white border border-[#d6d8d2] hover:bg-[#f0f2ee] active:scale-[0.98] text-[#3d4039] font-medium rounded-lg text-[13px] transition-all text-center">Ubah</a>
+    <div class="mt-3 flex items-center justify-end gap-1.5">
+      <a href="/pelayan/{{.ID}}/edit" aria-label="Ubah pelayan {{.JemaatNama}}" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong bg-surface-raised text-ink-muted hover:bg-surface-muted hover:text-ink active:scale-[0.96] transition-all">
+        {{template "icon-pencil" "h-4 w-4"}}
+      </a>
       <form method="POST" action="/pelayan/{{.ID}}"
         hx-delete="/pelayan/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus pelayan ini?">
         <input type="hidden" name="_method" value="DELETE">
-        <button type="submit" class="w-full py-2.5 px-3 bg-white border border-rose-200 hover:bg-rose-50 active:scale-[0.98] text-rose-600 font-medium rounded-lg text-[13px] transition-all cursor-pointer">Hapus</button>
+        <button type="submit" aria-label="Hapus pelayan {{.JemaatNama}}" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-200 bg-surface-raised text-rose-600 hover:bg-rose-50 active:scale-[0.96] transition-all cursor-pointer">
+          {{template "icon-trash-2" "h-4 w-4"}}
+        </button>
       </form>
     </div>
   </article>
   {{else}}
-  <div class="bg-white rounded-2xl border border-[#e5e6e2] p-8 text-center">
-    <div class="text-3xl mb-3 opacity-40">✋</div>
-    <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada pelayan</p>
-    <p class="text-[12px] text-[#8a8d87] mt-1">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
+  <div class="bg-surface-raised rounded-2xl border border-line p-10 text-center">
+    <div class="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-sage-50 text-sage-700">
+      {{template "icon-hand-helping" "h-7 w-7"}}
+    </div>
+    <p class="text-base font-semibold text-ink">Belum ada pelayan</p>
+    <p class="mt-1 text-sm text-ink-muted">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
+    <a href="/pelayan/new" class="mt-4 inline-flex items-center justify-center gap-1.5 py-2 px-4 bg-sage-600 hover:bg-sage-700 active:scale-[0.98] text-white font-semibold rounded-lg text-sm transition-all shadow-sm">
+      {{template "icon-plus" "h-4 w-4"}}
+      <span>Tambah Pelayan</span>
+    </a>
   </div>
   {{end}}
 </div>
 
-<div class="hidden overflow-x-auto bg-white rounded-2xl border border-[#e5e6e2] md:block">
+<div class="hidden overflow-x-auto bg-surface-raised rounded-2xl border border-line md:block">
   <table class="w-full">
     <thead>
-      <tr class="bg-[#f0f2ee]/50 border-b border-[#e5e6e2]">
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Jemaat</th>
-        <th class="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Tipe pelayanan</th>
-        <th class="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8a8d87]">Aksi</th>
+      <tr class="bg-surface-muted/50 border-b border-line">
+        <th class="text-left px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-ink-soft">Jemaat</th>
+        <th class="text-left px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-ink-soft">Tipe pelayanan</th>
+        <th class="text-right px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-ink-soft">Aksi</th>
       </tr>
     </thead>
     <tbody>
       {{range .Items}}
-      <tr id="row-{{.ID}}" class="border-b border-[#f0f2ee] hover:bg-[#f0f2ee]/30 transition-colors">
-        <td class="px-5 py-3"><a href="/pelayan/{{.ID}}" class="text-sm font-medium text-[#2d2d30] hover:text-[#1e1e20] hover:underline transition-colors">{{.JemaatNama}}</a></td>
-        <td class="px-5 py-3 text-[13px] text-[#6b6e68]">{{if .ServiceTypes}}{{.ServiceTypes}}{{else}}-{{end}}</td>
+      <tr id="row-{{.ID}}" class="border-b border-surface-muted hover:bg-surface-muted/30 transition-colors">
+        <td class="px-5 py-3"><a href="/pelayan/{{.ID}}" class="text-sm font-medium text-ink hover:text-sage-800 hover:underline transition-colors">{{.JemaatNama}}</a></td>
+        <td class="px-5 py-3 text-sm text-ink-muted">{{if .ServiceTypes}}{{.ServiceTypes}}{{else}}-{{end}}</td>
         <td class="px-5 py-3">
-          <div class="flex justify-end gap-2">
-            <a href="/pelayan/{{.ID}}/edit" class="text-[13px] text-[#6b6e68] hover:text-[#2d2d30] font-medium transition-colors">Ubah</a>
+          <div class="flex justify-end gap-3">
+            <a href="/pelayan/{{.ID}}/edit" class="text-sm text-ink-muted hover:text-ink font-medium transition-colors">Ubah</a>
             <form method="POST" action="/pelayan/{{.ID}}"
               hx-delete="/pelayan/{{.ID}}" hx-target="#row-{{.ID}}" hx-swap="outerHTML" hx-confirm="Hapus pelayan ini?">
               <input type="hidden" name="_method" value="DELETE">
-              <button type="submit" class="text-[13px] text-rose-500 hover:text-rose-700 font-medium transition-colors cursor-pointer">Hapus</button>
+              <button type="submit" class="text-sm text-rose-500 hover:text-rose-700 font-medium transition-colors cursor-pointer">Hapus</button>
             </form>
           </div>
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="3" class="px-5 py-10 text-center">
-        <div class="text-3xl mb-2 opacity-40">✋</div>
-        <p class="text-[13px] text-[#6b6e68] font-medium">Belum ada pelayan</p>
-        <p class="text-[12px] text-[#8a8d87] mt-0.5">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
+      <tr><td colspan="3" class="px-5 py-12 text-center">
+        <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-sage-50 text-sage-700">
+          {{template "icon-hand-helping" "h-6 w-6"}}
+        </div>
+        <p class="text-sm font-semibold text-ink">Belum ada pelayan</p>
+        <p class="text-xs text-ink-soft mt-0.5">Daftarkan jemaat sebagai pelayan untuk peran tertentu.</p>
       </td></tr>
       {{end}}
     </tbody>
