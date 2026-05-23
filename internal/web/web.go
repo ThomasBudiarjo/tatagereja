@@ -3,18 +3,19 @@ package web
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
-
-	"database/sql"
 
 	"github.com/go-chi/chi/v5"
 
@@ -67,11 +68,51 @@ func (r *Renderer) Page(w http.ResponseWriter, req *http.Request, name string, d
 		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if isHTMXNavigation(req) {
+		title := reflectTitle(data)
+		var pageTitle string
+		if title != "" {
+			pageTitle = html.EscapeString(title) + " - Tata Gereja"
+		} else {
+			pageTitle = "Tata Gereja"
+		}
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(w, `<title hx-swap-oob="true">%s</title>`, pageTitle)
+		return err
+	}
 	return r.tmpl.ExecuteTemplate(w, "layout", layoutData{
 		Data: data,
 		Body: template.HTML(buf.String()),
 		Path: req.URL.Path,
 	})
+}
+
+// isHTMXNavigation returns true when the request is an HTMX fetch targeting the
+// main content area (#content), i.e. a full-page navigation rather than an
+// inline partial (delete row, search result, etc.).
+func isHTMXNavigation(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Target") == "content"
+}
+
+// reflectTitle extracts the Title field from a page data struct via reflection.
+func reflectTitle(data any) string {
+	if data == nil {
+		return ""
+	}
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	f := v.FieldByName("Title")
+	if !f.IsValid() || f.Kind() != reflect.String {
+		return ""
+	}
+	return f.String()
 }
 
 func (r *Renderer) Fragment(w http.ResponseWriter, req *http.Request, name string, data any) error {

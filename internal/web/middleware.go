@@ -20,19 +20,31 @@ func RequireAuth(q *sqlc.Queries) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c, err := r.Cookie(auth.CookieName)
 			if err != nil || c.Value == "" {
-				http.Redirect(w, r, "/login", http.StatusFound)
+				redirectToLogin(w, r)
 				return
 			}
 			uid, err := auth.LookupSession(r.Context(), q, c.Value)
 			if err != nil {
 				auth.ClearCookie(w)
-				http.Redirect(w, r, "/login", http.StatusFound)
+				redirectToLogin(w, r)
 				return
 			}
 			ctx := context.WithValue(r.Context(), userIDKey, uid)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// redirectToLogin sends the client to /login. For HTMX requests the server uses
+// HX-Redirect so the browser does a full navigation instead of swapping the
+// login page into the content area.
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/login")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func UserID(r *http.Request) int64 {

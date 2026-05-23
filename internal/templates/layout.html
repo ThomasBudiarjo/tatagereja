@@ -6,7 +6,7 @@
 {{end}}
 
 {{define "flash"}}
-<div class="mx-4 mt-4 md:mx-6" role="status">
+<div class="mb-5" role="status">
   <div class="flex items-start gap-2.5 p-3.5 rounded-xl text-sm
     {{if eq .Kind `error`}}bg-rose-50 text-rose-700 border border-rose-100
     {{else if eq .Kind `success`}}bg-sage-50 text-sage-800 border border-sage-100
@@ -33,7 +33,10 @@
   {{template "assets" .}}
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body class="min-h-screen bg-surface text-ink antialiased" hx-boost="true">
+<body class="min-h-screen bg-surface text-ink antialiased">
+  <!-- Thin loading bar shown during HTMX navigations -->
+  <div id="htmx-progress" class="pointer-events-none fixed top-0 left-0 z-[100] h-[2px] bg-sage-600 transition-all duration-300" style="width:0;opacity:0"></div>
+
   <div class="flex min-h-screen">
     <!-- Desktop sidebar -->
     <aside class="hidden w-60 shrink-0 border-r border-line bg-surface-raised md:flex md:flex-col">
@@ -49,23 +52,38 @@
         <p class="truncate text-xs text-ink-soft mt-0.5">{{.Data.User.DisplayName}}</p>
       </div>
       <nav class="flex-1 px-3 py-4 space-y-0.5">
-        <a href="/jemaat" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+        <a href="/jemaat"
+           hx-get="/jemaat" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+           data-nav-path="/jemaat"
+           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
           {{template "icon-users" "h-4 w-4"}}
           <span>Jemaat</span>
         </a>
-        <a href="/keluarga" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+        <a href="/keluarga"
+           hx-get="/keluarga" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+           data-nav-path="/keluarga"
+           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
           {{template "icon-home" "h-4 w-4"}}
           <span>Keluarga</span>
         </a>
-        <a href="/pelayan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+        <a href="/pelayan"
+           hx-get="/pelayan" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+           data-nav-path="/pelayan"
+           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
           {{template "icon-hand-helping" "h-4 w-4"}}
           <span>Pelayan</span>
         </a>
-        <a href="/service-types" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+        <a href="/service-types"
+           hx-get="/service-types" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+           data-nav-path="/service-types"
+           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
           {{template "icon-layers" "h-4 w-4"}}
           <span>Tipe Pelayanan</span>
         </a>
-        <a href="/kebaktian" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
+        <a href="/kebaktian"
+           hx-get="/kebaktian" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+           data-nav-path="/kebaktian"
+           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-800 bg-sage-50{{else}}text-ink-muted hover:text-ink hover:bg-surface-muted{{end}}">
           {{template "icon-calendar-days" "h-4 w-4"}}
           <span>Kebaktian</span>
         </a>
@@ -87,15 +105,15 @@
         <div class="flex items-center justify-between px-4 py-3" style="padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));">
           <div class="min-w-0 flex-1">
             <p class="truncate text-2xs uppercase tracking-[0.08em] font-semibold text-ink-soft">{{.Data.User.ChurchName}}</p>
-            <p class="truncate text-xl font-semibold tracking-tight text-ink mt-0.5">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
+            <p id="mobile-page-title" class="truncate text-xl font-semibold tracking-tight text-ink mt-0.5">{{if .Data.Title}}{{.Data.Title}}{{else}}Tata Gereja{{end}}</p>
           </div>
         </div>
       </header>
 
-      {{with .Data.Flash}}{{if .Message}}{{template "flash" .}}{{end}}{{end}}
-
       <main class="flex-1 px-4 pt-4 pb-6 md:px-8 md:py-8">
-        <div class="mx-auto w-full max-w-7xl">
+        <div id="content" class="mx-auto w-full max-w-7xl"
+             hx-boost="true" hx-target="#content" hx-swap="innerHTML" hx-push-url="true">
+          {{with .Data.Flash}}{{if .Message}}{{template "flash" .}}{{end}}{{end}}
           {{.Body}}
         </div>
       </main>
@@ -105,33 +123,139 @@
   <!-- Mobile dock navigation -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface-raised/92 backdrop-blur-md md:hidden" aria-label="Navigasi utama" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
     <div class="flex items-stretch justify-around px-1 pt-1">
-      <a href="/jemaat" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/jemaat`}} aria-current="page"{{end}}>
-        {{if hasPrefix .Path `/jemaat`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+      <a href="/jemaat"
+         hx-get="/jemaat" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+         data-nav-path="/jemaat"
+         class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/jemaat`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/jemaat`}} aria-current="page"{{end}}>
+        <span class="nav-indicator absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"{{if not (hasPrefix .Path `/jemaat`)}} style="display:none"{{end}}></span>
         {{template "icon-users" "h-[22px] w-[22px]"}}
         <span class="text-2xs font-medium tracking-wide">Jemaat</span>
       </a>
-      <a href="/keluarga" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/keluarga`}} aria-current="page"{{end}}>
-        {{if hasPrefix .Path `/keluarga`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+      <a href="/keluarga"
+         hx-get="/keluarga" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+         data-nav-path="/keluarga"
+         class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/keluarga`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/keluarga`}} aria-current="page"{{end}}>
+        <span class="nav-indicator absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"{{if not (hasPrefix .Path `/keluarga`)}} style="display:none"{{end}}></span>
         {{template "icon-home" "h-[22px] w-[22px]"}}
         <span class="text-2xs font-medium tracking-wide">Keluarga</span>
       </a>
-      <a href="/pelayan" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/pelayan`}} aria-current="page"{{end}}>
-        {{if hasPrefix .Path `/pelayan`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+      <a href="/pelayan"
+         hx-get="/pelayan" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+         data-nav-path="/pelayan"
+         class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/pelayan`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/pelayan`}} aria-current="page"{{end}}>
+        <span class="nav-indicator absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"{{if not (hasPrefix .Path `/pelayan`)}} style="display:none"{{end}}></span>
         {{template "icon-hand-helping" "h-[22px] w-[22px]"}}
         <span class="text-2xs font-medium tracking-wide">Pelayan</span>
       </a>
-      <a href="/service-types" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/service-types`}} aria-current="page"{{end}}>
-        {{if hasPrefix .Path `/service-types`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+      <a href="/service-types"
+         hx-get="/service-types" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+         data-nav-path="/service-types"
+         class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/service-types`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/service-types`}} aria-current="page"{{end}}>
+        <span class="nav-indicator absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"{{if not (hasPrefix .Path `/service-types`)}} style="display:none"{{end}}></span>
         {{template "icon-layers" "h-[22px] w-[22px]"}}
         <span class="text-2xs font-medium tracking-wide">Tipe</span>
       </a>
-      <a href="/kebaktian" class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/kebaktian`}} aria-current="page"{{end}}>
-        {{if hasPrefix .Path `/kebaktian`}}<span class="absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"></span>{{end}}
+      <a href="/kebaktian"
+         hx-get="/kebaktian" hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+         data-nav-path="/kebaktian"
+         class="relative flex flex-1 flex-col items-center justify-center gap-1 min-w-0 px-1 pt-2 pb-2 transition-colors {{if hasPrefix .Path `/kebaktian`}}text-sage-700{{else}}text-ink-soft hover:text-ink-muted{{end}}"{{if hasPrefix .Path `/kebaktian`}} aria-current="page"{{end}}>
+        <span class="nav-indicator absolute top-0 h-[3px] w-8 rounded-full bg-sage-600"{{if not (hasPrefix .Path `/kebaktian`)}} style="display:none"{{end}}></span>
         {{template "icon-calendar-days" "h-[22px] w-[22px]"}}
         <span class="text-2xs font-medium tracking-wide">Kebaktian</span>
       </a>
     </div>
   </nav>
+
+  <script>
+    (function () {
+      var prog = document.getElementById('htmx-progress');
+
+      function showProgress() {
+        if (!prog) return;
+        prog.style.transition = 'none';
+        prog.style.width = '0';
+        prog.style.opacity = '1';
+        // small delay so the transition kicks in
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            prog.style.transition = 'width 2s ease';
+            prog.style.width = '70%';
+          });
+        });
+      }
+
+      function hideProgress() {
+        if (!prog) return;
+        prog.style.transition = 'width 0.15s ease, opacity 0.2s ease 0.1s';
+        prog.style.width = '100%';
+        setTimeout(function () {
+          prog.style.opacity = '0';
+          setTimeout(function () { prog.style.width = '0'; }, 250);
+        }, 150);
+      }
+
+      function updateNav() {
+        var path = window.location.pathname;
+        // Desktop sidebar links
+        document.querySelectorAll('aside [data-nav-path]').forEach(function (el) {
+          var navPath = el.getAttribute('data-nav-path');
+          var active = path.startsWith(navPath);
+          if (active) {
+            el.classList.add('text-sage-800', 'bg-sage-50');
+            el.classList.remove('text-ink-muted');
+          } else {
+            el.classList.remove('text-sage-800', 'bg-sage-50');
+            el.classList.add('text-ink-muted');
+          }
+        });
+        // Mobile dock links
+        document.querySelectorAll('nav[aria-label] [data-nav-path]').forEach(function (el) {
+          var navPath = el.getAttribute('data-nav-path');
+          var active = path.startsWith(navPath);
+          var indicator = el.querySelector('.nav-indicator');
+          if (active) {
+            el.classList.add('text-sage-700');
+            el.classList.remove('text-ink-soft');
+            el.setAttribute('aria-current', 'page');
+            if (indicator) indicator.style.display = '';
+          } else {
+            el.classList.remove('text-sage-700');
+            el.classList.add('text-ink-soft');
+            el.removeAttribute('aria-current');
+            if (indicator) indicator.style.display = 'none';
+          }
+        });
+        // Mobile header title
+        var mobileTitle = document.getElementById('mobile-page-title');
+        if (mobileTitle) {
+          var raw = document.title || '';
+          var parts = raw.split(' - ');
+          mobileTitle.textContent = parts.length > 1 ? parts[0] : raw;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', updateNav);
+
+      document.addEventListener('htmx:beforeRequest', function (evt) {
+        if (evt.detail && evt.detail.target && evt.detail.target.id === 'content') {
+          showProgress();
+        }
+      });
+
+      document.addEventListener('htmx:afterSettle', function (evt) {
+        if (evt.detail && evt.detail.target && evt.detail.target.id === 'content') {
+          hideProgress();
+          updateNav();
+        }
+      });
+
+      document.addEventListener('htmx:responseError', function (evt) {
+        if (evt.detail && evt.detail.target && evt.detail.target.id === 'content') {
+          hideProgress();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
 {{end}}
