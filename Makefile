@@ -1,4 +1,4 @@
-.PHONY: help setup dev build test lint sqlc seed-admin clean tailwind tailwind-watch tailwind-cli
+.PHONY: help setup dev build test lint sqlc seed-admin clean tailwind tailwind-watch tailwind-cli spa spa-dev
 TAILWIND_VERSION := v4.3.0
 TAILWIND_BIN     := bin/tailwindcss
 TAILWIND_OS      := $(shell uname -s | tr A-Z a-z)
@@ -9,8 +9,15 @@ setup:
 	go mod download
 dev:
 	go tool air
-build: tailwind
+build: tailwind spa
 	go build -o bin/server ./cmd/server
+
+spa:
+	npm --prefix frontend install --include=dev
+	npm --prefix frontend run build
+
+spa-dev:
+	npm --prefix frontend run dev
 test:
 	go test -race -cover ./...
 lint:

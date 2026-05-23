@@ -32,6 +32,13 @@ func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 
 	r.Get("/health", healthHandler(database))
 	r.Handle("/static/*", staticHandler())
+
+	// JSON API + embedded SolidJS SPA (served under /app during the migration;
+	// the legacy htmx pages remain at / until the SPA reaches parity).
+	mountAPI(r, cfg, q)
+	r.Handle("/app", spaHandler())
+	r.Handle("/app/*", spaHandler())
+
 	mountAuthRoutes(r, cfg, q, rdr)
 
 	r.Group(func(r chi.Router) {
