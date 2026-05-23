@@ -129,3 +129,13 @@ export const IconArrowLeft = (p: IconProps) =>
 
 export const IconChevronLeft = (p: IconProps) => svg(<path d="m15 18-6-6 6-6" />, p);
 export const IconChevronRight = (p: IconProps) => svg(<path d="m9 18 6-6-6-6" />, p);
+
+export const IconCircleAlert = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </>,
+    p,
+  );
