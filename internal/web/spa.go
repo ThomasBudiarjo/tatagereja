@@ -9,16 +9,15 @@ import (
 	"github.com/tatagereja/tatagereja/internal/spa"
 )
 
-// spaHandler serves the embedded SolidJS SPA under /app. Hashed asset files
-// (under assets/) get a 1-year immutable cache so Cloudflare can serve them
-// from the edge; everything else falls back to index.html (no-cache) so
+// spaHandler serves the embedded SolidJS SPA from the site root. Hashed asset
+// files (under assets/) get a 1-year immutable cache so Cloudflare can serve
+// them from the edge; every other path falls back to index.html (no-cache) so
 // client-side routing and fresh deploys work.
 func spaHandler() http.Handler {
 	dist := spa.FS
-	fileServer := http.StripPrefix("/app/", http.FileServer(http.FS(dist)))
+	fileServer := http.FileServer(http.FS(dist))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rel := strings.TrimPrefix(r.URL.Path, "/app")
-		rel = strings.TrimPrefix(rel, "/")
+		rel := strings.TrimPrefix(r.URL.Path, "/")
 		if rel == "" {
 			serveSPAIndex(w, dist)
 			return

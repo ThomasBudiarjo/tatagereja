@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/tatagereja/tatagereja/internal/auth"
@@ -38,18 +37,6 @@ func RequireAuth(q *sqlc.Queries) func(http.Handler) http.Handler {
 func UserID(r *http.Request) int64 {
 	v, _ := r.Context().Value(userIDKey).(int64)
 	return v
-}
-
-func MethodOverride(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			_ = r.ParseForm()
-			if m := r.FormValue("_method"); m != "" {
-				r.Method = strings.ToUpper(m)
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 func Logging(next http.Handler) http.Handler {

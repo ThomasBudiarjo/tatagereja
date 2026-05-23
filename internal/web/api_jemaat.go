@@ -10,6 +10,19 @@ import (
 	"github.com/tatagereja/tatagereja/internal/db/sqlc"
 )
 
+const (
+	jemaatStatusBelum   = "belum_menikah"
+	jemaatStatusMenikah = "menikah"
+	jemaatStatusCerai   = "cerai"
+	jemaatStatusDuda    = "duda"
+	jemaatStatusJanda   = "janda"
+)
+
+var jemaatStatusAllowed = []string{
+	jemaatStatusBelum, jemaatStatusMenikah, jemaatStatusCerai,
+	jemaatStatusDuda, jemaatStatusJanda,
+}
+
 type jemaatDTO struct {
 	ID               int64   `json:"id"`
 	NamaLengkap      string  `json:"nama_lengkap"`
@@ -69,11 +82,25 @@ type jemaatReq struct {
 func mountAPIJemaat(r chi.Router, q *sqlc.Queries) {
 	r.Route("/jemaat", func(r chi.Router) {
 		r.Get("/", apiJemaatList(q))
+		r.Get("/active", apiJemaatActive(q))
 		r.Post("/", apiJemaatCreate(q))
 		r.Get("/{id}", apiJemaatGet(q))
 		r.Put("/{id}", apiJemaatUpdate(q))
 		r.Delete("/{id}", apiJemaatDelete(q))
 	})
+}
+
+// apiJemaatActive returns active jemaat as id/name options (used by the pelayan
+// form to pick a member).
+func apiJemaatActive(q *sqlc.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		items, err := q.ListActiveJemaatNames(r.Context(), UserID(r))
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	}
 }
 
 func apiJemaatList(q *sqlc.Queries) http.HandlerFunc {

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,12 +12,10 @@ import (
 
 	"github.com/tatagereja/tatagereja/internal/config"
 	"github.com/tatagereja/tatagereja/internal/db/sqlc"
-	"github.com/tatagereja/tatagereja/internal/templates"
 )
 
 func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 	q := sqlc.New(database)
-	rdr := NewRenderer()
 
 	r := chi.NewRouter()
 	r.Use(
@@ -26,49 +23,18 @@ func NewRouter(cfg *config.Config, database *sql.DB) http.Handler {
 		middleware.RealIP,
 		Logging,
 		middleware.Recoverer,
-		MethodOverride,
 		middleware.Timeout(30*time.Second),
 	)
 
 	r.Get("/health", healthHandler(database))
-	r.Handle("/static/*", staticHandler())
+	mountAPI(r, cfg, q, database)
 
-	// JSON API + embedded SolidJS SPA (served under /app during the migration;
-	// the legacy htmx pages remain at / until the SPA reaches parity).
-	mountAPI(r, cfg, q)
-	r.Handle("/app", spaHandler())
-	r.Handle("/app/*", spaHandler())
-
-	mountAuthRoutes(r, cfg, q, rdr)
-
-	r.Group(func(r chi.Router) {
-		r.Use(RequireAuth(q))
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/jemaat", http.StatusFound)
-		})
-		mountJemaat(r, q, rdr)
-		mountKeluarga(r, q, rdr)
-		mountPelayan(r, q, database, rdr)
-		mountServiceTypes(r, q, rdr)
-		mountKebaktian(r, q, rdr)
-		mountJadwal(r, q, database, rdr)
-	})
+	// The SolidJS SPA owns every other route via client-side routing. Hashed
+	// assets are served with a long immutable cache (edge-cacheable by
+	// Cloudflare); all other paths fall back to index.html (no-cache).
+	r.Handle("/*", spaHandler())
 
 	return r
-}
-
-func staticHandler() http.Handler {
-	fs := http.FileServer(http.FS(templates.StaticFS))
-	stripped := http.StripPrefix("/static/", fs)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/static/")
-		if path == "" || strings.HasSuffix(path, "/") || strings.HasSuffix(path, ".src.css") {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		stripped.ServeHTTP(w, r)
-	})
 }
 
 func healthHandler(database *sql.DB) http.HandlerFunc {

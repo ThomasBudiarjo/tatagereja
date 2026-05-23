@@ -68,3 +68,79 @@ export interface ListResp<T> {
   offset: number;
   q: string;
 }
+
+export interface JemaatOption {
+  id: number;
+  nama_lengkap: string;
+}
+
+export interface ServiceType {
+  id: number;
+  nama: string;
+  deskripsi: string | null;
+  urutan: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceTypeReq {
+  nama: string;
+  deskripsi: string;
+  urutan: string;
+}
+
+export interface Pelayan {
+  id: number;
+  jemaat_id: number;
+  jemaat_nama: string;
+  catatan: string | null;
+  service_type_ids?: number[];
+  service_types: string[];
+}
+
+export interface PelayanReq {
+  jemaat_id: number;
+  catatan: string;
+  service_type_ids: number[];
+}
+
+export interface Kebaktian {
+  id: number;
+  nama: string;
+  waktu_mulai: string;
+  waktu_mulai_local: string;
+  waktu_mulai_text: string;
+  lokasi: string | null;
+  tema: string | null;
+  pengkhotbah: string | null;
+  catatan: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KebaktianReq {
+  nama: string;
+  waktu_mulai_local: string;
+  lokasi: string;
+  tema: string;
+  pengkhotbah: string;
+  catatan: string;
+}
+
+export interface JadwalSlot {
+  service_type_id: number;
+  pelayan_id: number | null;
+  catatan: string | null;
+}
+
+export interface PelayanForType {
+  id: number;
+  jemaat_nama: string;
+}
+
+export interface JadwalEditor {
+  kebaktian: Kebaktian;
+  service_types: ServiceType[];
+  slots: JadwalSlot[];
+  pelayan_options: Record<string, PelayanForType[]>;
+}

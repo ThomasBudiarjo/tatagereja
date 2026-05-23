@@ -14,13 +14,9 @@ import {
 } from "./icons";
 import { Spinner } from "./ui";
 
-// SPA-native sections (ported). Sections not yet migrated link to the legacy
-// htmx pages at the site root so the app stays fully usable mid-migration.
-const spaNav = [
+const nav = [
   { href: "/jemaat", label: "Jemaat", icon: IconUsers },
   { href: "/keluarga", label: "Keluarga", icon: IconHome },
-];
-const legacyNav = [
   { href: "/pelayan", label: "Pelayan", icon: IconHandHelping },
   { href: "/service-types", label: "Tipe Pelayanan", icon: IconLayers },
   { href: "/kebaktian", label: "Kebaktian", icon: IconCalendar },
@@ -30,7 +26,7 @@ export default function Layout(props: { user: User; children: JSX.Element }) {
   const location = useLocation();
   const logout = useMutation(() => ({
     mutationFn: () => api.post("/auth/logout", {}),
-    onSettled: () => window.location.assign("/app/login"),
+    onSettled: () => window.location.assign("/login"),
   }));
 
   const active = (href: string) => location.pathname.startsWith(`/app${href}`);
@@ -50,7 +46,7 @@ export default function Layout(props: { user: User; children: JSX.Element }) {
           <p class="mt-0.5 truncate text-xs text-ink-soft">{props.user.display_name}</p>
         </div>
         <nav class="flex-1 space-y-0.5 px-3 py-4">
-          {spaNav.map((item) => (
+          {nav.map((item) => (
             <A
               href={item.href}
               class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -62,15 +58,6 @@ export default function Layout(props: { user: User; children: JSX.Element }) {
               <item.icon class="h-4 w-4" />
               <span>{item.label}</span>
             </A>
-          ))}
-          {legacyNav.map((item) => (
-            <a
-              href={item.href}
-              class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
-            >
-              <item.icon class="h-4 w-4" />
-              <span>{item.label}</span>
-            </a>
           ))}
         </nav>
         <div class="border-t border-line p-3">
@@ -108,7 +95,7 @@ export default function Layout(props: { user: User; children: JSX.Element }) {
         aria-label="Navigasi utama"
       >
         <div class="flex items-stretch justify-around px-1 pt-1">
-          {spaNav.map((item) => (
+          {nav.map((item) => (
             <A
               href={item.href}
               class="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 pb-2 pt-2 transition-colors"
@@ -120,15 +107,6 @@ export default function Layout(props: { user: User; children: JSX.Element }) {
               <item.icon class="h-[22px] w-[22px]" />
               <span class="text-2xs font-medium tracking-wide">{item.label}</span>
             </A>
-          ))}
-          {legacyNav.map((item) => (
-            <a
-              href={item.href}
-              class="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 pb-2 pt-2 text-ink-soft transition-colors hover:text-ink-muted"
-            >
-              <item.icon class="h-[22px] w-[22px]" />
-              <span class="text-2xs font-medium tracking-wide">{item.label}</span>
-            </a>
           ))}
         </div>
       </nav>

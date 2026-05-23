@@ -183,6 +183,91 @@ func TestAPI_CrossUserIsolation(t *testing.T) {
 	}
 }
 
+func TestAPI_FullScheduleFlow(t *testing.T) {
+	h, q, _ := newAPI(t)
+	u1, _ := SeedTwoUsers(t, q)
+	c := sessionCookie(t, q, u1)
+
+	// Service type
+	rr := do(t, h, http.MethodPost, "/api/service-types", `{"nama":"Musik","urutan":"1"}`, c)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("service-type create: want 201, got %d (%s)", rr.Code, rr.Body.String())
+	}
+	var st struct {
+		ServiceType struct {
+			ID int64 `json:"id"`
+		} `json:"service_type"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &st)
+
+	// Jemaat -> pelayan
+	rr = do(t, h, http.MethodPost, "/api/jemaat", `{"nama_lengkap":"Pelayan A"}`, c)
+	var jem struct {
+		Jemaat struct {
+			ID int64 `json:"id"`
+		} `json:"jemaat"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &jem)
+
+	rr = do(t, h, http.MethodPost, "/api/pelayan",
+		`{"jemaat_id":`+itoa(jem.Jemaat.ID)+`,"service_type_ids":[`+itoa(st.ServiceType.ID)+`]}`, c)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("pelayan create: want 201, got %d (%s)", rr.Code, rr.Body.String())
+	}
+
+	// Pelayan list shows service-type name
+	rr = do(t, h, http.MethodGet, "/api/pelayan", "", c)
+	if !strings.Contains(rr.Body.String(), "Musik") {
+		t.Fatalf("pelayan list missing service type: %s", rr.Body.String())
+	}
+	var pl struct {
+		Items []struct {
+			ID int64 `json:"id"`
+		} `json:"items"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &pl)
+	if len(pl.Items) != 1 {
+		t.Fatalf("want 1 pelayan, got %d", len(pl.Items))
+	}
+	pelayanID := pl.Items[0].ID
+
+	// Kebaktian (local time round-trips through the user's timezone)
+	rr = do(t, h, http.MethodPost, "/api/kebaktian", `{"nama":"Ibadah Minggu","waktu_mulai_local":"2025-01-05T09:00"}`, c)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("kebaktian create: want 201, got %d (%s)", rr.Code, rr.Body.String())
+	}
+	var keb struct {
+		Kebaktian struct {
+			ID              int64  `json:"id"`
+			WaktuMulaiLocal string `json:"waktu_mulai_local"`
+		} `json:"kebaktian"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &keb)
+	if keb.Kebaktian.WaktuMulaiLocal != "2025-01-05T09:00" {
+		t.Fatalf("local time did not round-trip: %q", keb.Kebaktian.WaktuMulaiLocal)
+	}
+	kid := itoa(keb.Kebaktian.ID)
+
+	// Jadwal editor data exposes the service type + pelayan option
+	rr = do(t, h, http.MethodGet, "/api/kebaktian/"+kid+"/jadwal", "", c)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Pelayan A") {
+		t.Fatalf("jadwal editor: got %d (%s)", rr.Code, rr.Body.String())
+	}
+
+	// Assign the pelayan to the slot
+	rr = do(t, h, http.MethodPost, "/api/kebaktian/"+kid+"/jadwal",
+		`{"slots":[{"service_type_id":`+itoa(st.ServiceType.ID)+`,"pelayan_id":`+itoa(pelayanID)+`,"catatan":"lagu pembuka"}]}`, c)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("jadwal replace: want 204, got %d (%s)", rr.Code, rr.Body.String())
+	}
+
+	// Service type is now in use -> delete must 409
+	rr = do(t, h, http.MethodDelete, "/api/service-types/"+itoa(st.ServiceType.ID), "", c)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("service-type delete in use: want 409, got %d", rr.Code)
+	}
+}
+
 func itoa(n int64) string {
 	return strings.TrimSpace(jsonNumber(n))
 }

@@ -2,8 +2,8 @@ import { QueryClient, QueryCache, MutationCache } from "@tanstack/solid-query";
 import { ApiError } from "./api/client";
 
 function redirectToLogin() {
-  if (!window.location.pathname.endsWith("/login")) {
-    window.location.assign("/app/login");
+  if (window.location.pathname !== "/login") {
+    window.location.assign("/login");
   }
 }
 
