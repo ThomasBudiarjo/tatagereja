@@ -102,7 +102,7 @@ func apiPelayanGet(q *sqlc.Queries) http.HandlerFunc {
 func apiPelayanCreate(q *sqlc.Queries, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req pelayanReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -123,7 +123,7 @@ func apiPelayanCreate(q *sqlc.Queries, db *sql.DB) http.HandlerFunc {
 func apiPelayanUpdate(q *sqlc.Queries, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req pelayanReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

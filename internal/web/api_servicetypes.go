@@ -64,7 +64,7 @@ func apiServiceTypeList(q *sqlc.Queries) http.HandlerFunc {
 func apiServiceTypeCreate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req serviceTypeReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -90,7 +90,7 @@ func apiServiceTypeCreate(q *sqlc.Queries) http.HandlerFunc {
 func apiServiceTypeUpdate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req serviceTypeReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

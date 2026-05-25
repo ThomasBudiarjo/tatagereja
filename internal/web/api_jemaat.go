@@ -169,7 +169,7 @@ func apiJemaatGet(q *sqlc.Queries) http.HandlerFunc {
 func apiJemaatCreate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req jemaatReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -192,7 +192,7 @@ func apiJemaatCreate(q *sqlc.Queries) http.HandlerFunc {
 func apiJemaatUpdate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req jemaatReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

@@ -46,9 +46,6 @@ export default function Login() {
       <div class="relative z-10 w-full max-w-[400px] overflow-hidden rounded-2xl border border-line bg-surface-raised shadow-[0_15px_40px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] transition-shadow duration-300 hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)]">
         <div class="px-8 pb-7 pt-9">
           <div class="mb-6 flex flex-col items-center">
-            <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-50 text-sage-700">
-              <IconShield class="h-6 w-6" />
-            </div>
             <h1 class="text-xl font-semibold tracking-tight text-ink">Masuk ke akun</h1>
             <p class="mt-1.5 text-center text-sm leading-relaxed text-ink-muted">
               Kelola jemaat dan jadwal pelayanan Anda.

@@ -110,7 +110,7 @@ func apiKeluargaGet(q *sqlc.Queries) http.HandlerFunc {
 func apiKeluargaCreate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req keluargaReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -132,7 +132,7 @@ func apiKeluargaCreate(q *sqlc.Queries) http.HandlerFunc {
 func apiKeluargaUpdate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req keluargaReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

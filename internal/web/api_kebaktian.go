@@ -134,7 +134,7 @@ func apiKebaktianGet(q *sqlc.Queries) http.HandlerFunc {
 func apiKebaktianCreate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req kebaktianReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -162,7 +162,7 @@ func apiKebaktianCreate(q *sqlc.Queries) http.HandlerFunc {
 func apiKebaktianUpdate(q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req kebaktianReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

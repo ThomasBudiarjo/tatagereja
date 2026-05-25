@@ -32,8 +32,8 @@ func writeValidationErrors(w http.ResponseWriter, errs map[string]string) {
 	writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"errors": errs})
 }
 
-func decodeJSON(r *http.Request, dst any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	return dec.Decode(dst)
 }
 

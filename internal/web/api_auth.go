@@ -55,7 +55,7 @@ func apiMe(q *sqlc.Queries) http.HandlerFunc {
 func apiLogin(cfg *config.Config, q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req loginReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -98,7 +98,7 @@ func apiLogout(q *sqlc.Queries) http.HandlerFunc {
 func apiSignup(cfg *config.Config, q *sqlc.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req signupReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}

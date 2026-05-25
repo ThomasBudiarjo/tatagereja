@@ -21,7 +21,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  let data: any = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Non-JSON response (e.g. a Recoverer 500 or an upstream Cloudflare/Heroku
+      // error page). Surface it as an ApiError so the queryClient's 401 handling
+      // and field-error plumbing still apply instead of a raw SyntaxError.
+      throw new ApiError(res.status, res.statusText || "Terjadi kesalahan");
+    }
+  }
 
   if (!res.ok) {
     throw new ApiError(

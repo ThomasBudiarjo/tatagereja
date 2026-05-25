@@ -29,6 +29,14 @@ type jadwalReplaceReq struct {
 	Slots []jadwalSlotReq `json:"slots"`
 }
 
+// jadwalPelayanOption is one selectable pelayan for a service type. It keeps the
+// {id, jemaat_nama} wire shape the jadwal editor expects, dropping the
+// service_type_id used only to bucket the rows server-side.
+type jadwalPelayanOption struct {
+	ID         int64  `json:"id"`
+	JemaatNama string `json:"jemaat_nama"`
+}
+
 func mountAPIJadwal(r chi.Router, q *sqlc.Queries, db *sql.DB) {
 	r.Route("/kebaktian/{id}/jadwal", func(r chi.Router) {
 		r.Get("/", apiJadwalGet(q))
@@ -75,9 +83,23 @@ func apiJadwalGet(q *sqlc.Queries) http.HandlerFunc {
 			jadwalByST[j.ServiceTypeID] = j
 		}
 
+		// Fetch every service type's eligible pelayan in one query, then bucket
+		// by service_type_id, rather than querying once per service type.
+		allOpts, err := q.ListPelayanForAllServiceTypes(r.Context(), uid)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		optsByST := map[int64][]jadwalPelayanOption{}
+		for _, o := range allOpts {
+			optsByST[o.ServiceTypeID] = append(optsByST[o.ServiceTypeID], jadwalPelayanOption{
+				ID: o.ID, JemaatNama: o.JemaatNama,
+			})
+		}
+
 		stDTOs := make([]serviceTypeDTO, 0, len(serviceTypes))
 		slots := make([]jadwalSlotDTO, 0, len(serviceTypes))
-		options := map[string][]sqlc.ListPelayanForServiceTypeRow{}
+		options := map[string][]jadwalPelayanOption{}
 		for _, s := range serviceTypes {
 			stDTOs = append(stDTOs, toServiceTypeDTO(s))
 			slot := jadwalSlotDTO{ServiceTypeID: s.ID}
@@ -86,12 +108,9 @@ func apiJadwalGet(q *sqlc.Queries) http.HandlerFunc {
 				slot.Catatan = nullStrPtr(j.Catatan)
 			}
 			slots = append(slots, slot)
-			opts, err := q.ListPelayanForServiceType(r.Context(), sqlc.ListPelayanForServiceTypeParams{
-				UserID: uid, ServiceTypeID: s.ID,
-			})
-			if err != nil {
-				writeJSONError(w, http.StatusInternalServerError, "server error")
-				return
+			opts := optsByST[s.ID]
+			if opts == nil {
+				opts = []jadwalPelayanOption{}
 			}
 			options[strconv.FormatInt(s.ID, 10)] = opts
 		}
@@ -123,7 +142,7 @@ func apiJadwalReplace(q *sqlc.Queries, db *sql.DB) http.HandlerFunc {
 		}
 
 		var req jadwalReplaceReq
-		if err := decodeJSON(r, &req); err != nil {
+		if err := decodeJSON(w, r, &req); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
