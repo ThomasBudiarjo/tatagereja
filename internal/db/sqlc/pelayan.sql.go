@@ -145,35 +145,31 @@ func (q *Queries) ListPelayan(ctx context.Context, userID int64) ([]ListPelayanR
 	return items, nil
 }
 
-const listPelayanForServiceType = `-- name: ListPelayanForServiceType :many
-SELECT p.id, j.nama_lengkap AS jemaat_nama
+const listPelayanForAllServiceTypes = `-- name: ListPelayanForAllServiceTypes :many
+SELECT pst.service_type_id, p.id, j.nama_lengkap AS jemaat_nama
 FROM pelayan p
 JOIN jemaat j ON j.id = p.jemaat_id AND j.user_id = p.user_id
 JOIN pelayan_service_types pst ON pst.pelayan_id = p.id
-WHERE p.user_id = ? AND pst.service_type_id = ?
-ORDER BY j.nama_lengkap ASC
+WHERE p.user_id = ?
+ORDER BY pst.service_type_id ASC, j.nama_lengkap ASC
 `
 
-type ListPelayanForServiceTypeParams struct {
-	UserID        int64 `json:"user_id"`
-	ServiceTypeID int64 `json:"service_type_id"`
+type ListPelayanForAllServiceTypesRow struct {
+	ServiceTypeID int64  `json:"service_type_id"`
+	ID            int64  `json:"id"`
+	JemaatNama    string `json:"jemaat_nama"`
 }
 
-type ListPelayanForServiceTypeRow struct {
-	ID         int64  `json:"id"`
-	JemaatNama string `json:"jemaat_nama"`
-}
-
-func (q *Queries) ListPelayanForServiceType(ctx context.Context, arg ListPelayanForServiceTypeParams) ([]ListPelayanForServiceTypeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPelayanForServiceType, arg.UserID, arg.ServiceTypeID)
+func (q *Queries) ListPelayanForAllServiceTypes(ctx context.Context, userID int64) ([]ListPelayanForAllServiceTypesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPelayanForAllServiceTypes, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListPelayanForServiceTypeRow{}
+	items := []ListPelayanForAllServiceTypesRow{}
 	for rows.Next() {
-		var i ListPelayanForServiceTypeRow
-		if err := rows.Scan(&i.ID, &i.JemaatNama); err != nil {
+		var i ListPelayanForAllServiceTypesRow
+		if err := rows.Scan(&i.ServiceTypeID, &i.ID, &i.JemaatNama); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

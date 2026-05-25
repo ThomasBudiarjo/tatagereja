@@ -1,15 +1,12 @@
 package web
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,101 +16,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/tatagereja/tatagereja/internal/db/sqlc"
-	"github.com/tatagereja/tatagereja/internal/templates"
 )
 
 const (
-	flashCookieName = "tatagereja_flash"
 	defaultPageSize = 50
 	maxPageSize     = 100
 )
-
-type Flash struct {
-	Kind    string
-	Message string
-}
-
-type Renderer struct {
-	tmpl *template.Template
-}
-
-type layoutData struct {
-	Data any
-	Body template.HTML
-	Path string
-}
-
-func NewRenderer() *Renderer {
-	funcs := template.FuncMap{
-		"formatDateTime": formatDateTime,
-		"toLocalInput":   toLocalInput,
-		"add":            add,
-		"sub":            sub,
-		"derefString":    derefString,
-		"nullInt64":      nullInt64,
-		"hasPrefix":      strings.HasPrefix,
-	}
-	tmpl := template.New("").Funcs(funcs)
-	tmpl, err := tmpl.ParseFS(templates.FS, "*.html", "**/*.html")
-	if err != nil {
-		slog.Error("parse templates", "err", err)
-	}
-	return &Renderer{tmpl: tmpl}
-}
-
-func (r *Renderer) Page(w http.ResponseWriter, req *http.Request, name string, data any) error {
-	var buf bytes.Buffer
-	if err := r.tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return r.tmpl.ExecuteTemplate(w, "layout", layoutData{
-		Data: data,
-		Body: template.HTML(buf.String()),
-		Path: req.URL.Path,
-	})
-}
-
-func (r *Renderer) Fragment(w http.ResponseWriter, req *http.Request, name string, data any) error {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return r.tmpl.ExecuteTemplate(w, name, data)
-}
-
-func SetFlash(w http.ResponseWriter, msg, kind string) {
-	val := url.QueryEscape(kind + "|" + msg)
-	http.SetCookie(w, &http.Cookie{
-		Name:     flashCookieName,
-		Value:    val,
-		Path:     "/",
-		MaxAge:   120,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func PopFlash(w http.ResponseWriter, r *http.Request) (Flash, bool) {
-	c, err := r.Cookie(flashCookieName)
-	if err != nil || c.Value == "" {
-		return Flash{}, false
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     flashCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-	decoded, err := url.QueryUnescape(c.Value)
-	if err != nil {
-		return Flash{}, false
-	}
-	parts := strings.SplitN(decoded, "|", 2)
-	if len(parts) != 2 {
-		return Flash{}, false
-	}
-	return Flash{Kind: parts[0], Message: parts[1]}, true
-}
 
 func ParsePagination(r *http.Request) (limit, offset int64) {
 	limit = defaultPageSize
@@ -139,28 +47,6 @@ func EscapeLike(s string) string {
 	s = strings.ReplaceAll(s, `%`, `\%`)
 	s = strings.ReplaceAll(s, `_`, `\_`)
 	return "%" + s + "%"
-}
-
-func IsHTMX(r *http.Request) bool {
-	return r.Header.Get("HX-Request") == "true"
-}
-
-func HXRedirect(w http.ResponseWriter, url string) {
-	w.Header().Set("HX-Redirect", url)
-	w.WriteHeader(http.StatusOK)
-}
-
-func Redirect(w http.ResponseWriter, r *http.Request, url string) {
-	if IsHTMX(r) {
-		HXRedirect(w, url)
-		return
-	}
-	http.Redirect(w, r, url, http.StatusSeeOther)
-}
-
-func RedirectWithFlash(w http.ResponseWriter, r *http.Request, url, msg, kind string) {
-	SetFlash(w, msg, kind)
-	Redirect(w, r, url)
 }
 
 func FormString(r *http.Request, key string) string {

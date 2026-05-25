@@ -40,10 +40,10 @@ JOIN service_types st ON st.id = pst.service_type_id
 WHERE pst.pelayan_id = ?
 ORDER BY st.urutan ASC, st.nama ASC;
 
--- name: ListPelayanForServiceType :many
-SELECT p.id, j.nama_lengkap AS jemaat_nama
+-- name: ListPelayanForAllServiceTypes :many
+SELECT pst.service_type_id, p.id, j.nama_lengkap AS jemaat_nama
 FROM pelayan p
 JOIN jemaat j ON j.id = p.jemaat_id AND j.user_id = p.user_id
 JOIN pelayan_service_types pst ON pst.pelayan_id = p.id
-WHERE p.user_id = ? AND pst.service_type_id = ?
-ORDER BY j.nama_lengkap ASC;
+WHERE p.user_id = ?
+ORDER BY pst.service_type_id ASC, j.nama_lengkap ASC;
