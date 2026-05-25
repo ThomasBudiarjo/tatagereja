@@ -6,7 +6,7 @@ import { Spinner } from "../components/ui";
 import { IconShield, IconChevronRight, IconCircleAlert } from "../components/icons";
 
 const inputBase =
-  "w-full px-3.5 py-2.5 bg-surface-raised border rounded-lg text-md transition-all focus:outline-none focus:ring-2";
+  "w-full px-3.5 py-2 bg-surface-raised border rounded-lg text-sm transition-all focus:outline-none focus:ring-2";
 const inputOk = "border-line-strong focus:border-sage-700 focus:ring-sage-600/15";
 const inputErr = "border-rose-300 focus:border-rose-500 focus:ring-rose-500/20";
 
@@ -109,7 +109,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={login.isPending}
-              class="mt-6 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-sage-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-sage-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised"
+              class="mt-6 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-sage-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-sage-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised"
             >
               <Show when={login.isPending} fallback={<span>Masuk</span>}>
                 <Spinner />
