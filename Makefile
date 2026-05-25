@@ -4,6 +4,7 @@ help:
 setup:
 	go mod download
 	npm --prefix frontend install
+	npm --prefix frontend run build
 dev:
 	go tool air
 build: spa

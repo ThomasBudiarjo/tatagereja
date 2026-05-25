@@ -22,24 +22,13 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Reproducible build: npm ci honors the committed lockfile, and vite hashes
-      # asset filenames by content, so unchanged source produces identical output.
+      # The SPA build (internal/spa/dist) is not committed; it must exist before
+      # any Go step because cmd/server embeds it via go:embed. npm ci honors the
+      # committed lockfile for a reproducible build.
       - name: Build SPA
         run: |
           npm --prefix frontend ci
           npm --prefix frontend run build
-
-      # Staleness gate: the embedded SPA (internal/spa/dist) is committed and
-      # consumed via go:embed. If a fresh build differs from what's committed,
-      # someone changed frontend/ without running `make spa`. --porcelain catches
-      # modified, deleted, and newly-hashed (untracked) asset files alike.
-      - name: Verify embedded SPA build is up to date
-        run: |
-          if [ -n "$(git status --porcelain -- internal/spa/dist)" ]; then
-            echo "::error::internal/spa/dist is stale — run 'make spa' and commit the result."
-            git status --porcelain -- internal/spa/dist
-            exit 1
-          fi
 
       - name: Go build
         run: go build ./...

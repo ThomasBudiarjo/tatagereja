@@ -5,3 +5,7 @@ tmp/
 *.db
 .commandcode
 node_modules/
+
+# The SPA build is produced at deploy/CI time (Heroku Node buildpack, `make spa`)
+# and embedded via go:embed — not committed. Run `make spa` before any Go build.
+internal/spa/dist/

@@ -1,0 +1,8 @@
+{
+  "name": "tatagereja",
+  "description": "Church management web app: Go API + embedded SolidJS SPA.",
+  "buildpacks": [
+    { "url": "heroku/nodejs" },
+    { "url": "heroku/go" }
+  ]
+}

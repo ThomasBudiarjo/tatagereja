@@ -49,7 +49,15 @@ AWS_REGION=auto
 AWS_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
 ```
 
-Deploy: `git push heroku main` (Heroku builds `./cmd/server` and `./cmd/seed-admin` per the `+heroku install` directive in `go.mod`). After first deploy:
+Deploy uses two buildpacks, in order — the Node buildpack builds the SPA into `internal/spa/dist`, then the Go buildpack compiles `./cmd/server` and `./cmd/seed-admin` (per the `+heroku install` directive in `go.mod`), embedding the freshly built SPA via `go:embed`. Set the buildpack order once on the app:
+
+```bash
+heroku buildpacks:clear
+heroku buildpacks:add --index 1 heroku/nodejs
+heroku buildpacks:add --index 2 heroku/go
+```
+
+The Node build is driven by the root `package.json` `heroku-postbuild` script. Then deploy with `git push heroku main`. After first deploy:
 
 ```bash
 heroku run bin/seed-admin -- --email=admin@example.com --password=changeme \
@@ -67,7 +75,7 @@ heroku run bin/seed-admin -- --email=admin@example.com --password=changeme \
 | `make test` | Run tests |
 | `make sqlc` | Regenerate sqlc code |
 
-The built SPA (`internal/spa/dist`) is committed so the Heroku Go buildpack deploys it unchanged. Run `make spa` after changing frontend code and commit the result (or wire a Node build step in CI).
+The built SPA (`internal/spa/dist`) is **not** committed — it is generated at deploy time (Heroku Node buildpack) and in CI, then embedded via `go:embed`. Because the embed requires the directory to exist at compile time, run `make spa` once before any Go build (`make build` does this for you; `go build`/`go test`/`make dev` need it run first on a fresh clone).
 
 ## License
 
