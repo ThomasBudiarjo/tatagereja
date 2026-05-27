@@ -1,6 +1,6 @@
-.PHONY: help setup dev build test lint sqlc seed-admin clean spa spa-dev
+.PHONY: help setup dev build test lint sqlc seed-admin seed-dev db-reset clean spa spa-dev
 help:
-	@echo "setup | dev | build | spa | spa-dev | test | lint | sqlc | seed-admin | clean"
+	@echo "setup | dev | build | spa | spa-dev | test | lint | sqlc | seed-admin | seed-dev | db-reset | clean"
 setup:
 	go mod download
 	npm --prefix frontend install
@@ -23,6 +23,12 @@ sqlc:
 	go tool sqlc generate
 seed-admin:
 	go run ./cmd/seed-admin --email=admin@example.com --password=changeme --display-name="Admin" --church-name="GKI Demo"
+seed-dev:
+	go run ./cmd/seed-dev
+db-reset:
+	rm -f data/tatagereja.db data/tatagereja.db-shm data/tatagereja.db-wal
+	rm -rf data/replica
+	@echo "db wiped — run 'make seed-dev' to repopulate"
 
 clean:
 	rm -rf bin tmp data

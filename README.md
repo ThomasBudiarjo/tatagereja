@@ -35,6 +35,18 @@ go run ./cmd/seed-admin \
   --display-name="Pak Budi" --church-name="GKI Demo"
 ```
 
+### Dev data
+
+```bash
+make seed-dev     # dev@example.com / 1234, with full demo data
+make db-reset     # wipe the local SQLite DB (then re-run make seed-dev)
+```
+
+`make seed-dev` seeds a complete, re-runnable demo dataset for the `dev@example.com` user
+(it wipes that user first): service types, jemaat, pelayan, kebaktian on the Sundays around
+today (a few past + upcoming), and their jadwal assignments. `make db-reset` only deletes
+the local DB files; it does not re-seed.
+
 ## Production (Heroku + Cloudflare R2)
 
 Local SQLite lives on ephemeral disk; Litestream replicates to S3-compatible storage.
