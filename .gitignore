@@ -1,7 +1,0 @@
-data/
-bin/
-tmp/
-.env
-*.db
-.commandcode
-node_modules/
