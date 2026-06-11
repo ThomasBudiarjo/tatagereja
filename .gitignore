@@ -1,0 +1,19 @@
+# Go build output
+/bin/
+/tatagereja
+
+# Frontend build output (a committed .gitkeep keeps the go:embed directive
+# compiling before the first vite build)
+web/dist/*
+!web/dist/.gitkeep
+web/node_modules/
+node_modules/
+
+# Local databases
+*.db
+*.db-wal
+*.db-shm
+*.db-litestream/
+
+# Editor/OS noise
+.DS_Store
