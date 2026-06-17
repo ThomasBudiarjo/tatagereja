@@ -1,0 +1,135 @@
+version: '3'
+
+vars:
+  FRONTEND_DIR: frontend
+  BACKEND_ENTRY: ./cmd/server
+  BIN_DIR: bin
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  dev:
+    desc: Run backend and frontend dev servers
+    deps:
+      - task: be
+      - task: fe
+
+  fe:
+    desc: Run the React dev server
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm run dev
+
+  be:
+    desc: Run the Go backend
+    preconditions:
+      - sh: test -f go.mod
+        msg: Missing go.mod. Initialize the Go backend first.
+    cmds:
+      - go run {{.BACKEND_ENTRY}}
+
+  build:
+    desc: Build frontend and backend
+    deps:
+      - task: fe:build
+      - task: be:build
+
+  verify:
+    desc: Run lint, tests, and build
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  lint:
+    desc: Run frontend lint and Go vet
+    deps:
+      - task: fe:lint
+      - task: be:vet
+
+  test:
+    desc: Run frontend and backend tests
+    deps:
+      - task: fe:test
+      - task: be:test
+
+  install:
+    desc: Install frontend and backend dependencies
+    deps:
+      - task: fe:install
+      - task: be:install
+
+  fe:install:
+    desc: Install frontend dependencies
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm install
+
+  fe:build:
+    desc: Build the React frontend
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm run build
+
+  fe:lint:
+    desc: Run frontend lint if configured
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm run lint --if-present
+
+  fe:test:
+    desc: Run frontend tests if configured
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm test --if-present
+
+  be:install:
+    desc: Download Go dependencies
+    preconditions:
+      - sh: test -f go.mod
+        msg: Missing go.mod. Initialize the Go backend first.
+    cmds:
+      - go mod download
+
+  be:build:
+    desc: Build the Go backend binary
+    preconditions:
+      - sh: test -f go.mod
+        msg: Missing go.mod. Initialize the Go backend first.
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -o {{.BIN_DIR}}/server {{.BACKEND_ENTRY}}
+
+  be:test:
+    desc: Run Go tests
+    preconditions:
+      - sh: test -f go.mod
+        msg: Missing go.mod. Initialize the Go backend first.
+    cmds:
+      - go test ./...
+
+  be:vet:
+    desc: Run Go vet
+    preconditions:
+      - sh: test -f go.mod
+        msg: Missing go.mod. Initialize the Go backend first.
+    cmds:
+      - go vet ./...
