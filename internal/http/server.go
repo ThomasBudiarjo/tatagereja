@@ -10,6 +10,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/thomasbudiarjo/tatagereja/internal/config"
+	"github.com/thomasbudiarjo/tatagereja/internal/db"
 	"github.com/thomasbudiarjo/tatagereja/internal/http/middleware"
 )
 
@@ -20,6 +21,8 @@ const maxBodyBytes = 1 << 20 // 1 MiB
 // tasks add the database, auth service, and sessions.
 type Deps struct {
 	Config config.Config
+	// Store is the data-access layer (used by auth handlers in later tasks).
+	Store *db.Store
 	// Frontend, when non-nil, serves the embedded SPA as the catch-all route.
 	Frontend http.Handler
 }
