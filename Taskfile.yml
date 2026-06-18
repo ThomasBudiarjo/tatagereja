@@ -5,6 +5,10 @@ vars:
   BACKEND_ENTRY: ./cmd/server
   BIN_DIR: bin
 
+# Pure-Go builds (no cgo) so the Heroku Go buildpack works out of the box.
+env:
+  CGO_ENABLED: '0'
+
 tasks:
   default:
     desc: Show available tasks
@@ -41,17 +45,24 @@ tasks:
       - task: be:build
 
   verify:
-    desc: Run lint, tests, and build
+    desc: Frontend lint/typecheck/tests + backend vet/tests
     cmds:
-      - task: lint
-      - task: test
-      - task: build
+      - task: fe:lint
+      - task: fe:typecheck
+      - task: fe:test
+      - task: be:vet
+      - task: be:test
 
   lint:
     desc: Run frontend lint and Go vet
     deps:
       - task: fe:lint
       - task: be:vet
+
+  typecheck:
+    desc: Type-check the frontend
+    deps:
+      - task: fe:typecheck
 
   test:
     desc: Run frontend and backend tests
@@ -91,6 +102,24 @@ tasks:
         msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
     cmds:
       - npm run lint --if-present
+
+  fe:typecheck:
+    desc: Type-check the frontend
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm run typecheck --if-present
+
+  fe:format:
+    desc: Format the frontend
+    dir: '{{.FRONTEND_DIR}}'
+    preconditions:
+      - sh: test -f package.json
+        msg: Missing frontend package.json. Expected {{.FRONTEND_DIR}}/package.json.
+    cmds:
+      - npm run format --if-present
 
   fe:test:
     desc: Run frontend tests if configured
