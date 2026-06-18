@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/thomasbudiarjo/tatagereja/internal/config"
+	"github.com/thomasbudiarjo/tatagereja/internal/frontend"
 	apphttp "github.com/thomasbudiarjo/tatagereja/internal/http"
 )
 
@@ -31,7 +32,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	handler := apphttp.NewRouter(apphttp.Deps{Config: cfg})
+	handler := apphttp.NewRouter(apphttp.Deps{
+		Config:   cfg,
+		Frontend: frontend.Handler(),
+	})
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           handler,
