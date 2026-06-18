@@ -18,6 +18,12 @@ import (
 // maxBodyBytes caps JSON request bodies for API handlers.
 const maxBodyBytes = 1 << 20 // 1 MiB
 
+// Auth endpoint rate limit: requests per window, per client IP.
+const (
+	authRateMax    = 10
+	authRateWindow = time.Minute
+)
+
 // Deps carries the collaborators the router needs. It is extended as later
 // tasks add the database, auth service, and sessions.
 type Deps struct {
@@ -28,6 +34,9 @@ type Deps struct {
 	Auth *auth.Service
 	// Sessions resolves the signed session cookie to a user.
 	Sessions *auth.SessionService
+	// TrustedOrigins are extra origins allowed by cross-origin protection
+	// (e.g. the production site origin). Same-origin requests pass regardless.
+	TrustedOrigins []string
 	// Frontend, when non-nil, serves the embedded SPA as the catch-all route.
 	Frontend http.Handler
 }
@@ -48,6 +57,7 @@ func NewRouter(deps Deps) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		api.Use(middleware.NoStore)
 		api.Use(middleware.MaxBytes(maxBodyBytes))
+		api.Use(middleware.CrossOrigin(deps.TrustedOrigins))
 		if deps.Sessions != nil {
 			api.Use(middleware.Session(deps.Config.SessionSecret, deps.Sessions))
 		}
@@ -65,8 +75,9 @@ func NewRouter(deps Deps) http.Handler {
 				secret: deps.Config.SessionSecret,
 				isProd: deps.Config.IsProduction(),
 			}
-			api.With(middleware.RequireJSON).Post("/auth/register", h.register)
-			api.With(middleware.RequireJSON).Post("/auth/login", h.login)
+			throttle := middleware.AuthThrottle(authRateMax, authRateWindow)
+			api.With(throttle, middleware.RequireJSON).Post("/auth/register", h.register)
+			api.With(throttle, middleware.RequireJSON).Post("/auth/login", h.login)
 			api.Post("/auth/logout", h.logout)
 			api.Get("/me", h.me)
 		}
