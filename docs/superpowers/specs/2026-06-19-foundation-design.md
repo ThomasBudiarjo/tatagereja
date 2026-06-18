@@ -29,10 +29,15 @@ Deferred (wired as no-op stubs behind real interfaces, swapped in later):
 - **SQLite driver: `modernc.org/sqlite`** (pure Go). No cgo, trivial Heroku builds, easy
   cross-compile. Compatible with the Litestream library later, which operates at the
   WAL-file level rather than through the SQL driver.
-- **Sessions/CSRF: small hand-rolled package in `internal/auth`.** `backend.md` is highly
-  prescriptive (SQLite-stored sessions, ID rotation after login, masked-token CSRF with a
-  signed HttpOnly cookie, uniform auth errors). A custom implementation matches the spec
-  exactly and stays pure Go. (Rejected: `alexedwards/scs` — adds opinions we'd fight.)
+- **Sessions: small hand-rolled package in `internal/auth`.** SQLite-stored sessions, ID
+  rotation after login, uniform auth errors. Custom impl matches the prescriptive spec and
+  stays pure Go. (Rejected: `alexedwards/scs` — adds opinions we'd fight.)
+- **CSRF: Go 1.25 `net/http.CrossOriginProtection`** instead of the docs' masked-token flow.
+  `Sec-Fetch-Site` (all browsers since 2023) with an Origin-vs-Host fallback, combined with
+  `SameSite=Lax` cookies, covers CSRF with no `/api/csrf` endpoint, no signed secret cookie,
+  and no client-side token plumbing. `AddTrustedOrigin` registers the production origin;
+  `SetDenyHandler` returns a JSON 403. This intentionally deviates from the token flow in
+  `backend.md`/`frontend.md`, which predate Go 1.25.
 - **Frontend toolchain: Vite+ (`vite-plus`) alpha.** Real and on npm at `0.2.1`; exposes the
   `vp` CLI, wraps the existing package manager, single `vite.config.ts`. Added as a local
   dev dependency and driven through `package.json` scripts. Alpha risk is accepted; report
@@ -79,10 +84,10 @@ internal/db/migrations/*.sql  embedded, ordered, tracked
 internal/db/queries/*.sql     sqlc source
 internal/db/gen/              sqlc-generated typed queries (package gen)
 internal/db/seeds/*.sql       idempotent reference data
-internal/auth/                argon2id hashing, session store, CSRF token logic, service
+internal/auth/                argon2id hashing, session store + cookie signing, service
 internal/http/                router, handlers
 internal/http/middleware/     request ID, recover, timeout, body limit, no-store,
-                              security headers, session, csrf, throttle
+                              security headers, CrossOriginProtection, session, throttle
 internal/litestream/          Replicator interface + noop impl
 internal/frontend/            embed.FS SPA serving (build-tag fallback)
 internal/domain/              shared domain types (minimal for now)
@@ -127,14 +132,16 @@ ON CONFLICT (code) DO UPDATE SET name = excluded.name;
 
 - **Password hashing**: Argon2id via `golang.org/x/crypto/argon2`. Parameters encoded in the
   stored hash string; tuned for ~100–250ms verification on an Eco dyno.
-- **Sessions**: opaque random session IDs stored in SQLite. Cookie is `HttpOnly`,
-  `Secure` (production), `SameSite=Lax`, `Path=/`. Session ID is rotated after login.
-  Server-side expiry. Logout deletes the session row.
-- **CSRF**: signed, `HttpOnly`, `SameSite=Lax` secret cookie (HMAC with `SESSION_SECRET`).
-  `GET /api/csrf` returns an ephemeral **masked** token in JSON; the client sends it in
-  `X-CSRF-Token` on unsafe methods. Backend validates the masked token against the cookie
-  secret. Secret rotates after login, cleared on logout. `Origin`/`Referer` also validated
-  for unsafe browser requests.
+- **Sessions**: opaque random session IDs stored in SQLite. The cookie value is the session
+  ID, HMAC-signed with `SESSION_SECRET` so tampered cookies are rejected before any DB
+  lookup. Cookie is `HttpOnly`, `Secure` (production), `SameSite=Lax`, `Path=/`. Session ID
+  is rotated after login. Server-side expiry. Logout deletes the session row.
+- **CSRF**: `net/http.CrossOriginProtection` middleware (Go 1.25) wrapping the API router.
+  Safe methods (GET/HEAD/OPTIONS) always pass; unsafe cross-origin browser requests are
+  rejected via `Sec-Fetch-Site`, with an Origin-vs-Host fallback. The production origin is
+  added with `AddTrustedOrigin`; the deny handler returns a JSON 403. No tokens, no
+  `/api/csrf` endpoint, no client-side token handling. `SameSite=Lax` session cookies are
+  the complementary layer.
 - **Uniform auth errors**: invalid email, invalid password, inactive/missing user all return
   the same generic error to avoid enumeration.
 
@@ -144,24 +151,23 @@ Routes (foundation set):
 
 ```
 GET  /healthz                 no-store; liveness
-GET  /api/csrf                 issues masked CSRF token (+ sets secret cookie)
 GET  /api/me                   current user from session, or 401
-POST /api/auth/login           CSRF-checked; rotates session + CSRF secret
-POST /api/auth/logout          CSRF-checked; deletes session, clears cookies
-POST /api/auth/register        CSRF-checked; creates user + session in one tx
+POST /api/auth/login           rotates session id on success
+POST /api/auth/logout          deletes session, clears cookie
+POST /api/auth/register        creates user + session in one tx
 ```
 
 Middleware (chi, `github.com/go-chi/chi/v5`): request ID, panic recovery, timeout, request
 body-size limit, `Cache-Control: no-store` on API + health, security headers
 (`Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`,
-`Permissions-Policy`, `Strict-Transport-Security` in production), session loading, CSRF
-validation on `POST/PUT/PATCH/DELETE`, and per-IP + normalized-email throttling on auth
-endpoints. JSON handlers enforce `Content-Type: application/json`.
+`Permissions-Policy`, `Strict-Transport-Security` in production), `net/http.CrossOriginProtection`
+(rejects unsafe cross-origin requests), session loading, and per-IP + normalized-email
+throttling on auth endpoints. JSON handlers enforce `Content-Type: application/json`.
 
-Register flow (foundation): validate CSRF → validate JSON → **(Turnstile verify: no-op stub;
-dev disables it anyway)** → hash password → create user + session in one transaction →
-commit → `replicator.NotifyWrite()` → respond. `turnstileToken` is accepted in the body but
-not yet verified.
+Register flow (foundation): validate JSON → **(Turnstile verify: no-op stub; dev disables it
+anyway)** → hash password → create user + session in one transaction → commit →
+`replicator.NotifyWrite()` → respond. `turnstileToken` is accepted in the body but not yet
+verified. Cross-origin protection is enforced by middleware, not in the handler.
 
 ## Frontend (`frontend/`, Vite+)
 
@@ -174,8 +180,9 @@ not yet verified.
   mutations, cache invalidation), Valibot, React Hook Form + `@hookform/resolvers`,
   `lucide-react`, `sonner`.
 - **Typed API client** (native `fetch`): `credentials: "include"` by default, JSON
-  request/response, fetches + caches the masked CSRF token in memory and injects
-  `X-CSRF-Token` on unsafe requests, handles `401`, parses responses with Valibot.
+  request/response, handles `401`, parses responses with Valibot. No CSRF token handling —
+  same-origin requests pass `CrossOriginProtection` automatically (browser sends
+  `Sec-Fetch-Site: same-origin`).
 - Routes: `/login`, `/register`, `/` with a protected-route guard derived from the `/api/me`
   query; unauthenticated users redirect to `/login`. Not-found route.
 - Dev server proxies `/api/*` to the Go backend. Turnstile widget is **omitted in dev** and
@@ -191,7 +198,8 @@ not yet verified.
 ## Config (`internal/config`)
 
 Reads + validates env. Foundation-relevant: `APP_ENV`, `PORT`, `DATABASE_PATH`,
-`SESSION_SECRET` (≥32 bytes, required outside dev). R2 / Litestream / Turnstile vars are
+`SESSION_SECRET` (≥32 bytes, required outside dev; used to HMAC-sign the session cookie).
+R2 / Litestream / Turnstile vars are
 read and held but not yet acted on (deferred). Turnstile verification disabled in dev.
 
 ## Taskfile changes
@@ -206,12 +214,13 @@ Extend the existing `Taskfile.yml`:
 
 ## Testing
 
-- **Go**: argon2 hash/verify roundtrip + param parsing; session create/rotate/expire/delete;
-  CSRF mask/unmask/verify; config validation (missing/short `SESSION_SECRET`); migrator +
-  seeder idempotency against a temp SQLite file; httptest handler tests for
-  login/register/logout/me incl. CSRF rejection and uniform auth errors.
-- **Frontend (Vitest + RTL)**: API client (credentials, CSRF header injection, 401, Valibot
-  parse); auth form validation; protected-route guard behavior.
+- **Go**: argon2 hash/verify roundtrip + param parsing; session create/rotate/expire/delete +
+  cookie-signature verification; `CrossOriginProtection` wiring (cross-site unsafe request →
+  JSON 403; same-origin / safe methods allowed); config validation (missing/short
+  `SESSION_SECRET`); migrator + seeder idempotency against a temp SQLite file; httptest
+  handler tests for login/register/logout/me incl. uniform auth errors.
+- **Frontend (Vitest + RTL)**: API client (credentials, 401, Valibot parse); auth form
+  validation; protected-route guard behavior.
 
 ## Out of scope (later cycles)
 
