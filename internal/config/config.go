@@ -55,7 +55,7 @@ const devSessionSecret = "dev-insecure-session-secret-change-me-please"
 func Load() (Config, error) {
 	c := Config{
 		AppEnv:          env("APP_ENV", "development"),
-		Port:            env("PORT", "8080"),
+		Port:            env("PORT", "7356"),
 		DatabasePath:    env("DATABASE_PATH", "./data/app.db"),
 		TurnstileSecret: os.Getenv("TURNSTILE_SECRET_KEY"),
 		R2: R2Config{
