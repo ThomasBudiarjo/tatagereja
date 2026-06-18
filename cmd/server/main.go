@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/thomasbudiarjo/tatagereja/internal/auth"
 	"github.com/thomasbudiarjo/tatagereja/internal/config"
 	"github.com/thomasbudiarjo/tatagereja/internal/db"
 	"github.com/thomasbudiarjo/tatagereja/internal/frontend"
@@ -65,6 +66,8 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	store := db.NewStore(conn, repl)
+	sessions := auth.NewSessionService(store)
+	authService := auth.NewService(store, sessions)
 
 	// 4. If boot changed the DB, push a replication flush before serving.
 	if migrated || seeded {
@@ -80,6 +83,8 @@ func run(logger *slog.Logger) error {
 	handler := apphttp.NewRouter(apphttp.Deps{
 		Config:   cfg,
 		Store:    store,
+		Auth:     authService,
+		Sessions: sessions,
 		Frontend: frontend.Handler(),
 	})
 	srv := &http.Server{

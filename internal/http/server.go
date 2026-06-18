@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 
+	"github.com/thomasbudiarjo/tatagereja/internal/auth"
 	"github.com/thomasbudiarjo/tatagereja/internal/config"
 	"github.com/thomasbudiarjo/tatagereja/internal/db"
 	"github.com/thomasbudiarjo/tatagereja/internal/http/middleware"
@@ -21,8 +22,12 @@ const maxBodyBytes = 1 << 20 // 1 MiB
 // tasks add the database, auth service, and sessions.
 type Deps struct {
 	Config config.Config
-	// Store is the data-access layer (used by auth handlers in later tasks).
+	// Store is the data-access layer.
 	Store *db.Store
+	// Auth, when non-nil, mounts the auth + /api/me endpoints.
+	Auth *auth.Service
+	// Sessions resolves the signed session cookie to a user.
+	Sessions *auth.SessionService
 	// Frontend, when non-nil, serves the embedded SPA as the catch-all route.
 	Frontend http.Handler
 }
@@ -43,12 +48,28 @@ func NewRouter(deps Deps) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		api.Use(middleware.NoStore)
 		api.Use(middleware.MaxBytes(maxBodyBytes))
+		if deps.Sessions != nil {
+			api.Use(middleware.Session(deps.Config.SessionSecret, deps.Sessions))
+		}
+
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not found")
 		})
 		api.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		})
+
+		if deps.Auth != nil {
+			h := &apiHandlers{
+				auth:   deps.Auth,
+				secret: deps.Config.SessionSecret,
+				isProd: deps.Config.IsProduction(),
+			}
+			api.With(middleware.RequireJSON).Post("/auth/register", h.register)
+			api.With(middleware.RequireJSON).Post("/auth/login", h.login)
+			api.Post("/auth/logout", h.logout)
+			api.Get("/me", h.me)
+		}
 	})
 
 	if deps.Frontend != nil {
