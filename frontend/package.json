@@ -1,0 +1,26 @@
+{
+  "name": "tatagereja-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "lint": "vp lint",
+    "typecheck": "vp check",
+    "test": "vp test",
+    "format": "vp fmt"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^5.9.3",
+    "vite-plus": "^0.2.1"
+  }
+}
