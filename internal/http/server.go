@@ -13,6 +13,7 @@ import (
 	"github.com/thomasbudiarjo/tatagereja/internal/config"
 	"github.com/thomasbudiarjo/tatagereja/internal/db"
 	"github.com/thomasbudiarjo/tatagereja/internal/http/middleware"
+	"github.com/thomasbudiarjo/tatagereja/internal/scheduling"
 )
 
 // maxBodyBytes caps JSON request bodies for API handlers.
@@ -34,6 +35,8 @@ type Deps struct {
 	Auth *auth.Service
 	// Sessions resolves the signed session cookie to a user.
 	Sessions *auth.SessionService
+	// Scheduling, when non-nil, mounts the worship service roster endpoints.
+	Scheduling *scheduling.Service
 	// TrustedOrigins are extra origins allowed by cross-origin protection
 	// (e.g. the production site origin). Same-origin requests pass regardless.
 	TrustedOrigins []string
@@ -80,6 +83,38 @@ func NewRouter(deps Deps) http.Handler {
 			api.With(throttle, middleware.RequireJSON).Post("/auth/login", h.login)
 			api.Post("/auth/logout", h.logout)
 			api.Get("/me", h.me)
+		}
+
+		if deps.Store != nil {
+			persons := &personHandlers{store: deps.Store}
+			roles := &roleHandlers{store: deps.Store}
+			api.Group(func(pr chi.Router) {
+				pr.Use(middleware.RequireUser)
+
+				pr.Get("/pelayanan-types", roles.listPelayananTypes)
+
+				pr.Get("/roles", roles.list)
+				pr.Post("/roles", roles.create)
+				pr.Put("/roles/{code}", roles.update)
+				pr.Delete("/roles/{code}", roles.delete)
+
+				pr.Get("/persons", persons.list)
+				pr.Post("/persons", persons.create)
+				pr.Get("/persons/{id}", persons.get)
+				pr.Put("/persons/{id}", persons.update)
+				pr.Delete("/persons/{id}", persons.delete)
+
+				if deps.Scheduling != nil {
+					services := &serviceHandlers{scheduling: deps.Scheduling}
+					pr.Get("/services", services.list)
+					pr.Post("/services", services.create)
+					pr.Get("/services/{id}", services.get)
+					pr.Put("/services/{id}", services.update)
+					pr.Delete("/services/{id}", services.delete)
+					pr.Post("/services/{id}/assignments", services.assign)
+					pr.Delete("/services/{id}/assignments/{assignmentId}", services.unassign)
+				}
+			})
 		}
 	})
 

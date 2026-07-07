@@ -18,6 +18,7 @@ import (
 	"github.com/thomasbudiarjo/tatagereja/internal/frontend"
 	apphttp "github.com/thomasbudiarjo/tatagereja/internal/http"
 	"github.com/thomasbudiarjo/tatagereja/internal/litestream"
+	"github.com/thomasbudiarjo/tatagereja/internal/scheduling"
 )
 
 const (
@@ -81,11 +82,12 @@ func run(logger *slog.Logger) error {
 
 	// 5. Build the HTTP handler and server.
 	handler := apphttp.NewRouter(apphttp.Deps{
-		Config:   cfg,
-		Store:    store,
-		Auth:     authService,
-		Sessions: sessions,
-		Frontend: frontend.Handler(),
+		Config:     cfg,
+		Store:      store,
+		Auth:       authService,
+		Sessions:   sessions,
+		Scheduling: scheduling.NewService(store),
+		Frontend:   frontend.Handler(),
 	})
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
