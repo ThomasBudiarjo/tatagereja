@@ -9,15 +9,36 @@ import (
 )
 
 type Querier interface {
+	CreateAssignment(ctx context.Context, arg CreateAssignmentParams) (Assignment, error)
+	CreatePerson(ctx context.Context, arg CreatePersonParams) (Person, error)
+	CreateService(ctx context.Context, arg CreateServiceParams) (Service, error)
+	CreateServingRole(ctx context.Context, arg CreateServingRoleParams) (ServingRole, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAssignment(ctx context.Context, arg DeleteAssignmentParams) error
 	DeleteExpiredSessions(ctx context.Context) error
+	DeletePerson(ctx context.Context, id string) error
+	DeleteService(ctx context.Context, id string) error
+	DeleteServingRole(ctx context.Context, code string) error
 	DeleteSession(ctx context.Context, id string) error
 	DeleteSessionsForUser(ctx context.Context, userID string) error
+	GetPerson(ctx context.Context, id string) (Person, error)
+	GetService(ctx context.Context, id string) (GetServiceRow, error)
+	GetServingRole(ctx context.Context, code string) (ServingRole, error)
 	GetSession(ctx context.Context, id string) (Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserBySessionID(ctx context.Context, id string) (User, error)
+	ListAssignmentsBetween(ctx context.Context, arg ListAssignmentsBetweenParams) ([]ListAssignmentsBetweenRow, error)
+	ListAssignmentsByService(ctx context.Context, serviceID string) ([]ListAssignmentsByServiceRow, error)
+	ListPelayananTypes(ctx context.Context) ([]PelayananType, error)
+	ListPersonAssignmentsOnDate(ctx context.Context, arg ListPersonAssignmentsOnDateParams) ([]ListPersonAssignmentsOnDateRow, error)
+	ListPersons(ctx context.Context) ([]Person, error)
+	ListServicesBetween(ctx context.Context, arg ListServicesBetweenParams) ([]ListServicesBetweenRow, error)
+	ListServingRoles(ctx context.Context) ([]ServingRole, error)
+	UpdatePerson(ctx context.Context, arg UpdatePersonParams) (Person, error)
+	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)
+	UpdateServingRole(ctx context.Context, arg UpdateServingRoleParams) (ServingRole, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -22,7 +22,7 @@ func TestMigrateAppliesAndIsIdempotent(t *testing.T) {
 		t.Fatal("expected first migrate to change the database")
 	}
 
-	for _, table := range []string{"users", "sessions", "pelayanan_types", "schema_migrations"} {
+	for _, table := range []string{"users", "sessions", "pelayanan_types", "persons", "serving_roles", "services", "assignments", "schema_migrations"} {
 		var n int
 		q := "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?"
 		if err := conn.QueryRow(q, table).Scan(&n); err != nil {

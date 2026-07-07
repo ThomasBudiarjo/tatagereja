@@ -9,7 +9,7 @@ func TestLoadDefaultsInDevelopment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.Port != "8080" || c.DatabasePath != "./data/app.db" {
+	if c.Port != "7356" || c.DatabasePath != "./data/app.db" {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
 	if len(c.SessionSecret) < 32 {

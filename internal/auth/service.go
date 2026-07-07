@@ -2,9 +2,7 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"strings"
 
@@ -28,11 +26,7 @@ func normalizeEmail(email string) string {
 }
 
 func newID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic("auth: cannot read random bytes: " + err.Error())
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return db.NewID()
 }
 
 // Register creates a user and an initial session in one transaction. It returns

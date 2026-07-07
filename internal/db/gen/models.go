@@ -4,9 +4,43 @@
 
 package gen
 
+type Assignment struct {
+	ID        string
+	ServiceID string
+	PersonID  string
+	RoleCode  string
+	CreatedAt string
+}
+
 type PelayananType struct {
 	Code string
 	Name string
+}
+
+type Person struct {
+	ID        string
+	Name      string
+	Phone     string
+	Notes     string
+	CreatedAt string
+	UpdatedAt string
+}
+
+type Service struct {
+	ID                string
+	PelayananTypeCode string
+	ServiceDate       string
+	StartTime         string
+	Title             string
+	Notes             string
+	CreatedAt         string
+	UpdatedAt         string
+}
+
+type ServingRole struct {
+	Code      string
+	Name      string
+	SortOrder int64
 }
 
 type Session struct {
