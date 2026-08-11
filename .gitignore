@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local environment files
+.env
+.env.local
+
+# PocketBase runtime files
+apps/backend/.pocketbase/
+apps/backend/pb_data/

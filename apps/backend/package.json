@@ -1,0 +1,10 @@
+{
+  "name": "@tatagereja/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "install:pocketbase": "./scripts/install-pocketbase.sh",
+    "check": "./scripts/check.sh"
+  }
+}
