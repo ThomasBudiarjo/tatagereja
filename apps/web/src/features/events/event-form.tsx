@@ -1,4 +1,4 @@
-import { eventInputSchema, isAdmin, type Event, type EventInput } from '@tatagereja/shared';
+import { eventInputSchema, isAdmin, type Event, type EventInput, type Group } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Field, FormActions } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
-import { Alert } from '@/components/ui/misc';
+import { Alert, ErrorState, PageLoader } from '@/components/ui/misc';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { groupsQuery } from '@/features/groups/api';
@@ -16,15 +16,7 @@ import { getErrorMessage } from '@/lib/api';
 import { applyServerErrors } from '@/lib/forms';
 
 type FormInput = z.input<typeof eventInputSchema>;
-const FIELDS = [
-  'title',
-  'description',
-  'location',
-  'groupId',
-  'startsAt',
-  'endsAt',
-  'isAllDay',
-] as const;
+const FIELDS = ['title', 'description', 'location', 'groupId', 'startsAt', 'endsAt', 'isAllDay'] as const;
 
 const inOneHour = () => {
   const date = new Date();
@@ -33,26 +25,39 @@ const inOneHour = () => {
   return date.toISOString();
 };
 
-export function EventForm({
-  event,
-  defaultGroupId,
-  onSubmit,
-  submitLabel,
-  onCancel,
-}: {
+type EventFormProps = {
   event?: Event;
   defaultGroupId?: string | null;
   onSubmit: (values: EventInput) => Promise<unknown>;
   submitLabel: string;
   onCancel?: () => void;
-}) {
-  const { churchId, access } = useChurch();
+};
+
+/**
+ * Groups load before the form renders so the scope select and the form state
+ * always agree, even for a leader whose only option is one of their groups.
+ */
+export function EventForm(props: EventFormProps) {
+  const { churchId } = useChurch();
   const groups = useQuery(groupsQuery(churchId, { includeInactive: true }));
+  if (groups.isPending) return <PageLoader />;
+  if (groups.isError) {
+    return <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />;
+  }
+  return <EventFormFields groups={groups.data.items} {...props} />;
+}
+
+function EventFormFields({
+  groups,
+  event,
+  defaultGroupId,
+  onSubmit,
+  submitLabel,
+  onCancel,
+}: EventFormProps & { groups: Group[] }) {
+  const { access } = useChurch();
   const admin = isAdmin(access);
-  const allGroups = groups.data?.items ?? [];
-  const selectableGroups = admin
-    ? allGroups
-    : allGroups.filter((group) => access.leaderGroupIds.includes(group.id));
+  const selectable = admin ? groups : groups.filter((group) => access.leaderGroupIds.includes(group.id));
 
   const form = useForm<FormInput, unknown, EventInput>({
     resolver: zodResolver(eventInputSchema),
@@ -60,8 +65,7 @@ export function EventForm({
       title: event?.title ?? '',
       description: event?.description ?? '',
       location: event?.location ?? '',
-      groupId:
-        event?.groupId ?? defaultGroupId ?? (admin ? null : (selectableGroups[0]?.id ?? null)),
+      groupId: event?.groupId ?? defaultGroupId ?? (admin ? null : (selectable[0]?.id ?? null)),
       startsAt: event?.startsAt ?? inOneHour(),
       endsAt: event?.endsAt ?? '',
       isAllDay: event?.isAllDay ?? false,
@@ -70,6 +74,10 @@ export function EventForm({
   const errors = form.formState.errors;
 
   const submit = form.handleSubmit(async (values) => {
+    if (!admin && !values.groupId) {
+      form.setError('groupId', { message: 'Choose one of the groups you lead' });
+      return;
+    }
     try {
       await onSubmit(values);
     } catch (error) {
@@ -79,8 +87,16 @@ export function EventForm({
     }
   });
 
+  if (!admin && selectable.length === 0) {
+    return (
+      <Alert variant="warning" title="No groups to schedule for">
+        You can create events for groups you lead. Ask an administrator to assign you to a group.
+      </Alert>
+    );
+  }
+
   return (
-    <form onSubmit={(event_) => void submit(event_)} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={(formEvent) => void submit(formEvent)} className="flex flex-col gap-4" noValidate>
       {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
       <Field label="Title" htmlFor="event-title" error={errors.title?.message} required>
         <Input id="event-title" {...form.register('title')} aria-invalid={!!errors.title} />
@@ -93,20 +109,17 @@ export function EventForm({
             label="Scope"
             htmlFor="event-group"
             error={errors.groupId?.message}
-            description={
-              admin
-                ? 'Church-wide events are visible to everyone.'
-                : 'You can create events for groups you lead.'
-            }
+            description={admin ? 'Church-wide events are visible to everyone.' : 'You can create events for groups you lead.'}
           >
             <Select
               id="event-group"
               value={field.value ?? ''}
               onChange={(selectEvent) => field.onChange(selectEvent.target.value || null)}
-              disabled={groups.isPending}
+              aria-invalid={!!errors.groupId}
             >
               {admin ? <option value="">Church-wide</option> : null}
-              {selectableGroups.map((group) => (
+              {!admin && !field.value ? <option value="">Select a group…</option> : null}
+              {selectable.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
                 </option>
@@ -120,12 +133,7 @@ export function EventForm({
         name="startsAt"
         render={({ field }) => (
           <Field label="Starts" htmlFor="event-starts" error={errors.startsAt?.message} required>
-            <DateTimeInput
-              id="event-starts"
-              value={field.value ?? ''}
-              onChange={field.onChange}
-              aria-invalid={!!errors.startsAt}
-            />
+            <DateTimeInput id="event-starts" value={field.value ?? ''} onChange={field.onChange} aria-invalid={!!errors.startsAt} />
           </Field>
         )}
       />
@@ -133,18 +141,8 @@ export function EventForm({
         control={form.control}
         name="endsAt"
         render={({ field }) => (
-          <Field
-            label="Ends"
-            htmlFor="event-ends"
-            error={errors.endsAt?.message}
-            description="Optional."
-          >
-            <DateTimeInput
-              id="event-ends"
-              value={field.value ?? ''}
-              onChange={field.onChange}
-              aria-invalid={!!errors.endsAt}
-            />
+          <Field label="Ends" htmlFor="event-ends" error={errors.endsAt?.message} description="Optional.">
+            <DateTimeInput id="event-ends" value={field.value ?? ''} onChange={field.onChange} aria-invalid={!!errors.endsAt} />
           </Field>
         )}
       />
