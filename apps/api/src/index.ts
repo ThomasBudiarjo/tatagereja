@@ -6,7 +6,23 @@ const config = loadConfig();
 const database = openDatabase(config.databasePath);
 const app = createApp(createDeps(database.db, config));
 
-app.listen({ hostname: config.host, port: config.port });
+try {
+  // `reusePort: false` makes a second instance fail loudly instead of silently
+  // sharing the port, which would serve requests from two different databases.
+  app.listen({ hostname: config.host, port: config.port, reusePort: false });
+} catch (error) {
+  const code = (error as { code?: string })?.code;
+  if (code === 'EADDRINUSE') {
+    console.error(
+      `Port ${config.port} is already in use. Another TataGereja server is probably running; ` +
+        'stop it or set PORT to a free port.',
+    );
+  } else {
+    console.error('Failed to start the server:', error);
+  }
+  database.close();
+  process.exit(1);
+}
 
 console.log(
   `TataGereja API listening on http://${config.host}:${config.port} ` +
