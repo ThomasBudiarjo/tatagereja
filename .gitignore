@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Build output
+dist/
+apps/web/dist/
+
 # Editors and operating systems
 .DS_Store
 .idea/
@@ -10,6 +14,14 @@ node_modules/
 .env
 .env.local
 
-# PocketBase runtime files
-apps/backend/.pocketbase/
-apps/backend/pb_data/
+# Runtime data
+apps/api/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Test and tooling artifacts
+coverage/
+playwright-report/
+test-results/

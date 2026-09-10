@@ -2,37 +2,34 @@
 
 ## Vision
 
-TataGereja is an open-source church management mobile application. A free hosted backend will be available by default, while churches that want data sovereignty can run the same backend on their own server.
+TataGereja is an open-source church management application. A hosted backend is available by default,
+while churches that want data sovereignty can run the same backend on their own server.
 
-## Agreed Technology
+## Technology
 
-- **Mobile:** React Native with Expo and TypeScript
-- **Backend:** PocketBase
-- **Repository:** Monorepo
-- **Initial platform:** Android, distributed through Google Play
-- **Notifications:** Not included for now
-- **Bot protection:** Optional Cloudflare Turnstile for public registration
+The product started as an Expo application on PocketBase. It is now a mobile-first single-page web app
+with a purpose-built API, which keeps one codebase for phones, tablets and desktop, and lets the server
+enforce every permission rule rather than expressing them as collection rules.
 
-Planned repository structure:
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS v4, Radix UI primitives, TanStack Query, Zustand,
+  React Hook Form, Axios, Zod
+- **Backend:** Bun, Elysia, Drizzle ORM, SQLite, Zod
+- **Shared:** one package of Zod schemas, types and permission functions imported by both sides
+- **Repository:** a Bun workspace monorepo
 
 ```text
 tatagereja/
-├── apps/
-│   ├── mobile/       # Expo React Native application
-│   └── backend/      # PocketBase configuration, hooks, and migrations
-├── deploy/           # Self-hosting and Docker files
-├── docs/
+├── packages/shared/   Schemas, types, permission matrix
+├── apps/api/          Elysia server, database schema, migrations, tests
+├── apps/web/          React single-page app
+├── deploy/            Docker Compose for self-hosting
 └── README.md
 ```
 
-## Account Model
+## Account model
 
-There is only one type of user account. After registering, a user can:
-
-1. **Create a church** and automatically become its owner.
-2. **Join a church** using a QR code or invitation link.
-
-A user is connected to a church through a membership with a role, rather than being permanently classified as a church or regular account.
+There is a single kind of account. After registering, a person can create a church and become its owner,
+or join one through an invitation link or QR code.
 
 ```text
 User ── Church membership ── Church
@@ -40,273 +37,114 @@ User ── Church membership ── Church
                 └── role: owner, administrator, or member
 ```
 
-This allows a user to belong to more than one church and have a different role in each church.
+A user can belong to several churches with a different role in each. Group leadership is a scoped
+assignment on top of the church role rather than a fourth role.
 
-## Server Selection
+## Server selection
 
-The mobile app will support both the official hosted service and self-hosted servers.
+The app offers the hosted server or a self-hosted address. It calls `GET /api/meta` to confirm the
+address is a TataGereja server, and stores sessions per server so signing in to one does not affect
+another.
 
-```text
-Welcome to TataGereja
+## Registration modes
 
-[ Continue with TataGereja Cloud ]
-[ Use another server ]
-```
+`REGISTRATION_MODE` accepts `public`, `invite_only` or `disabled`. Recommended defaults are `public` for
+the hosted service and `invite_only` for self-hosted servers. A self-hosted server can stay reachable for
+its members without accepting public sign-ups. The mode is enforced by the API, not hidden in the interface.
 
-Choosing **Use another server** lets the user enter a base URL, similar to selecting a Mastodon server:
+## Bot protection
 
-```text
-https://church.example.com
-```
-
-The app checks that the URL points to a compatible TataGereja backend before showing its login and registration options. Authentication is stored separately for each server.
-
-## Registration Modes
-
-The backend supports three registration modes:
-
-- `public` — anyone can create an account
-- `invite_only` — registration requires a valid invitation
-- `disabled` — only an administrator can create users
-
-Recommended defaults:
-
-- **TataGereja Cloud:** `public`
-- **Self-hosted server:** `invite_only`
-
-A self-hosted backend can remain publicly accessible for mobile users without allowing public registration. Registration restrictions must be enforced by the backend, not only hidden in the mobile interface.
-
-Example self-hosted configuration:
-
-```env
-REGISTRATION_MODE=invite_only
-```
-
-## Bot Protection
-
-PocketBase remains responsible for authentication. Clerk will not be used because it would add a hosted dependency and make self-hosted authentication behave differently.
-
-Cloudflare Turnstile can be enabled through server configuration:
-
-```env
-REGISTRATION_MODE=public
-TURNSTILE_ENABLED=true
-TURNSTILE_SITE_KEY=...
-TURNSTILE_SECRET_KEY=...
-```
-
-Recommended defaults:
-
-- **TataGereja Cloud:** Turnstile enabled
-- **Invite-only self-hosted server:** Turnstile disabled
-- **Self-hosted server with public registration:** The owner can configure and enable Turnstile
-
-When enabled, the React Native app displays the Turnstile challenge in a WebView and sends the resulting token to the backend. The backend verifies the token before creating the PocketBase user. The secret key must never be sent to the mobile app.
-
-Turnstile protects new account creation only, not normal login. Registration restrictions, Turnstile verification, and basic rate limits must all be enforced by the backend so they cannot be bypassed by calling PocketBase directly.
+Cloudflare Turnstile can be enabled with `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY` and
+`TURNSTILE_SECRET_KEY`. The site key reaches the browser through `GET /api/meta`, the app renders the
+challenge, and the API verifies the token before creating the account. The secret key never leaves the
+server. Turnstile protects registration only; login is protected by per-IP and per-email rate limits.
 
 ## Invitations
 
-An administrator can invite someone using either:
+An administrator creates an invitation with a role, an optional label, an optional expiry and an optional
+usage limit. It is shared as a link or QR code that opens `/join/<token>`. The recipient registers or logs
+in, the server validates the invitation, and the membership is created inside one transaction with the
+usage counter. Invitations can be revoked at any time.
 
-- A QR code
-- An invitation link
+## Permissions
 
-An invitation identifies the backend, church, and temporary invitation token. The intended flow is:
+Permissions live in one shared module. The API checks them before every write, and the interface uses the
+same functions to hide actions people cannot take. Hidden buttons are a usability choice, never the
+security boundary.
 
-```text
-Open link or scan QR code
-          ↓
-App connects to the correct server
-          ↓
-User registers or logs in
-          ↓
-Server validates the invitation
-          ↓
-User joins the church
-```
+### Roles
 
-Invitation tokens should expire and should only be usable according to limits selected by the administrator.
+- **Owner:** the church creator; can do everything and transfer ownership
+- **Administrator:** can manage the church but cannot transfer ownership or delete it
+- **Member:** regular access; can manage their own linked profile
+- **Group leader:** a scoped assignment for specific groups
 
-## Authentication
+### Matrix
 
-Email and password authentication will be supported. PocketBase also supports Google OAuth, which can be added as an optional login method.
+| Feature                                | Member      | Assigned group leader  | Administrator | Owner |
+| -------------------------------------- | ----------- | ---------------------- | ------------- | ----- |
+| View church, directory, groups, events | Yes         | Yes                    | Yes           | Yes   |
+| Edit church                            | No          | No                     | Yes           | Yes   |
+| Delete church, transfer ownership      | No          | No                     | No            | Yes   |
+| Manage members and roles               | No          | No                     | Yes           | Yes   |
+| Create invitations                     | No          | No                     | Yes           | Yes   |
+| Manage people                          | Own profile | Assigned group members | Yes           | Yes   |
+| Private person details                 | Own         | No                     | Yes           | Yes   |
+| Manage groups                          | No          | Assigned groups        | Yes           | Yes   |
+| Assign group leaders                   | No          | No                     | Yes           | Yes   |
+| Manage events                          | No          | Assigned groups        | Yes           | Yes   |
+| Record and view attendance             | Own history | Assigned groups        | Yes           | Yes   |
+| Publish announcements                  | No          | Assigned groups        | Yes           | Yes   |
 
-- The official hosted service uses its own Google OAuth configuration.
-- Self-hosters who want Google login configure their own Google OAuth credentials.
-- OAuth registration must follow the server's registration mode and must not bypass invitation requirements.
+## Modules
 
-## Permissions and Data Access
+- **Church:** profile, logo and brand colour, member management, ownership transfer, deletion
+- **People:** directory with search and filters, profiles, private details stored in a separate table,
+  optional link to a login account (children and visitors need no account)
+- **Groups:** ministries and small groups, assigned leaders, membership
+- **Events:** church-wide and group events, participants, RSVP
+- **Attendance:** sessions created from an event or standalone, present/absent/excused marking, personal
+  history; members see only their own
+- **Announcements:** drafts and published posts, church-wide or for one group
+- **Invitations:** links and QR codes with expiry, usage limits and revocation
 
-PocketBase uses collection API rules rather than PostgreSQL-style row-level security. These rules will provide record-level protection for normal CRUD operations. Backend hooks or custom endpoints will protect important workflows such as creating churches, joining through invitations, and changing roles.
-
-Every church-owned record must belong to a church. Access is allowed only when the authenticated user has an active membership in that same church.
-
-Permissions must always be enforced by the backend. The mobile app can hide unavailable actions for usability, but hidden buttons are not a security boundary.
-
-### Church-Wide Roles
-
-- **Owner:** The church creator. Can manage everything and transfer ownership.
-- **Administrator:** Can manage the church but cannot transfer ownership.
-- **Member:** Has regular member access and can manage their own profile.
-
-Group leadership is a scoped assignment rather than a church-wide role. A leader can manage only the groups, events, announcements, and attendance assigned to them.
-
-```text
-Church role: owner | administrator | member
-Group assignment: leader of a specific group
-```
-
-Custom roles and a configurable permission builder are not part of the initial release.
-
-### Permission Matrix
-
-| Feature | Member | Assigned group leader | Administrator | Owner |
-| --- | --- | --- | --- | --- |
-| View church | Yes | Yes | Yes | Yes |
-| Edit church | No | No | Yes | Yes |
-| Transfer ownership | No | No | No | Yes |
-| View directory | Yes | Yes | Yes | Yes |
-| Manage people | Own profile | Assigned group members | Yes | Yes |
-| Manage groups | No | Assigned groups | Yes | Yes |
-| Manage events | No | Assigned groups | Yes | Yes |
-| Record attendance | No | Assigned groups | Yes | Yes |
-| Publish announcements | No | Assigned groups | Yes | Yes |
-| Create invitations | No | No | Yes | Yes |
-
-## MVP Modules
-
-### Church
-
-- Church profile, logo, and basic information
-- Registration settings
-- Administrator management
-- Ownership transfer
-
-### People
-
-- Member directory and profiles
-- Contact information and membership status
-- Optional connection between a person and a login account
-
-People and user accounts remain separate because some people, such as children, may not have an account. Sensitive information must be stored separately from normal directory information because PocketBase rules protect whole records rather than individual fields.
-
-### Groups and Ministries
-
-- Create groups
-- Assign group leaders
-- Add people to groups
-- View and manage group members
-
-### Events
-
-- Church-wide and group events
-- Event details and schedules
-- Event participants
-
-### Attendance
-
-- Create attendance sessions from events
-- Mark people present or absent
-- View previous attendance
-
-Members cannot view everyone else's attendance. Assigned group leaders can manage attendance only for their groups.
-
-### Announcements
-
-- Church-wide and group announcements
-- Draft and published states
-- Group leaders publish only to assigned groups
-
-### Invitations
-
-- QR codes and invitation links
-- Expiration and usage limits
-- Invitation revocation
-
-## Initial PocketBase Collections
+## Data model
 
 ```text
-users
-churches
-church_memberships
-people
-person_private_details
-groups
-group_members
-group_leaders
-events
-attendance_sessions
-attendance_records
+users              sessions           churches          church_memberships
+invitations        people             person_private_details
+groups             group_members      group_leaders
+events             event_participants
+attendance_sessions attendance_records
 announcements
-invitations
 ```
 
-Collections may be adjusted during implementation, but the separation between users, people, memberships, and private person details should remain.
+Private person details live in their own table so the API can serve a profile without them. Every
+church-owned row carries its `church_id`, and deletions cascade from the church down.
 
-## UI Design System
+## Interface
 
-The mobile application will use:
+Navigation is `Home · People · Events · Groups · More` on phones, and a sidebar on wider screens. The
+design uses warm neutral surfaces with one brand colour, large touch targets, restrained shadows, and
+light and dark themes. There is no separate administrator area: management actions appear next to the
+data they affect for the people allowed to use them.
 
-- **Expo Router** for navigation
-- **HeroUI Native** for accessible UI components
-- **Uniwind** for component styling and design tokens
-- **React Native Reanimated** for purposeful motion
+## Delivered
 
-HeroUI Native is chosen for its polished mobile components, Expo-first setup, accessibility, and flexible styling. TataGereja will not use HeroUI's default appearance as its product identity. The app will define its own colors, typography, spacing, radius, shadows, and motion tokens, then use HeroUI as the component foundation.
-
-The visual direction will use:
-
-- A polished, modern, and bespoke interface
-- Warm neutral backgrounds with one primary brand color
-- Strong, editorial page headings
-- Clear typography and large touch targets
-- Consistent spacing, soft surfaces, and restrained shadows
-- Purposeful animations for transitions, sheets, and success states
-- Light and dark themes
-- Optional church logo and brand color customization later
-
-Product-specific components such as member cards, event rows, attendance sheets, and church headers will be designed for TataGereja rather than assembled directly from default HeroUI examples.
-
-Initial member navigation:
-
-```text
-Home | People | Events | Profile
-```
-
-The app will not have a separate administrator interface. Management actions appear in the relevant screens only when the current user has permission. For example, an administrator sees an **Add person** action in the People screen while a member sees only the directory.
-
-## Initial MVP
-
-The first useful release will focus on:
-
-1. User registration and login
+1. Registration, login, sessions and password management
 2. Hosted or self-hosted server selection
-3. Church creation
-4. Church invitations and joining
-5. People directory
-6. Groups or ministries
-7. Events
-8. Attendance
-9. Announcements
-10. Owner, administrator, member, and scoped group-leader permissions
+3. Church creation, profile, members, roles, ownership transfer and deletion
+4. Invitations with links, QR codes, expiry, usage limits and revocation
+5. People directory, profiles and private details
+6. Groups with assigned leaders and members
+7. Events with participants and RSVP
+8. Attendance sessions and personal history
+9. Announcements with drafts
+10. Owner, administrator, member and scoped group-leader permissions, enforced by the API
+11. Docker packaging for self-hosting
 
-Not planned for the initial release:
+## Not in this release
 
-- Push notifications
-- Chat
-- Donations or accounting
-- Counseling records
-- Complex permission configuration
-- Offline synchronization
-
-## Initial Implementation Order
-
-1. Set up the Expo mobile app and PocketBase backend in the monorepo.
-2. Set up HeroUI Native, Uniwind, TataGereja design tokens, and base navigation.
-3. Add server selection and backend compatibility checking.
-4. Add authentication, optional Turnstile protection, and persistent per-server sessions.
-5. Add churches, memberships, registration modes, and collection access rules.
-6. Add church creation, invitations, QR codes, and invite links.
-7. Build People, Groups, Events, Attendance, and Announcements.
-8. Package the backend for simple self-hosting with Docker.
+Push notifications, chat, donations and accounting, counselling records, a configurable permission
+builder, and offline synchronisation. Google OAuth is a natural next addition: the account model already
+separates people from login accounts, so it only needs to respect the registration mode.
