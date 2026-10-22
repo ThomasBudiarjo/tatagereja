@@ -21,9 +21,13 @@ same permission rules on the server and in the interface.
 | Attendance    | Sessions from an event or standalone, a fast present/absent/excused sheet, personal history       |
 | Announcements | Drafts and published posts for the whole church or a single group                                 |
 
-Roles are `owner`, `administrator` and `member`, plus a scoped **group leader** assignment. A leader
-manages only their own groups' members, events, announcements and attendance. There is no separate
-administrator interface: management actions appear where the data lives, for the people allowed to use them.
+Every member has a base role (`owner`, `administrator` or `member`) and any number of church-defined
+**custom roles** built from a catalog of granular permissions. Suggested roles for Pendeta, Majelis,
+Bendahara, Sekretaris, Koordinator Pelayanan and Guru Sekolah Minggu are created with every church.
+A scoped **group leader** assignment lets a leader manage only their own groups' members, events,
+announcements and attendance. Nobody can grant a permission they do not hold, sensitive changes are
+recorded in an audit log, and optional modules can be switched off per church. Management actions appear
+where the data lives, for the people allowed to use them.
 
 ## Stack
 
@@ -89,6 +93,7 @@ server with a clear message. See `apps/api/.env.example` for the full list.
 | `WEB_DIST_DIR`                                | empty                   | Serve a built web app from this directory       |
 | `APP_URL`                                     | `http://localhost:5173` | Public web address used in invitation links     |
 | `SERVER_NAME`                                 | `TataGereja`            | Name shown to people choosing this server       |
+| `MAX_BODY_KB`                                 | `2048`                  | Largest accepted request body                   |
 
 Registration mode, invitation validity, Turnstile verification and rate limits are all enforced by the API,
 so they cannot be bypassed by calling it directly.
@@ -114,10 +119,10 @@ WEB_DIST_DIR=apps/web/dist APP_URL=https://church.example.com bun run start
 
 ## Database changes
 
-The Drizzle schema lives in `apps/api/src/db/schema.ts`. After editing it:
+The Drizzle schema lives in `apps/api/src/db/schema/`, one file per module. After editing it:
 
 ```sh
-bun run db:generate
+bun run db:generate --name <module>_<change>
 ```
 
 Generated SQL is committed under `apps/api/drizzle/` and applied automatically when the server starts.
@@ -128,4 +133,6 @@ All routes are under `/api`. `GET /api/meta` is public and identifies the server
 `Authorization: Bearer <token>` header. Errors always come back as
 `{ "error": { "code": "...", "message": "...", "issues": [...] } }`.
 
-The product direction and decisions are documented in [PLAN.md](./PLAN.md).
+The product direction and decisions are documented in [PLAN.md](./PLAN.md). How modules are built —
+the permission catalog, schema and migration rules, the audit, notification and module helpers, and the
+testing pattern — is described in [docs/ARCHITECTURE-MODULES.md](./docs/ARCHITECTURE-MODULES.md).

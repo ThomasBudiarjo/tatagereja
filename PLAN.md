@@ -68,18 +68,30 @@ usage counter. Invitations can be revoked at any time.
 
 ## Permissions
 
-Permissions live in one shared module. The API checks them before every write, and the interface uses the
-same functions to hide actions people cannot take. Hidden buttons are a usability choice, never the
-security boundary.
+Permissions live in one shared catalog, one file per module (`packages/shared/src/permissions/`). The
+API checks them before every write and every read of sensitive data, and the interface uses the same
+functions to hide actions people cannot take. Hidden buttons are a usability choice, never the security
+boundary.
 
 ### Roles
 
-- **Owner:** the church creator; can do everything and transfer ownership
-- **Administrator:** can manage the church but cannot transfer ownership or delete it
-- **Member:** regular access; can manage their own linked profile
+- **Owner:** the church creator; holds every permission, including deleting the church, transferring
+  ownership, the security policy and the church backup
+- **Administrator:** holds every permission except the owner-only ones and confidential pastoral care,
+  which must be granted explicitly
+- **Member:** viewing the directory, groups, events, announcements, services and facilities, booking
+  requests and prayer requests, plus their own data
+- **Custom roles:** church-defined sets of permissions added on top of the base role. Pendeta, Majelis /
+  Penatua, Bendahara, Sekretaris, Koordinator Pelayanan and Guru Sekolah Minggu are suggested for every
+  church and can be edited freely
 - **Group leader:** a scoped assignment for specific groups
 
-### Matrix
+Effective permissions are the base role's permissions plus those of every assigned custom role. Nobody
+can grant, remove or edit a permission they do not hold, the owner's roles are never edited, and nobody
+can remove their own ability to manage roles. Members can be suspended, which blocks the church without
+deleting anything.
+
+### Matrix (base roles)
 
 | Feature                                | Member      | Assigned group leader  | Administrator | Owner |
 | -------------------------------------- | ----------- | ---------------------- | ------------- | ----- |
@@ -95,6 +107,15 @@ security boundary.
 | Manage events                          | No          | Assigned groups        | Yes           | Yes   |
 | Record and view attendance             | Own history | Assigned groups        | Yes           | Yes   |
 | Publish announcements                  | No          | Assigned groups        | Yes           | Yes   |
+| Audit log, module settings             | No          | No                     | Yes           | Yes   |
+| Confidential pastoral care             | No          | No                     | When granted  | Yes   |
+
+### Audit log and notifications
+
+Sensitive changes (church profile, deletion and ownership, member roles and status, custom roles,
+invitations, private person details, person deletion, module settings) are written to an audit log in
+the same transaction as the change, with sensitive values redacted. In-app notifications are created
+per recipient, respect each person's preferences, and only reach active members of the church.
 
 ## Modules
 
@@ -112,6 +133,8 @@ security boundary.
 
 ```text
 users              sessions           churches          church_memberships
+church_roles       membership_roles   audit_logs        notifications
+notification_preferences
 invitations        people             person_private_details
 groups             group_members      group_leaders
 events             event_participants
@@ -142,9 +165,19 @@ data they affect for the people allowed to use them.
 9. Announcements with drafts
 10. Owner, administrator, member and scoped group-leader permissions, enforced by the API
 11. Docker packaging for self-hosting
+12. Granular permission catalog, custom roles with suggested templates, anti-escalation rules
+13. Member suspension, audit log, in-app notifications, per-church module toggles
+14. Security headers, request size limits and reusable rate limiting
+
+## In progress
+
+The permission catalog, schema folders and module routers are in place for the next modules: worship
+services and volunteer rosters, pastoral care and prayer, the church registry, finance, facilities and
+inventory, kids check-in, two-factor authentication and reports. They are built against the contract in
+[docs/ARCHITECTURE-MODULES.md](./docs/ARCHITECTURE-MODULES.md).
 
 ## Not in this release
 
-Push notifications, chat, donations and accounting, counselling records, a configurable permission
-builder, and offline synchronisation. Google OAuth is a natural next addition: the account model already
-separates people from login accounts, so it only needs to respect the registration mode.
+Push notifications, chat and offline synchronisation. Google OAuth is a natural next addition: the
+account model already separates people from login accounts, so it only needs to respect the
+registration mode.
