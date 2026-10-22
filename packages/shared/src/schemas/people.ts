@@ -548,6 +548,19 @@ export const personImportBodySchema = z.object({
 });
 export type PersonImportBody = z.infer<typeof personImportBodySchema>;
 
+/** Why an import row needs attention; the interface translates these. */
+export const PERSON_IMPORT_ISSUE_CODES = [
+  'missing',
+  'invalid',
+  'unknown_area',
+  'household_ignored',
+  'unknown_tag',
+  'unknown_field',
+  'invalid_field_value',
+  'duplicate_in_file',
+] as const;
+export type PersonImportIssueCode = (typeof PERSON_IMPORT_ISSUE_CODES)[number];
+
 export const personImportResultSchema = z.object({
   dryRun: z.boolean(),
   created: z.number().int().nonnegative(),
@@ -555,7 +568,13 @@ export const personImportResultSchema = z.object({
     z.object({
       index: z.number().int().nonnegative(),
       status: z.enum(['ok', 'invalid', 'duplicate', 'created', 'skipped']),
-      issues: z.array(z.object({ path: z.string(), message: z.string() })),
+      issues: z.array(
+        z.object({
+          path: z.string(),
+          code: z.enum(PERSON_IMPORT_ISSUE_CODES),
+          message: z.string(),
+        }),
+      ),
       duplicateOf: z.array(idSchema),
     }),
   ),

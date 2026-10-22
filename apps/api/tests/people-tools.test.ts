@@ -86,6 +86,7 @@ describe('people tools: CSV export and import, duplicates and merge', () => {
       { firstName: 'Salah', areaName: 'Wilayah 99' },
       { firstName: 'Yohanes', lastName: 'Nainggolan' },
       { firstName: 'Lina', 'field:pekerjaan': 'Petani' },
+      { lastName: 'Tanpa Nama' },
     ];
     const dry = await t.request('POST', `${s.base}/people/import`, {
       token: importer.token,
@@ -100,9 +101,13 @@ describe('people tools: CSV export and import, duplicates and merge', () => {
       'invalid',
       'duplicate',
       'invalid',
+      'invalid',
     ]);
     expect(dry.json.rows[1].duplicateOf).toEqual([s.alice.id]);
-    expect(dry.json.rows[2].issues[0].path).toBe('birthDate');
+    expect(dry.json.rows[2].issues[0]).toMatchObject({ path: 'birthDate', code: 'invalid' });
+    expect(dry.json.rows[3].issues[0].code).toBe('unknown_area');
+    expect(dry.json.rows[5].issues[0].code).toBe('invalid_field_value');
+    expect(dry.json.rows[6].issues[0]).toMatchObject({ path: 'firstName', code: 'missing' });
     expect(dry.json.rows[0].issues.map((issue: { path: string }) => issue.path)).toContain(
       'householdName',
     );
@@ -254,5 +259,33 @@ describe('people tools: CSV export and import, duplicates and merge', () => {
       body: { keepId: s.memberPerson.id, mergeId: linked.id },
     });
     expect(response.status).toBe(409);
+  });
+  it('does not report people who only share a phone number', async () => {
+    const phone = '0811-2233-4455';
+    const father = await t.createPerson(s.owner.token, s.church.id, {
+      firstName: 'Hendra',
+      lastName: 'Wibowo',
+      phone,
+    });
+    const mother = await t.createPerson(s.owner.token, s.church.id, {
+      firstName: 'Sri',
+      lastName: 'Wibowo',
+      phone,
+    });
+    const twin = await t.createPerson(s.owner.token, s.church.id, {
+      firstName: 'Sri W.',
+      phone,
+      birthDate: '1970-10-22',
+    });
+    await t.request('PATCH', `${s.base}/people/${mother.id}`, {
+      token: s.owner.token,
+      body: { firstName: 'Sri', lastName: 'Wibowo', phone, birthDate: '1970-10-22' },
+    });
+    const list = await t.request('GET', `${s.base}/people/duplicates`, { token: merger.token });
+    const ids = (item: { people: { id: string }[] }) => item.people.map((person) => person.id);
+    const pairs = list.json.items as { people: { id: string }[]; reasons: string[] }[];
+    expect(pairs.some((item) => ids(item).includes(father.id))).toBe(false);
+    const pair = pairs.find((item) => ids(item).includes(mother.id) && ids(item).includes(twin.id));
+    expect(pair?.reasons).toEqual(['phone', 'birthDate']);
   });
 });

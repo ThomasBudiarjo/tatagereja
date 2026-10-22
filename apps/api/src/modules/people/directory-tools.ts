@@ -69,14 +69,17 @@ const signatureOf = (person: {
   birth: person.birthDate,
 });
 
-/** Why two records look like the same person. Same name alone is enough to ask. */
+/**
+ * Why two records look like the same person. Same name alone is enough to ask; a phone number
+ * alone is not, because families often share one.
+ */
 const matchReasons = (a: Signature, b: Signature): DuplicateCandidate['reasons'] => {
   const reasons: DuplicateCandidate['reasons'] = [];
   if (a.name && a.name === b.name) reasons.push('name');
   if (a.email && a.email === b.email) reasons.push('email');
   if (a.phone && a.phone === b.phone) reasons.push('phone');
   if (a.birth && a.birth === b.birth && reasons.length > 0) reasons.push('birthDate');
-  return reasons;
+  return reasons.length === 1 && reasons[0] === 'phone' ? [] : reasons;
 };
 
 const SCORE: Record<DuplicateCandidate['reasons'][number], number> = {
@@ -249,13 +252,19 @@ export const directoryToolsRouter = (deps: Deps) => {
         const accepted: Parsed[] = [];
         const seen: { index: number; signature: Signature }[] = [];
         body.rows.forEach((raw, index) => {
-          const parsed = personImportRowSchema.safeParse(normalizeImportRow(raw));
+          const normalized = normalizeImportRow(raw);
+          const parsed = personImportRowSchema.safeParse(normalized);
           if (!parsed.success) {
             results.push({
               index,
               status: 'invalid',
               issues: parsed.error.issues.map((issue) => ({
                 path: issue.path.map(String).join('.') || 'root',
+                code:
+                  issue.code === 'invalid_type' &&
+                  (normalized as Record<string, unknown>)[String(issue.path[0])] === undefined
+                    ? ('missing' as const)
+                    : ('invalid' as const),
                 message: issue.message,
               })),
               duplicateOf: [],
@@ -266,15 +275,27 @@ export const directoryToolsRouter = (deps: Deps) => {
           const issues: Parsed['issues'] = [];
           let invalid = false;
           if (row.areaName && !areaByName.has(row.areaName.toLowerCase())) {
-            issues.push({ path: 'areaName', message: `Unknown area "${row.areaName}"` });
+            issues.push({
+              path: 'areaName',
+              code: 'unknown_area',
+              message: `Unknown area "${row.areaName}"`,
+            });
             invalid = true;
           }
           if (row.householdName && !canHouseholds) {
-            issues.push({ path: 'householdName', message: 'Household ignored: no permission' });
+            issues.push({
+              path: 'householdName',
+              code: 'household_ignored',
+              message: 'Household ignored: no permission',
+            });
           }
           for (const tag of row.tags) {
             if (!tagByName.has(tag.toLowerCase()) && !canTags) {
-              issues.push({ path: 'tags', message: `Unknown tag "${tag}" ignored` });
+              issues.push({
+                path: 'tags',
+                code: 'unknown_tag',
+                message: `Unknown tag "${tag}" ignored`,
+              });
             }
           }
           for (const [key, value] of Object.entries(row.customFields)) {
@@ -282,11 +303,13 @@ export const directoryToolsRouter = (deps: Deps) => {
             if (!field) {
               issues.push({
                 path: `customFields.${key}`,
+                code: 'unknown_field',
                 message: `Unknown field "${key}" ignored`,
               });
             } else if (!isValidCustomFieldValue(toCustomFieldDefinition(field), value)) {
               issues.push({
                 path: `customFields.${key}`,
+                code: 'invalid_field_value',
                 message: `Invalid value for ${field.label}`,
               });
               invalid = true;
@@ -310,7 +333,11 @@ export const directoryToolsRouter = (deps: Deps) => {
           seen.push({ index, signature });
           if ((duplicateOf.length > 0 || inFile) && !allowed.has(index)) {
             if (inFile)
-              issues.push({ path: 'root', message: 'Same person appears earlier in the file' });
+              issues.push({
+                path: 'root',
+                code: 'duplicate_in_file',
+                message: 'Same person appears earlier in the file',
+              });
             results.push({
               index,
               status: body.dryRun ? 'duplicate' : 'skipped',
