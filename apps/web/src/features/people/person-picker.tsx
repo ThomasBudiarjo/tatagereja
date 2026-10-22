@@ -1,5 +1,6 @@
 import { fullName, type PersonSummary } from '@tatagereja/shared';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Check, UserSearch } from 'lucide-react';
 import { useState } from 'react';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,9 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { EmptyState, ErrorState, PageLoader, SearchInput } from '@/components/ui/misc';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SearchInput } from '@/components/ui/misc';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
 import { getErrorMessage } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { useDebounced } from '@/lib/use-debounced';
+import { cn } from '@/lib/utils';
 import { peopleListQuery } from './api';
 
 /** Dialog for selecting one or more people from the church directory. */
@@ -26,8 +32,9 @@ export function PersonPickerDialog({
   title,
   description,
   excludeIds = [],
-  confirmLabel = 'Add',
+  confirmLabel,
   loading = false,
+  single = false,
   onConfirm,
 }: {
   churchId: string;
@@ -38,14 +45,18 @@ export function PersonPickerDialog({
   excludeIds?: string[];
   confirmLabel?: string;
   loading?: boolean;
+  /** Choose exactly one person. */
+  single?: boolean;
   onConfirm: (personIds: string[]) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const debounced = useDebounced(search);
   const people = useQuery({
-    ...peopleListQuery(churchId, { q: debounced || undefined, limit: 200 }),
+    ...peopleListQuery(churchId, { q: debounced || undefined, limit: 100 }),
     enabled: open,
+    placeholderData: keepPreviousData,
   });
 
   const reset = () => {
@@ -57,15 +68,18 @@ export function PersonPickerDialog({
 
   const toggle = (person: PersonSummary) =>
     setSelected((current) =>
-      current.includes(person.id)
-        ? current.filter((id) => id !== person.id)
-        : [...current, person.id],
+      single
+        ? [person.id]
+        : current.includes(person.id)
+          ? current.filter((id) => id !== person.id)
+          : [...current, person.id],
     );
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (loading) return;
         onOpenChange(next);
         if (!next) reset();
       }}
@@ -75,42 +89,75 @@ export function PersonPickerDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search people" />
-        <DialogBody className="max-h-[45dvh] min-h-40">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t('people.searchPeople')}
+          autoFocus
+        />
+        <DialogBody className="max-h-[45dvh] min-h-48">
           {people.isPending ? (
-            <PageLoader />
+            <SkeletonList rows={4} className="border-0 shadow-none" />
           ) : people.isError ? (
             <ErrorState
+              compact
               message={getErrorMessage(people.error)}
               onRetry={() => void people.refetch()}
             />
           ) : available.length === 0 ? (
             <EmptyState
-              title="Nobody found"
-              description={search ? 'Try a different search.' : 'Everyone is already added.'}
+              compact
+              icon={UserSearch}
+              tone="sky"
+              title={t('people.pickerEmpty')}
+              description={search ? t('common.noResultsHint') : t('people.pickerAllAdded')}
             />
           ) : (
-            <ul className="flex flex-col">
-              {available.map((person) => (
-                <li key={person.id}>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-2 hover:bg-muted/60">
-                    <Checkbox
-                      checked={selected.includes(person.id)}
-                      onCheckedChange={() => toggle(person)}
-                    />
-                    <EntityAvatar name={fullName(person)} src={person.photoUrl} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {fullName(person)}
-                    </span>
-                  </label>
-                </li>
-              ))}
+            <ul className="flex flex-col py-1">
+              {available.map((person) => {
+                const checked = selected.includes(person.id);
+                const name = fullName(person);
+                return (
+                  <li key={person.id}>
+                    <label
+                      className={cn(
+                        'flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60',
+                        checked && 'bg-accent/60',
+                      )}
+                    >
+                      {single ? (
+                        <input
+                          type="radio"
+                          name="person-picker"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={() => toggle(person)}
+                        />
+                      ) : (
+                        <Checkbox checked={checked} onCheckedChange={() => toggle(person)} />
+                      )}
+                      <EntityAvatar name={name} src={person.photoUrl} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{name}</span>
+                        {person.householdName ? (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {person.householdName}
+                          </span>
+                        ) : null}
+                      </span>
+                      {single && checked ? (
+                        <Check className="size-4 text-primary" aria-hidden />
+                      ) : null}
+                    </label>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+            {t('common.cancel')}
           </Button>
           <Button
             disabled={selected.length === 0}
@@ -120,8 +167,8 @@ export function PersonPickerDialog({
               reset();
             }}
           >
-            {confirmLabel}
-            {selected.length > 0 ? ` (${selected.length})` : ''}
+            {confirmLabel ?? t('common.add')}
+            {!single && selected.length > 0 ? ` (${selected.length})` : ''}
           </Button>
         </DialogFooter>
       </DialogContent>

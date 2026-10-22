@@ -5,7 +5,9 @@ import {
   GENDERS,
   GROUP_TYPES,
   LIMITS,
+  type Gender,
   type GroupType,
+  type MaritalStatus,
   type PersonMembershipStatus,
 } from '../constants';
 import type { LocalizedText } from '../localized';
@@ -62,6 +64,20 @@ export const PERSON_STATUS_TEXT: Record<PersonMembershipStatus, LocalizedText> =
   regular: { en: 'Regular attendee', id: 'Jemaat tetap' },
   member: { en: 'Member', id: 'Anggota jemaat' },
   inactive: { en: 'Inactive', id: 'Tidak aktif' },
+};
+
+export const GENDER_TEXT: Record<Gender, LocalizedText> = {
+  male: { en: 'Male', id: 'Laki-laki' },
+  female: { en: 'Female', id: 'Perempuan' },
+  unspecified: { en: 'Not specified', id: 'Tidak disebutkan' },
+};
+
+export const MARITAL_STATUS_TEXT: Record<MaritalStatus, LocalizedText> = {
+  single: { en: 'Single', id: 'Belum menikah' },
+  married: { en: 'Married', id: 'Menikah' },
+  widowed: { en: 'Widowed', id: 'Janda / duda' },
+  divorced: { en: 'Divorced', id: 'Bercerai' },
+  unspecified: { en: 'Not specified', id: 'Tidak disebutkan' },
 };
 
 export const WEEKDAY_TEXT: readonly LocalizedText[] = [
@@ -1193,3 +1209,15 @@ export const normalizeName = (person: { firstName: string; lastName?: string | n
     .replace(/[^\p{L}\p{N} ]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+/** Member accounts offered when linking a person or choosing leaders and coordinators. */
+export const directoryAccountSchema = z.object({
+  userId: idSchema,
+  name: z.string(),
+  email: z.string(),
+  avatarUrl: z.string().nullable(),
+  /** The person record already linked to the account. */
+  personId: idSchema.nullable(),
+});
+export type DirectoryAccount = z.infer<typeof directoryAccountSchema>;
+export const directoryAccountListSchema = z.object({ items: z.array(directoryAccountSchema) });

@@ -1,8 +1,9 @@
-import { churchParamsSchema, has } from '@tatagereja/shared';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { churchParamsSchema, has, hasAny } from '@tatagereja/shared';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { Elysia } from 'elysia';
-import { groupJoinRequests, groups } from '../../db/schema';
+import { churchMemberships, groupJoinRequests, groups, people, users } from '../../db/schema';
 import type { Deps } from '../../deps';
+import { forbidden } from '../../lib/errors';
 import { authPlugin } from '../../plugins/auth';
 import { moduleStatus } from '../../services/modules';
 import { coordinatedAreaIdsOf, todayIn } from '../../services/people';
@@ -56,6 +57,47 @@ const peopleStatusRouter = (deps: Deps) => {
           coordinatedAreaIds: coordinatedAreaIdsOf(db, church.id, access.userId),
           leaderGroupIds: [...access.leaderGroupIds],
           pendingJoinRequests,
+        };
+      },
+      { church: 'people', params: churchParamsSchema },
+    )
+    .get(
+      '/accounts',
+      ({ church, access }) => {
+        if (
+          !hasAny(access, [
+            'people.link',
+            'groups.leaders.assign',
+            'areas.manage',
+            'members.view',
+            'members.manage',
+          ])
+        ) {
+          throw forbidden('You cannot list member accounts');
+        }
+        return {
+          items: db
+            .select({
+              userId: users.id,
+              name: users.name,
+              email: users.email,
+              avatarUrl: users.avatarUrl,
+              personId: people.id,
+            })
+            .from(churchMemberships)
+            .innerJoin(users, eq(users.id, churchMemberships.userId))
+            .leftJoin(
+              people,
+              and(eq(people.userId, users.id), eq(people.churchId, churchMemberships.churchId)),
+            )
+            .where(
+              and(
+                eq(churchMemberships.churchId, church.id),
+                eq(churchMemberships.status, 'active'),
+              ),
+            )
+            .orderBy(asc(users.name))
+            .all(),
         };
       },
       { church: 'people', params: churchParamsSchema },

@@ -377,8 +377,19 @@ export const peopleModule = (deps: Deps) => {
         if (tagIds && !has(access, 'people.edit')) throw forbidden('You cannot change tags');
         // Membership status and join date are administrative fields.
         const patch = can.editPersonAdminFields(access)
-          ? profile
+          ? { ...profile }
           : { ...profile, membershipStatus: person.membershipStatus, joinedAt: person.joinedAt };
+        // The form cannot show contact fields the person hid from the caller; leaving one empty
+        // keeps the stored value instead of erasing it.
+        const hidden = hiddenFieldsFor(
+          access,
+          person,
+          privacyOf(privacyByPerson(db, [person.id]), person.id),
+        );
+        for (const field of hidden) {
+          const column = field === 'birthday' ? 'birthDate' : field;
+          if (patch[column] === null) patch[column] = person[column];
+        }
         const updated = db.transaction((tx) => {
           const row = tx
             .update(people)

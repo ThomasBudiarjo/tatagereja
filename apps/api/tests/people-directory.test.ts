@@ -476,6 +476,21 @@ describe('people directory: filters, privacy, tags and custom fields', () => {
     expect(profile.json.area.name).toBe('Wilayah 1');
     expect(profile.json.areaSource).toBe('person');
 
+    // Fields the person hid stay stored when an editor who cannot see them saves the form.
+    await t.request('PUT', `${s.base}/people/${sari.id}/privacy`, {
+      token: s.admin.token,
+      body: { showPhone: false, showEmail: true, showAddress: false, showBirthday: true },
+    });
+    const blind = await t.request('PATCH', `${s.base}/people/${sari.id}`, {
+      token: coordinator.token,
+      body: { firstName: 'Sari', lastName: 'Santoso', phone: null, notes: 'Pindah sektor' },
+    });
+    expect(blind.status).toBe(200);
+    expect(blind.json.person.phone).toBeNull();
+    const stored = await t.request('GET', `${s.base}/people/${sari.id}`, { token: s.admin.token });
+    expect(stored.json.person.phone).toBe('0813 9999');
+    expect(stored.json.person.notes).toBe('Pindah sektor');
+
     const me = await t.request('GET', `${s.base}/directory/me`, { token: coordinator.token });
     expect(me.json.coordinatedAreaIds).toEqual([area.json.area.id]);
     expect(names(await list(s.member.token, `?areaId=${area.json.area.id}`))).toEqual(['Sari']);
@@ -513,6 +528,23 @@ describe('people directory: filters, privacy, tags and custom fields', () => {
           item.person.firstName === 'Budi' && item.kind === 'birthday',
       ),
     ).toBe(true);
+  });
+
+  it('lists member accounts only for people who link or appoint them', async () => {
+    expect(
+      (await t.request('GET', `${s.base}/directory/accounts`, { token: s.member.token })).status,
+    ).toBe(403);
+    const accounts = await t.request('GET', `${s.base}/directory/accounts`, {
+      token: s.admin.token,
+    });
+    expect(accounts.status).toBe(200);
+    const member = accounts.json.items.find(
+      (item: { userId: string }) => item.userId === s.member.user.id,
+    );
+    expect(member.personId).toBe(s.memberPerson.id);
+    expect(
+      accounts.json.items.some((item: { userId: string }) => item.userId === s.other.owner.user.id),
+    ).toBe(false);
   });
 
   it('refuses ids from another church and private groups as filters', async () => {

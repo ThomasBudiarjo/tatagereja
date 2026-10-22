@@ -44,7 +44,10 @@ describe('people tools: CSV export and import, duplicates and merge', () => {
     expect(response.headers.get('content-type')).toContain('text/csv');
     expect(response.headers.get('content-disposition')).toContain('attachment');
     const text = await response.text();
-    const [header, row] = text.replace(/^\uFEFF/, '').trim().split('\r\n');
+    const [header, row] = text
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split('\r\n');
     expect(header?.split(',')).toContain('field:pekerjaan');
     // Formula injection is neutralised and hidden fields stay hidden for the exporter.
     expect(row).toContain(`"'=HYPERLINK(""x"")"`);

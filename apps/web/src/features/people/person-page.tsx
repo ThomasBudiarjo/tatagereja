@@ -1,542 +1,652 @@
 import {
-  ATTENDANCE_STATUS_LABELS,
-  GENDER_LABELS,
-  MARITAL_STATUSES,
-  MARITAL_STATUS_LABELS,
-  PERSON_MEMBERSHIP_STATUS_LABELS,
+  GENDER_TEXT,
+  MARITAL_STATUS_TEXT,
+  ageOn,
   fullName,
-  personPrivateDetailsInputSchema,
-  type PersonPrivateDetailsInput,
+  localize,
+  type PersonPrivacy,
+  type PersonProfile,
 } from '@tatagereja/shared';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarCheck, Link2, Lock, Pencil, Trash2, Unlink } from 'lucide-react';
+import {
+  EyeOff,
+  HandCoins,
+  HandHeart,
+  Home,
+  Link2,
+  Lock,
+  MapPin,
+  Milestone,
+  MoreHorizontal,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  Unlink,
+  UserPlus,
+} from 'lucide-react';
+import type * as React from 'react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
-import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader, Section } from '@/components/layout/page';
 import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { EntityAvatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Field } from '@/components/ui/field';
-import { Input, Textarea } from '@/components/ui/input';
-import { ListGroup, ListRow } from '@/components/ui/list';
-import { Alert, EmptyState, ErrorState, PageLoader } from '@/components/ui/misc';
-import { Select } from '@/components/ui/select';
-import { membersQuery } from '@/features/churches/api';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
+import { ToneIcon } from '@/components/ui/status-badge';
+import { Switch } from '@/components/ui/switch';
+import { TabsContent, TabsList, TabsTrigger, UrlTabs } from '@/components/ui/tabs';
 import { getErrorMessage } from '@/lib/api';
-import { ageFromBirthDate, formatDate, formatDateTime, formatLongDate } from '@/lib/format';
-import { applyServerErrors } from '@/lib/forms';
+import { useI18n } from '@/lib/i18n';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
+import { personQuery, useDeletePerson, useSavePrivacy } from './api';
+import { todayInZone } from './labels';
 import {
-  personAttendanceQuery,
-  personQuery,
-  useDeletePerson,
-  useLinkPersonUser,
-  useSavePrivateDetails,
-} from './api';
+  AddFamilyDialog,
+  AssignAreaDialog,
+  JoinHouseholdDialog,
+  LinkAccountDialog,
+  PrivateDetailsDialog,
+} from './person-dialogs';
+import { FamilyTab, GroupsTab, TimelineTab } from './person-tabs';
+import {
+  AreaChip,
+  CelebrationBadges,
+  ContactButtons,
+  PersonStatusBadge,
+  TagChip,
+} from './people-ui';
 
-type PrivateInput = z.input<typeof personPrivateDetailsInputSchema>;
+type DialogName = 'private' | 'link' | 'family' | 'household' | 'area' | 'delete' | null;
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
+    <div className="flex items-baseline justify-between gap-4 py-2.5">
       <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-right text-sm font-medium break-words">{value}</dd>
+      <dd className="min-w-0 text-right text-sm font-medium break-words">{value}</dd>
     </div>
   );
 }
 
-function PrivateDetailsDialog({
-  churchId,
-  personId,
-  open,
-  onOpenChange,
-  details,
-}: {
-  churchId: string;
-  personId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  details: PersonPrivateDetailsInput | null;
-}) {
-  const save = useSavePrivateDetails(churchId, personId);
-  const form = useForm<PrivateInput, unknown, PersonPrivateDetailsInput>({
-    resolver: zodResolver(personPrivateDetailsInputSchema),
-    defaultValues: {
-      nationalId: details?.nationalId ?? '',
-      maritalStatus: details?.maritalStatus ?? 'unspecified',
-      baptismDate: details?.baptismDate ?? '',
-      emergencyContactName: details?.emergencyContactName ?? '',
-      emergencyContactPhone: details?.emergencyContactPhone ?? '',
-      medicalNotes: details?.medicalNotes ?? '',
-      privateNotes: details?.privateNotes ?? '',
-    },
-  });
-  const errors = form.formState.errors;
-  const submit = form.handleSubmit(async (values) => {
-    try {
-      await save.mutateAsync(values);
-      toast.success('Private details saved');
-      onOpenChange(false);
-    } catch (error) {
-      if (
-        !applyServerErrors(error, form.setError, [
-          'nationalId',
-          'maritalStatus',
-          'baptismDate',
-          'emergencyContactName',
-          'emergencyContactPhone',
-          'medicalNotes',
-          'privateNotes',
-        ])
-      ) {
-        toast.error(getErrorMessage(error));
-      }
-    }
-  });
+function PersonSkeleton() {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Private details</DialogTitle>
-          <DialogDescription>
-            Only administrators and this person can see these fields.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody>
-          <form
-            id="private-details-form"
-            onSubmit={(event) => void submit(event)}
-            className="flex flex-col gap-4"
-            noValidate
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Marital status"
-                htmlFor="maritalStatus"
-                error={errors.maritalStatus?.message}
-              >
-                <Select id="maritalStatus" {...form.register('maritalStatus')}>
-                  {MARITAL_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {MARITAL_STATUS_LABELS[status]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Baptism date" htmlFor="baptismDate" error={errors.baptismDate?.message}>
-                <Input
-                  id="baptismDate"
-                  type="date"
-                  {...form.register('baptismDate')}
-                  aria-invalid={!!errors.baptismDate}
-                />
-              </Field>
-            </div>
-            <Field label="National ID" htmlFor="nationalId" error={errors.nationalId?.message}>
-              <Input id="nationalId" {...form.register('nationalId')} />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Emergency contact"
-                htmlFor="emergencyContactName"
-                error={errors.emergencyContactName?.message}
-              >
-                <Input id="emergencyContactName" {...form.register('emergencyContactName')} />
-              </Field>
-              <Field
-                label="Emergency phone"
-                htmlFor="emergencyContactPhone"
-                error={errors.emergencyContactPhone?.message}
-              >
-                <Input
-                  id="emergencyContactPhone"
-                  type="tel"
-                  inputMode="tel"
-                  {...form.register('emergencyContactPhone')}
-                />
-              </Field>
-            </div>
-            <Field
-              label="Medical notes"
-              htmlFor="medicalNotes"
-              error={errors.medicalNotes?.message}
-            >
-              <Textarea id="medicalNotes" rows={2} {...form.register('medicalNotes')} />
-            </Field>
-            <Field
-              label="Private notes"
-              htmlFor="privateNotes"
-              error={errors.privateNotes?.message}
-            >
-              <Textarea id="privateNotes" rows={3} {...form.register('privateNotes')} />
-            </Field>
-          </form>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" form="private-details-form" loading={form.formState.isSubmitting}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function LinkAccountDialog({
-  churchId,
-  personId,
-  open,
-  onOpenChange,
-  currentUserId,
-}: {
-  churchId: string;
-  personId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  currentUserId: string | null;
-}) {
-  const members = useQuery({ ...membersQuery(churchId), enabled: open });
-  const link = useLinkPersonUser(churchId, personId);
-  const [selected, setSelected] = useState(currentUserId ?? '');
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Link a login account</DialogTitle>
-          <DialogDescription>
-            Linking lets this person manage their own profile and see their attendance.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody>
-          {members.isPending ? (
-            <PageLoader />
-          ) : members.isError ? (
-            <Alert variant="error">{getErrorMessage(members.error)}</Alert>
-          ) : (
-            <Field label="Church account" htmlFor="link-user">
-              <Select
-                id="link-user"
-                value={selected}
-                onChange={(event) => setSelected(event.target.value)}
-              >
-                <option value="">Not linked</option>
-                {members.data.items.map((membership) => (
-                  <option key={membership.userId} value={membership.userId}>
-                    {membership.user.name} · {membership.user.email}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            loading={link.isPending}
-            onClick={async () => {
-              try {
-                await link.mutateAsync({ userId: selected || null });
-                toast.success(selected ? 'Account linked' : 'Account unlinked');
-                onOpenChange(false);
-              } catch (error) {
-                toast.error(getErrorMessage(error));
-              }
-            }}
-          >
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Page size="wide">
+      <Skeleton className="h-4 w-32" />
+      <div className="flex items-center gap-4">
+        <Skeleton className="size-20 rounded-full" />
+        <div className="flex flex-1 flex-col gap-2">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+      <Skeleton className="h-11 w-full rounded-xl" />
+      <SkeletonText lines={6} />
+    </Page>
   );
 }
 
 export function PersonPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { churchId, base } = useChurch();
+  const { churchId, base, church } = useChurch();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const query = useQuery(personQuery(churchId, id));
   const remove = useDeletePerson(churchId);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [privateOpen, setPrivateOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const attendance = useQuery({
-    ...personAttendanceQuery(churchId, id),
-    enabled: !!query.data?.canViewPrivate,
-    retry: false,
-  });
+  const removal = useMutationToast(remove);
+  const [dialog, setDialog] = useState<DialogName>(null);
+  const today = todayInZone(church.timezone);
 
-  if (query.isPending) return <PageLoader />;
+  if (query.isPending) return <PersonSkeleton />;
   if (query.isError) {
     return (
       <Page>
-        <PageHeader backTo={`${base}/people`} title="Person" />
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
+        <PageHeader backTo={`${base}/people`} title={t('people.person')} />
+        <ErrorState
+          error={query.error}
+          title={isGone(query.error) ? t('people.goneTitle') : undefined}
+          message={getErrorMessage(query.error)}
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
+        />
       </Page>
     );
   }
 
-  const {
-    person,
-    groups,
-    linkedUser,
-    privateDetails,
-    canEdit,
-    canDelete,
-    canViewPrivate,
-    canEditPrivate,
-    canLinkUser,
-  } = query.data;
+  const profile = query.data;
+  const { person } = profile;
   const name = fullName(person);
-  const age = ageFromBirthDate(person.birthDate);
+  const open = (name: DialogName) => () => setDialog(name);
+  const close = (next: boolean) => {
+    if (!next) setDialog(null);
+  };
+  const menu = [
+    profile.canAddFamily
+      ? { id: 'family', icon: UserPlus, label: t('people.addFamily'), onSelect: open('family') }
+      : null,
+    profile.canManageHousehold
+      ? {
+          id: 'household',
+          icon: Home,
+          label: profile.household ? t('people.moveHousehold') : t('people.joinHousehold'),
+          onSelect: open('household'),
+        }
+      : null,
+    profile.canAssignArea
+      ? { id: 'area', icon: MapPin, label: t('people.assignArea'), onSelect: open('area') }
+      : null,
+    profile.canLinkUser
+      ? {
+          id: 'link',
+          icon: person.userId ? Unlink : Link2,
+          label: person.userId ? t('people.changeAccount') : t('people.linkAccount'),
+          onSelect: open('link'),
+        }
+      : null,
+  ].filter((item): item is NonNullable<typeof item> => !!item);
+  const showMenu = menu.length > 0 || profile.canDelete;
+
+  const tabs = ['overview', 'family', 'groups', 'timeline'] as const;
+  const links = [
+    profile.links.care
+      ? {
+          to: `${base}/care?personId=${person.id}`,
+          icon: HandHeart,
+          tone: 'rose' as const,
+          label: t('people.linkCare'),
+          value: t('people.linkCareCount', { count: profile.links.care.open }),
+        }
+      : null,
+    profile.links.giving
+      ? {
+          to: `${base}/finance?personId=${person.id}`,
+          icon: HandCoins,
+          tone: 'emerald' as const,
+          label: t('people.linkGiving'),
+          value: t('people.linkGivingCount', { count: profile.links.giving.count }),
+        }
+      : null,
+    profile.links.records
+      ? {
+          to: `${base}/records?personId=${person.id}`,
+          icon: Milestone,
+          tone: 'violet' as const,
+          label: t('people.linkRecords'),
+          value: t('people.linkRecordsCount', { count: profile.links.records.count }),
+        }
+      : null,
+  ].filter((item): item is NonNullable<typeof item> => !!item);
 
   return (
-    <Page>
+    <Page size="wide">
       <PageHeader
-        backTo={`${base}/people`}
-        title={name}
-        description={PERSON_MEMBERSHIP_STATUS_LABELS[person.membershipStatus]}
+        breadcrumbs={[{ label: t('people.title'), to: `${base}/people` }, { label: name }]}
+        title={<span className="sr-only">{name}</span>}
+        documentTitle={name}
+        className="-mb-2"
         actions={
-          canEdit ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to={`${base}/people/${person.id}/edit`}>
-                <Pencil /> Edit
-              </Link>
-            </Button>
-          ) : null
+          <>
+            {profile.canEdit ? (
+              <Button asChild size="sm" variant="outline">
+                <Link to={`${base}/people/${person.id}/edit`}>
+                  <Pencil /> {t('common.edit')}
+                </Link>
+              </Button>
+            ) : null}
+            {showMenu ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="size-9"
+                    aria-label={t('common.moreActions')}
+                  >
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-56">
+                  {menu.map((item) => (
+                    <DropdownMenuItem key={item.id} onSelect={item.onSelect}>
+                      <item.icon /> {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                  {profile.canDelete ? (
+                    <>
+                      {menu.length > 0 ? <DropdownMenuSeparator /> : null}
+                      <DropdownMenuItem destructive onSelect={open('delete')}>
+                        <Trash2 /> {t('people.deletePerson')}
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </>
         }
       />
 
-      <div className="flex items-center gap-4">
-        <EntityAvatar name={name} src={person.photoUrl} size="xl" />
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap gap-1.5">
-            <Badge variant={person.membershipStatus === 'member' ? 'success' : 'secondary'}>
-              {PERSON_MEMBERSHIP_STATUS_LABELS[person.membershipStatus]}
-            </Badge>
-            {linkedUser ? <Badge variant="muted">Has account</Badge> : null}
-          </div>
-          {person.phone ? (
-            <a
-              href={`tel:${person.phone}`}
-              className="block text-sm text-primary underline-offset-4 hover:underline"
+      <ProfileHero profile={profile} today={today} />
+
+      {links.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {links.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="pressable flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3.5 shadow-soft outline-none hover:border-border focus-visible:ring-[3px] focus-visible:ring-ring/40"
             >
-              {person.phone}
-            </a>
-          ) : null}
-          {person.email ? (
-            <a
-              href={`mailto:${person.email}`}
-              className="block truncate text-sm text-primary underline-offset-4 hover:underline"
-            >
-              {person.email}
-            </a>
-          ) : null}
+              <ToneIcon icon={link.icon} tone={link.tone} size="sm" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">{link.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">{link.value}</span>
+              </span>
+            </Link>
+          ))}
         </div>
-      </div>
+      ) : null}
 
-      <Card>
-        <CardContent>
-          <dl className="divide-y divide-border/60">
-            <DetailRow label="Gender" value={GENDER_LABELS[person.gender]} />
-            <DetailRow
-              label="Birth date"
-              value={
-                person.birthDate
-                  ? `${formatLongDate(person.birthDate)}${age !== null ? ` · ${age} yrs` : ''}`
-                  : null
-              }
-            />
-            <DetailRow label="Address" value={person.address} />
-            <DetailRow
-              label="Joined"
-              value={person.joinedAt ? formatDate(person.joinedAt) : null}
-            />
-            <DetailRow label="Notes" value={person.notes} />
-            <DetailRow label="Added" value={formatDate(person.createdAt)} />
-          </dl>
-        </CardContent>
-      </Card>
-
-      <Section title="Groups">
-        {groups.length === 0 ? (
-          <EmptyState
-            title="Not in any group"
-            description="Group leaders and administrators can add this person to a group."
+      <UrlTabs defaultValue="overview" values={tabs}>
+        <TabsList variant="underline">
+          <TabsTrigger value="overview">{t('people.tabOverview')}</TabsTrigger>
+          <TabsTrigger value="family">
+            {t('people.tabFamily')}
+            {profile.household ? (
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular">
+                {profile.household.members.length}
+              </span>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="groups">
+            {t('people.tabGroups')}
+            {profile.groups.length > 0 ? (
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular">
+                {profile.groups.length}
+              </span>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="timeline">{t('people.tabTimeline')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview">
+          <OverviewTab
+            profile={profile}
+            today={today}
+            onEditPrivate={open('private')}
+            onLink={open('link')}
           />
-        ) : (
-          <ListGroup>
-            {groups.map((group) => (
-              <ListRow key={group.id} to={`${base}/groups/${group.id}`} title={group.name} />
-            ))}
-          </ListGroup>
-        )}
-      </Section>
+        </TabsContent>
+        <TabsContent value="family">
+          <FamilyTab
+            profile={profile}
+            onAddFamily={profile.canAddFamily ? open('family') : undefined}
+            onJoinHousehold={profile.canManageHousehold ? open('household') : undefined}
+          />
+        </TabsContent>
+        <TabsContent value="groups">
+          <GroupsTab profile={profile} />
+        </TabsContent>
+        <TabsContent value="timeline">
+          <TimelineTab profile={profile} />
+        </TabsContent>
+      </UrlTabs>
 
-      {canViewPrivate ? (
-        <Section
-          title="Private details"
-          action={
-            canEditPrivate ? (
-              <Button size="sm" variant="ghost" onClick={() => setPrivateOpen(true)}>
-                <Lock /> {privateDetails ? 'Edit' : 'Add'}
-              </Button>
-            ) : null
-          }
-        >
-          <Card>
-            <CardContent>
-              {privateDetails ? (
-                <dl className="divide-y divide-border/60">
-                  <DetailRow
-                    label="Marital status"
-                    value={MARITAL_STATUS_LABELS[privateDetails.maritalStatus]}
-                  />
-                  <DetailRow
-                    label="Baptism"
-                    value={
-                      privateDetails.baptismDate ? formatDate(privateDetails.baptismDate) : null
-                    }
-                  />
-                  <DetailRow label="National ID" value={privateDetails.nationalId} />
-                  <DetailRow
-                    label="Emergency contact"
-                    value={privateDetails.emergencyContactName}
-                  />
-                  <DetailRow label="Emergency phone" value={privateDetails.emergencyContactPhone} />
-                  <DetailRow label="Medical notes" value={privateDetails.medicalNotes} />
-                  <DetailRow label="Private notes" value={privateDetails.privateNotes} />
-                </dl>
-              ) : (
-                <p className="text-sm text-muted-foreground">No private details recorded.</p>
-              )}
-            </CardContent>
-          </Card>
-        </Section>
-      ) : null}
-
-      {canViewPrivate ? (
-        <Section title="Attendance history">
-          {attendance.isPending ? (
-            <PageLoader />
-          ) : attendance.isError ? (
-            <Alert variant="info">Attendance history is not available.</Alert>
-          ) : attendance.data.items.length === 0 ? (
-            <EmptyState icon={CalendarCheck} title="No attendance recorded yet" />
-          ) : (
-            <ListGroup>
-              {attendance.data.items.slice(0, 10).map((item) => (
-                <ListRow
-                  key={item.sessionId}
-                  title={item.title}
-                  subtitle={`${formatDateTime(item.sessionAt)}${item.groupName ? ` · ${item.groupName}` : ''}`}
-                  trailing={
-                    <Badge
-                      variant={
-                        item.status === 'present'
-                          ? 'success'
-                          : item.status === 'excused'
-                            ? 'warning'
-                            : 'destructive'
-                      }
-                    >
-                      {ATTENDANCE_STATUS_LABELS[item.status]}
-                    </Badge>
-                  }
-                />
-              ))}
-            </ListGroup>
-          )}
-        </Section>
-      ) : null}
-
-      {canLinkUser ? (
-        <Section title="Login account">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                {linkedUser ? linkedUser.name : 'No account linked'}
-              </CardTitle>
-              <CardDescription>
-                {linkedUser
-                  ? linkedUser.email
-                  : 'Link a church account so this person can manage their own profile.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
-                {linkedUser ? <Unlink /> : <Link2 />}
-                {linkedUser ? 'Change or unlink' : 'Link an account'}
-              </Button>
-            </CardContent>
-          </Card>
-        </Section>
-      ) : null}
-
-      {canDelete ? (
-        <Button variant="outline" className="text-destructive" onClick={() => setDeleteOpen(true)}>
-          <Trash2 /> Delete person
-        </Button>
-      ) : null}
-
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={`Delete ${name}?`}
-        description="Their group memberships, event participation and attendance records are deleted too."
-        confirmLabel="Delete"
-        loading={remove.isPending}
-        onConfirm={async () => {
-          try {
-            await remove.mutateAsync(person.id);
-            toast.success('Person deleted');
-            navigate(`${base}/people`, { replace: true });
-          } catch (error) {
-            toast.error(getErrorMessage(error));
-          }
-        }}
-      />
-      {canEditPrivate ? (
+      {profile.canEditPrivate ? (
         <PrivateDetailsDialog
-          key={privateDetails?.updatedAt ?? 'new'}
+          key={profile.privateDetails?.updatedAt ?? 'new'}
           churchId={churchId}
           personId={person.id}
-          open={privateOpen}
-          onOpenChange={setPrivateOpen}
-          details={privateDetails}
+          details={profile.privateDetails}
+          open={dialog === 'private'}
+          onOpenChange={close}
         />
       ) : null}
-      {canLinkUser ? (
+      {profile.canLinkUser ? (
         <LinkAccountDialog
           key={person.userId ?? 'unlinked'}
           churchId={churchId}
           personId={person.id}
-          open={linkOpen}
-          onOpenChange={setLinkOpen}
           currentUserId={person.userId}
+          open={dialog === 'link'}
+          onOpenChange={close}
+        />
+      ) : null}
+      {profile.canAddFamily ? (
+        <AddFamilyDialog
+          churchId={churchId}
+          profile={profile}
+          open={dialog === 'family'}
+          onOpenChange={close}
+        />
+      ) : null}
+      {profile.canManageHousehold ? (
+        <JoinHouseholdDialog
+          churchId={churchId}
+          profile={profile}
+          open={dialog === 'household'}
+          onOpenChange={close}
+        />
+      ) : null}
+      {profile.canAssignArea ? (
+        <AssignAreaDialog
+          key={`${profile.area?.id ?? 'none'}-${profile.areaSource ?? ''}`}
+          churchId={churchId}
+          profile={profile}
+          open={dialog === 'area'}
+          onOpenChange={close}
+        />
+      ) : null}
+      {profile.canDelete ? (
+        <ConfirmDialog
+          open={dialog === 'delete'}
+          onOpenChange={close}
+          title={t('people.deleteTitle', { name })}
+          description={t('people.deleteDescription')}
+          confirmText={name}
+          confirmLabel={t('people.deletePerson')}
+          loading={removal.isPending}
+          onConfirm={async () => {
+            if (await removal.run(person.id)) {
+              toast.success(t('people.deleted', { name }));
+              navigate(`${base}/people`, { replace: true });
+            }
+          }}
         />
       ) : null}
     </Page>
+  );
+}
+
+function ProfileHero({ profile, today }: { profile: PersonProfile; today: string }) {
+  const { base } = useChurch();
+  const { t, locale } = useI18n();
+  const { person } = profile;
+  const name = fullName(person);
+  const years = person.birthDate ? ageOn(person.birthDate, today) : null;
+  return (
+    <Card className="overflow-hidden">
+      <div
+        aria-hidden
+        className="h-16 bg-gradient-to-r from-sky-500/15 via-primary/10 to-violet-500/15 sm:h-20"
+      />
+      <CardContent className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end">
+        <EntityAvatar name={name} src={person.photoUrl} size="xl" className="ring-4 ring-card" />
+        <div className="min-w-0 flex-1">
+          {/* The page heading (for screen readers) is in the header above. */}
+          <p
+            aria-hidden
+            className="text-2xl leading-tight font-bold tracking-tight text-balance sm:text-[1.75rem]"
+          >
+            {name}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <PersonStatusBadge status={person.membershipStatus} />
+            <CelebrationBadges
+              birthDate={person.birthDate}
+              weddingDate={person.weddingDate}
+              today={today}
+            />
+            {years !== null ? (
+              <span className="text-sm text-muted-foreground">
+                {t('common.years', { count: years })} ·{' '}
+                {localize(GENDER_TEXT[person.gender], locale)}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {profile.household ? (
+              <Link
+                to={`${base}/households/${profile.household.id}`}
+                className="inline-flex h-6 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              >
+                <Home className="size-3.5" aria-hidden /> {profile.household.name}
+              </Link>
+            ) : null}
+            {profile.area ? (
+              <Link
+                to={`${base}/areas/${profile.area.id}`}
+                className="rounded-full transition-opacity hover:opacity-80"
+              >
+                <AreaChip area={profile.area} />
+              </Link>
+            ) : null}
+            {profile.tags.map((tag) => (
+              <TagChip key={tag.id} tag={tag} />
+            ))}
+          </div>
+        </div>
+        <ContactButtons phone={person.phone} email={person.email} />
+      </CardContent>
+      {profile.hiddenFields.length > 0 ? (
+        <p className="flex items-center gap-2 border-t border-border/60 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground sm:px-5">
+          <EyeOff className="size-3.5 shrink-0" aria-hidden />
+          {t('people.hiddenNotice')}
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+function OverviewTab({
+  profile,
+  today,
+  onEditPrivate,
+  onLink,
+}: {
+  profile: PersonProfile;
+  today: string;
+  onEditPrivate: () => void;
+  onLink: () => void;
+}) {
+  const { t, locale, formatDate } = useI18n();
+  const { person, privateDetails } = profile;
+  const years = person.birthDate ? ageOn(person.birthDate, today) : null;
+  const visibleFields = profile.customFields.filter(
+    (item) => item.value !== null && item.value !== '',
+  );
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <Section title={t('people.details')}>
+          <Card>
+            <CardContent className="py-2 sm:py-2">
+              <dl className="divide-y divide-border/60">
+                <DetailRow
+                  label={t('people.gender')}
+                  value={localize(GENDER_TEXT[person.gender], locale)}
+                />
+                <DetailRow
+                  label={t('people.birthDate')}
+                  value={
+                    person.birthDate
+                      ? `${formatDate(person.birthDate, 'dateLong')}${years !== null ? ` · ${t('common.years', { count: years })}` : ''}`
+                      : null
+                  }
+                />
+                <DetailRow
+                  label={t('people.weddingDate')}
+                  value={person.weddingDate ? formatDate(person.weddingDate, 'dateLong') : null}
+                />
+                <DetailRow label={t('people.phone')} value={person.phone} />
+                <DetailRow label={t('people.emailLabel')} value={person.email} />
+                <DetailRow label={t('people.address')} value={person.address} />
+                <DetailRow
+                  label={t('people.joinedAt')}
+                  value={person.joinedAt ? formatDate(person.joinedAt, 'dateShort') : null}
+                />
+                <DetailRow label={t('people.notes')} value={person.notes} />
+                <DetailRow
+                  label={t('people.addedOn')}
+                  value={formatDate(person.createdAt, 'dateShort')}
+                />
+              </dl>
+            </CardContent>
+          </Card>
+        </Section>
+
+        {visibleFields.length > 0 ? (
+          <Section title={t('people.customFields')}>
+            <Card>
+              <CardContent className="py-2 sm:py-2">
+                <dl className="divide-y divide-border/60">
+                  {visibleFields.map((item) => (
+                    <DetailRow
+                      key={item.field.id}
+                      label={item.field.label}
+                      value={
+                        item.field.type === 'checkbox'
+                          ? item.value === 'true'
+                            ? t('common.yes')
+                            : t('common.no')
+                          : item.field.type === 'date' && item.value
+                            ? formatDate(item.value, 'dateShort')
+                            : item.value
+                      }
+                    />
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+          </Section>
+        ) : null}
+
+        {profile.canViewPrivate ? (
+          <Section
+            title={t('people.privateDetails')}
+            icon={Lock}
+            action={
+              profile.canEditPrivate ? (
+                <Button size="sm" variant="ghost" onClick={onEditPrivate}>
+                  <Pencil /> {privateDetails ? t('common.edit') : t('common.add')}
+                </Button>
+              ) : null
+            }
+          >
+            <Card className="border-dashed">
+              <CardContent className="py-2 sm:py-2">
+                {privateDetails ? (
+                  <dl className="divide-y divide-border/60">
+                    <DetailRow
+                      label={t('people.maritalStatus')}
+                      value={localize(MARITAL_STATUS_TEXT[privateDetails.maritalStatus], locale)}
+                    />
+                    <DetailRow
+                      label={t('people.baptismDate')}
+                      value={
+                        privateDetails.baptismDate
+                          ? formatDate(privateDetails.baptismDate, 'dateShort')
+                          : null
+                      }
+                    />
+                    <DetailRow label={t('people.nationalId')} value={privateDetails.nationalId} />
+                    <DetailRow
+                      label={t('people.emergencyName')}
+                      value={privateDetails.emergencyContactName}
+                    />
+                    <DetailRow
+                      label={t('people.emergencyPhone')}
+                      value={privateDetails.emergencyContactPhone}
+                    />
+                    <DetailRow
+                      label={t('people.medicalNotes')}
+                      value={privateDetails.medicalNotes}
+                    />
+                    <DetailRow
+                      label={t('people.privateNotes')}
+                      value={privateDetails.privateNotes}
+                    />
+                  </dl>
+                ) : (
+                  <p className="py-3 text-sm text-muted-foreground">
+                    {t('people.noPrivateDetails')}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </Section>
+        ) : null}
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-5">
+        {profile.privacy ? <PrivacyCard profile={profile} privacy={profile.privacy} /> : null}
+        {profile.canLinkUser || profile.linkedUser ? (
+          <Section title={t('people.loginAccount')}>
+            <Card>
+              <CardContent className="flex flex-col gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {profile.linkedUser ? profile.linkedUser.name : t('people.noAccount')}
+                  </p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {profile.linkedUser ? profile.linkedUser.email : t('people.noAccountHint')}
+                  </p>
+                </div>
+                {profile.canLinkUser ? (
+                  <Button variant="outline" size="sm" className="w-fit" onClick={onLink}>
+                    {profile.linkedUser ? <Unlink /> : <Link2 />}
+                    {profile.linkedUser ? t('people.changeAccount') : t('people.linkAccount')}
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          </Section>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const PRIVACY_TOGGLES: {
+  key: keyof PersonPrivacy;
+  label: 'people.showPhone' | 'people.showEmail' | 'people.showAddress' | 'people.showBirthday';
+}[] = [
+  { key: 'showPhone', label: 'people.showPhone' },
+  { key: 'showEmail', label: 'people.showEmail' },
+  { key: 'showAddress', label: 'people.showAddress' },
+  { key: 'showBirthday', label: 'people.showBirthday' },
+];
+
+/** Directory privacy: each switch saves at once and rolls back if the server refuses. */
+function PrivacyCard({ profile, privacy }: { profile: PersonProfile; privacy: PersonPrivacy }) {
+  const { churchId } = useChurch();
+  const { t } = useI18n();
+  const save = useSavePrivacy(churchId, profile.person.id);
+  const change = (next: PersonPrivacy) =>
+    save.mutate(next, {
+      onSuccess: () => toast.success(t('people.privacySaved'), { id: 'privacy-saved' }),
+      onError: (error) => toast.error(getErrorMessage(error)),
+    });
+  return (
+    <Section title={t('people.privacy')} icon={ShieldCheck} description={t('people.privacyHint')}>
+      <Card>
+        <CardContent className="flex flex-col divide-y divide-border/60 py-1 sm:py-1">
+          {PRIVACY_TOGGLES.map((toggle) => {
+            const id = `privacy-${toggle.key}`;
+            return (
+              <label
+                key={toggle.key}
+                htmlFor={id}
+                className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2 text-sm"
+              >
+                <span>{t(toggle.label)}</span>
+                <Switch
+                  id={id}
+                  checked={privacy[toggle.key]}
+                  onCheckedChange={(checked) => change({ ...privacy, [toggle.key]: checked })}
+                />
+              </label>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </Section>
   );
 }
