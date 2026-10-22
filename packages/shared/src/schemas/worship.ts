@@ -168,6 +168,7 @@ export type WorshipServiceInput = z.infer<typeof worshipServiceInputSchema>;
 export const worshipServiceListQuerySchema = paginationQuerySchema.extend({
   scope: z.enum(['upcoming', 'past', 'all']).default('upcoming'),
   serviceTypeId: idSchema.optional(),
+  status: z.enum(SERVICE_STATUSES).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
 });
@@ -472,7 +473,8 @@ export const rosterRespondBodySchema = z
   });
 export type RosterRespondBody = z.infer<typeof rosterRespondBodySchema>;
 
-export const copyRosterBodySchema = z.object({ fromServiceId: idSchema });
+/** Without `fromServiceId` the latest earlier service of the same type (with a roster) is used. */
+export const copyRosterBodySchema = z.object({ fromServiceId: idSchema.optional() });
 export type CopyRosterBody = z.infer<typeof copyRosterBodySchema>;
 
 export const rosterSuggestionSchema = z.object({
@@ -490,6 +492,7 @@ export type RosterSuggestion = z.infer<typeof rosterSuggestionSchema>;
 export const volunteerBlockoutSchema = z.object({
   id: idSchema,
   personId: idSchema,
+  person: personSummarySchema,
   startDate: isoDateSchema,
   endDate: isoDateSchema,
   reason: z.string().nullable(),
@@ -530,3 +533,264 @@ export const canScheduleTeam = (
   ledTeamIds: readonly string[],
   teamId: string,
 ): boolean => has(access, 'volunteers.schedule') || ledTeamIds.includes(teamId);
+
+// ---------------------------------------------------------------------------------------------
+// Responses
+// ---------------------------------------------------------------------------------------------
+
+export const serviceTypeResponseSchema = z.object({ serviceType: serviceTypeSchema });
+
+export const worshipServiceResponseSchema = z.object({ service: worshipServiceSchema });
+
+export const worshipServiceDetailSchema = z.object({
+  service: worshipServiceSchema,
+  liturgy: z.array(liturgyItemSchema),
+  roster: z.array(rosterAssignmentSchema),
+  /** Whether the caller may edit the plan and the liturgy. */
+  canManage: z.boolean(),
+  /** Teams the caller may schedule (every team with `volunteers.schedule`, else the ones led). */
+  schedulableTeamIds: z.array(idSchema),
+});
+export type WorshipServiceDetail = z.infer<typeof worshipServiceDetailSchema>;
+
+export const liturgyResponseSchema = z.object({
+  items: z.array(liturgyItemSchema),
+  totalMinutes: z.number().int().nonnegative(),
+});
+export type LiturgyResponse = z.infer<typeof liturgyResponseSchema>;
+
+export const songResponseSchema = z.object({ song: songSchema });
+
+export const songDetailSchema = z.object({
+  song: songSchema,
+  usage: songUsageSchema.shape.items,
+});
+export type SongDetail = z.infer<typeof songDetailSchema>;
+
+export const songTagsSchema = z.object({
+  items: z.array(z.object({ tag: z.string(), count: z.number().int().nonnegative() })),
+});
+
+export const servingTeamListSchema = z.object({ items: z.array(servingTeamSchema) });
+
+export const servingTeamResponseSchema = z.object({ team: servingTeamSchema });
+
+export const servingTeamDetailSchema = z.object({
+  team: servingTeamSchema,
+  members: z.array(servingTeamMemberSchema),
+  /** The caller may edit positions and members (`services.manage` or a leader of the team). */
+  canManage: z.boolean(),
+  /** The caller may put this team on rosters. */
+  canSchedule: z.boolean(),
+});
+export type ServingTeamDetail = z.infer<typeof servingTeamDetailSchema>;
+
+export const servingPositionResponseSchema = z.object({ position: servingPositionSchema });
+
+export const servingTeamMemberUpdateSchema = servingTeamMemberInputSchema.omit({ personId: true });
+export type ServingTeamMemberUpdate = z.infer<typeof servingTeamMemberUpdateSchema>;
+
+export const servingTeamMemberResponseSchema = z.object({ member: servingTeamMemberSchema });
+
+export const teamParamsSchema = z.object({ churchId: idSchema, id: idSchema, itemId: idSchema });
+
+export const rosterAssignmentResponseSchema = z.object({ assignment: rosterAssignmentSchema });
+
+export const rosterAssignResultSchema = z.object({
+  items: z.array(rosterAssignmentSchema),
+  /** Requested assignments that already existed (or, when copying, could not be made). */
+  skipped: z.number().int().nonnegative(),
+});
+export type RosterAssignResult = z.infer<typeof rosterAssignResultSchema>;
+
+export const rosterSuggestionQuerySchema = z.object({ positionId: idSchema.optional() });
+
+export const rosterSuggestionsSchema = z.object({ items: z.array(rosterSuggestionSchema) });
+
+export const autoFillRosterBodySchema = z.object({
+  /** Only fill this team's positions; all teams the caller may schedule otherwise. */
+  teamId: idSchema.optional(),
+});
+export type AutoFillRosterBody = z.infer<typeof autoFillRosterBodySchema>;
+
+export const volunteerBlockoutListQuerySchema = z.object({
+  /** Defaults to the caller's own person record. */
+  personId: idSchema.optional(),
+  /** `team` lists the blockouts of everyone the caller schedules. */
+  scope: z.enum(['mine', 'team']).default('mine'),
+});
+export type VolunteerBlockoutListQuery = z.infer<typeof volunteerBlockoutListQuerySchema>;
+
+export const volunteerBlockoutListSchema = z.object({ items: z.array(volunteerBlockoutSchema) });
+
+export const volunteerBlockoutResponseSchema = z.object({ blockout: volunteerBlockoutSchema });
+
+export const myScheduleQuerySchema = z.object({
+  scope: z.enum(['upcoming', 'past']).default('upcoming'),
+});
+export type MyScheduleQuery = z.infer<typeof myScheduleQuerySchema>;
+
+export const myScheduleItemSchema = myScheduleSchema.shape.items.element;
+export type MyScheduleItem = z.infer<typeof myScheduleItemSchema>;
+
+export const worshipMeSchema = z.object({
+  personId: idSchema.nullable(),
+  /** Teams the caller leads (team leader scope). */
+  ledTeamIds: z.array(idSchema),
+  memberTeamIds: z.array(idSchema),
+  /** Upcoming assignments still waiting for the caller's reply. */
+  pendingCount: z.number().int().nonnegative(),
+});
+export type WorshipMe = z.infer<typeof worshipMeSchema>;
+
+export const worshipOverviewSchema = z.object({
+  upcoming: z.array(worshipServiceSchema),
+  stats: z.object({
+    /** Planned services in the next four weeks. */
+    upcomingServices: z.number().int().nonnegative(),
+    /** Positions still needed in teams already on those rosters. */
+    openPositions: z.number().int().nonnegative(),
+    pendingResponses: z.number().int().nonnegative(),
+    declined: z.number().int().nonnegative(),
+    songs: z.number().int().nonnegative(),
+    teams: z.number().int().nonnegative(),
+  }),
+  mySchedule: z.array(myScheduleItemSchema),
+  /** Declined or conflicting assignments the caller can fix. */
+  attention: z.array(myScheduleItemSchema),
+});
+export type WorshipOverview = z.infer<typeof worshipOverviewSchema>;
+
+export const worshipPeopleQuerySchema = z.object({
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
+export const worshipPeopleSchema = z.object({ items: z.array(personSummarySchema) });
+
+export const worshipSetupResultSchema = z.object({
+  serviceTypes: z.number().int().nonnegative(),
+  teams: z.number().int().nonnegative(),
+});
+
+// ---------------------------------------------------------------------------------------------
+// Rules shared by the API and the interface
+// ---------------------------------------------------------------------------------------------
+
+/** Plan services, the liturgy, songs and the team structure. */
+export const canManageServices = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  has(access, 'services.manage');
+
+/**
+ * Edit a team's positions and members: `services.manage`, or a leader of that team. Making
+ * someone a leader always needs `services.manage`.
+ */
+export const canManageServingTeam = (
+  access: Pick<AccessLike, 'permissions'>,
+  ledTeamIds: readonly string[],
+  teamId: string,
+): boolean => has(access, 'services.manage') || ledTeamIds.includes(teamId);
+
+/** Only the scheduled person answers an assignment; schedulers can record it for them. */
+export const canRespondToAssignment = (
+  access: Pick<AccessLike, 'permissions' | 'personId'>,
+  ledTeamIds: readonly string[],
+  assignment: { personId: string; teamId: string },
+): boolean =>
+  (!!access.personId && access.personId === assignment.personId) ||
+  canScheduleTeam(access, ledTeamIds, assignment.teamId);
+
+/** Volunteers keep their own blockout dates; schedulers keep anyone's. */
+export const canManageBlockout = (
+  access: Pick<AccessLike, 'permissions' | 'personId'>,
+  personId: string,
+): boolean =>
+  (!!access.personId && access.personId === personId) || has(access, 'volunteers.schedule');
+
+/** Fallback length of a service without an end time, in minutes. */
+export const DEFAULT_SERVICE_MINUTES = 120;
+
+/** Sum of the liturgy item durations (items without a duration count as zero). */
+export const liturgyTotalMinutes = (items: readonly { durationMinutes: number | null }[]): number =>
+  items.reduce((total, item) => total + (item.durationMinutes ?? 0), 0);
+
+/** The time a service occupies, as epoch milliseconds. */
+export const serviceWindow = (
+  service: { startsAt: string; endsAt: string | null },
+  fallbackMinutes: number = DEFAULT_SERVICE_MINUTES,
+): { start: number; end: number } => {
+  const start = new Date(service.startsAt).getTime();
+  const end = service.endsAt
+    ? new Date(service.endsAt).getTime()
+    : start + fallbackMinutes * 60_000;
+  return { start, end: Math.max(end, start + 1) };
+};
+
+export const windowsOverlap = (
+  a: { start: number; end: number },
+  b: { start: number; end: number },
+): boolean => a.start < b.end && b.start < a.end;
+
+/** The calendar day (`YYYY-MM-DD`) of an instant in a time zone. */
+export const localDateOf = (iso: string, timeZone: string): string => {
+  const date = new Date(iso);
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+};
+
+/** Whether a blockout (inclusive day range) covers a day. */
+export const blockoutCovers = (
+  blockout: { startDate: string; endDate: string },
+  day: string,
+): boolean => blockout.startDate <= day && day <= blockout.endDate;
+
+/** Weeks a song should rest before it is sung again. */
+export const SONG_REST_WEEKS = 4;
+
+/** Whether a song was sung recently enough that choosing it again repeats it. */
+export const songRecentlyUsed = (
+  lastUsedAt: string | null,
+  at: string | number | Date = Date.now(),
+  weeks: number = SONG_REST_WEEKS,
+): boolean => {
+  if (!lastUsedAt) return false;
+  const reference = new Date(at).getTime();
+  const used = new Date(lastUsedAt).getTime();
+  return reference - used < weeks * 7 * 86_400_000 && used <= reference;
+};
+
+/**
+ * Orders candidates for a position by rotation fairness: people without conflicts first, then
+ * whoever served least in the rotation window, then whoever served longest ago, then by name.
+ */
+export const rankRosterCandidates = <
+  T extends {
+    timesServed: number;
+    lastServedAt: string | null;
+    conflicts: readonly unknown[];
+    firstName: string;
+    lastName: string | null;
+  },
+>(
+  candidates: readonly T[],
+): T[] =>
+  [...candidates].sort((a, b) => {
+    const conflicted = Number(a.conflicts.length > 0) - Number(b.conflicts.length > 0);
+    if (conflicted !== 0) return conflicted;
+    if (a.timesServed !== b.timesServed) return a.timesServed - b.timesServed;
+    const lastA = a.lastServedAt ? new Date(a.lastServedAt).getTime() : 0;
+    const lastB = b.lastServedAt ? new Date(b.lastServedAt).getTime() : 0;
+    if (lastA !== lastB) return lastA - lastB;
+    return `${a.firstName} ${a.lastName ?? ''}`.localeCompare(
+      `${b.firstName} ${b.lastName ?? ''}`,
+      'id',
+    );
+  });
