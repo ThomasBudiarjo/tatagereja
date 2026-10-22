@@ -20,8 +20,9 @@ import {
   paginatedSchema,
   requiredText,
 } from './common';
-import { groupInputSchema } from './group';
+import { groupInputSchema, groupListQuerySchema, groupMemberSchema, groupSchema } from './group';
 import {
+  personDetailSchema,
   personInputSchema,
   personListQuerySchema,
   personSchema,
@@ -138,6 +139,9 @@ export const GROUP_JOIN_REQUEST_STATUS_LABELS: Record<GroupJoinRequestStatus, Lo
   declined: { en: 'Declined', id: 'Ditolak' },
   cancelled: { en: 'Cancelled', id: 'Dibatalkan' },
 };
+
+export const CELEBRATION_KINDS = ['birthday', 'anniversary', 'any'] as const;
+export type CelebrationKind = (typeof CELEBRATION_KINDS)[number];
 
 /** Contact fields a person can hide from the member directory. */
 export const PERSON_PRIVACY_FIELDS = ['phone', 'email', 'address', 'birthday'] as const;
@@ -462,7 +466,7 @@ export const applyPersonPrivacy = <
 // Directory, import/export and merge
 // ---------------------------------------------------------------------------------------------
 
-export const DIRECTORY_SORTS = ['name', 'created', 'birthday', 'joined'] as const;
+export const DIRECTORY_SORTS = ['name', 'created', 'birthday', 'anniversary', 'joined'] as const;
 export type DirectorySort = (typeof DIRECTORY_SORTS)[number];
 
 const booleanQuery = z
@@ -481,14 +485,24 @@ export const directoryQuerySchema = personListQuerySchema.extend({
   /** Custom field filter: `fieldId` with an exact `fieldValue`. */
   fieldId: idSchema.optional(),
   fieldValue: z.string().trim().max(PEOPLE_LIMITS.customFieldValueMax).optional(),
+  /** People whose birthday or wedding anniversary falls within the next `withinDays` days. */
+  celebration: z.enum(CELEBRATION_KINDS).optional(),
+  withinDays: z.coerce.number().int().min(0).max(366).default(7),
   sort: z.enum(DIRECTORY_SORTS).default('name'),
   order: z.enum(['asc', 'desc']).default('asc'),
 });
 export type DirectoryQuery = z.infer<typeof directoryQuerySchema>;
 
+/** The directory filters without paging, used by the CSV export. */
+export const directoryExportQuerySchema = directoryQuerySchema.omit({ page: true, limit: true });
+export type DirectoryExportQuery = z.infer<typeof directoryExportQuerySchema>;
+
 export const directoryPersonSchema = personSchema.extend({
   weddingDate: isoDateSchema.nullable(),
   householdId: idSchema.nullable(),
+  householdName: z.string().nullable(),
+  relationship: z.enum(HOUSEHOLD_RELATIONSHIPS).nullable(),
+  /** The person's own area, or their household's. */
   areaId: idSchema.nullable(),
   tagIds: z.array(idSchema),
   hasAccount: z.boolean(),
@@ -666,3 +680,516 @@ export const decideGroupJoinRequestBodySchema = z.object({
 export type DecideGroupJoinRequestBody = z.infer<typeof decideGroupJoinRequestBodySchema>;
 
 export const groupJoinRequestListSchema = z.object({ items: z.array(groupJoinRequestSchema) });
+
+// ---------------------------------------------------------------------------------------------
+// Extended responses: areas, households, the person profile and groups
+// ---------------------------------------------------------------------------------------------
+
+export const areaListQuerySchema = z.object({
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
+  includeInactive: booleanQuery,
+});
+export type AreaListQuery = z.infer<typeof areaListQuerySchema>;
+
+export const areaResponseSchema = z.object({ area: areaSchema });
+
+/** Assigns households and people to an area in one step. A person row overrides their household. */
+export const areaAssignBodySchema = z
+  .object({
+    householdIds: z.array(idSchema).max(LIMITS.bulkIdsMax).default([]),
+    personIds: z.array(idSchema).max(LIMITS.bulkIdsMax).default([]),
+  })
+  .refine((value) => value.householdIds.length + value.personIds.length > 0, {
+    message: 'Choose at least one household or person',
+    path: ['personIds'],
+  });
+export type AreaAssignBody = z.infer<typeof areaAssignBodySchema>;
+
+const countRowSchema = z.object({ key: z.string(), count: z.number().int().nonnegative() });
+
+export const upcomingCelebrationSchema = z.object({
+  person: personSummarySchema,
+  kind: z.enum(['birthday', 'anniversary']),
+  date: isoDateSchema,
+  /** 0 = today. */
+  inDays: z.number().int().nonnegative(),
+  /** The age or the number of years married on that day. */
+  years: z.number().int().nonnegative(),
+});
+export type UpcomingCelebration = z.infer<typeof upcomingCelebrationSchema>;
+
+/** Counts shown on the directory and area pages. */
+export const peopleStatsSchema = z.object({
+  people: z.number().int().nonnegative(),
+  households: z.number().int().nonnegative(),
+  byStatus: z.array(countRowSchema),
+  byGender: z.array(countRowSchema),
+  /** Age bands: `0-12`, `13-17`, `18-30`, `31-50`, `51-65`, `66+`, `unknown`. */
+  byAge: z.array(countRowSchema),
+  newThisMonth: z.number().int().nonnegative(),
+  celebrations: z.array(upcomingCelebrationSchema),
+});
+export type PeopleStats = z.infer<typeof peopleStatsSchema>;
+
+export const PEOPLE_AGE_BANDS = [
+  '0-12',
+  '13-17',
+  '18-30',
+  '31-50',
+  '51-65',
+  '66+',
+  'unknown',
+] as const;
+export type PeopleAgeBand = (typeof PEOPLE_AGE_BANDS)[number];
+
+export const PEOPLE_AGE_BAND_LABELS: Record<PeopleAgeBand, LocalizedText> = {
+  '0-12': { en: 'Children (0–12)', id: 'Anak (0–12)' },
+  '13-17': { en: 'Teens (13–17)', id: 'Remaja (13–17)' },
+  '18-30': { en: 'Young adults (18–30)', id: 'Pemuda (18–30)' },
+  '31-50': { en: 'Adults (31–50)', id: 'Dewasa (31–50)' },
+  '51-65': { en: 'Older adults (51–65)', id: 'Madya (51–65)' },
+  '66+': { en: 'Seniors (66+)', id: 'Lansia (66+)' },
+  unknown: { en: 'Unknown', id: 'Tidak diketahui' },
+};
+
+export const peopleAgeBandOf = (birthDate: string | null, today: string): PeopleAgeBand => {
+  if (!birthDate) return 'unknown';
+  const age = ageOn(birthDate, today);
+  if (age <= 12) return '0-12';
+  if (age <= 17) return '13-17';
+  if (age <= 30) return '18-30';
+  if (age <= 50) return '31-50';
+  if (age <= 65) return '51-65';
+  return '66+';
+};
+
+export const areaDetailSchema = z.object({
+  area: areaSchema,
+  stats: peopleStatsSchema,
+  canManage: z.boolean(),
+  /** The caller coordinates this area. */
+  isCoordinator: z.boolean(),
+});
+export type AreaDetail = z.infer<typeof areaDetailSchema>;
+
+export const householdMemberInputSchema = z.object({
+  personId: idSchema,
+  relationship: z.enum(HOUSEHOLD_RELATIONSHIPS),
+  isPrimaryContact: z.boolean().default(false),
+});
+
+/** Creates a household, optionally with its first members (people in another household move). */
+export const householdCreateSchema = householdInputSchema.extend({
+  members: z.array(householdMemberInputSchema).max(PEOPLE_LIMITS.householdMembersMax).default([]),
+});
+export type HouseholdCreateInput = z.infer<typeof householdCreateSchema>;
+
+export const householdResponseSchema = z.object({ household: householdSchema });
+
+export const householdDetailSchema = z.object({
+  household: householdSchema,
+  canManage: z.boolean(),
+  canAddPeople: z.boolean(),
+});
+export type HouseholdDetail = z.infer<typeof householdDetailSchema>;
+
+export const householdMemberResultSchema = z.object({
+  household: householdSchema,
+  /** The household the person left, when they moved. */
+  movedFrom: z.object({ id: idSchema, name: z.string() }).nullable(),
+});
+
+export const familyMemberResultSchema = z.object({
+  household: householdSchema,
+  person: directoryPersonSchema,
+});
+
+/** "Add family member" from a person page: the household is created when the person has none. */
+export const addFamilyMemberBodySchema = createFamilyMemberBodySchema.extend({
+  /** The relationship of the person whose page it is, when a new household is created. */
+  anchorRelationship: z.enum(HOUSEHOLD_RELATIONSHIPS).default('head'),
+});
+export type AddFamilyMemberBody = z.infer<typeof addFamilyMemberBodySchema>;
+
+export const customFieldValueSchema = z.object({
+  field: customFieldDefinitionSchema,
+  value: z.string().nullable(),
+});
+export type CustomFieldValue = z.infer<typeof customFieldValueSchema>;
+
+export const personTagResponseSchema = z.object({ tag: personTagSchema });
+export const customFieldDefinitionResponseSchema = z.object({ field: customFieldDefinitionSchema });
+
+/** The full person page: the base detail plus family, area, tags, fields and privacy. */
+export const personProfileSchema = personDetailSchema.extend({
+  person: directoryPersonSchema,
+  groups: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      type: z.enum(GROUP_TYPES),
+      coverColor: z.string().nullable(),
+      isLeader: z.boolean(),
+      addedAt: isoDateTimeSchema,
+    }),
+  ),
+  household: householdSchema.nullable(),
+  area: areaSummarySchema.nullable(),
+  /** Where the area comes from: the person's own assignment or their household. */
+  areaSource: z.enum(['person', 'household']).nullable(),
+  tags: z.array(personTagSchema.pick({ id: true, name: true, color: true })),
+  customFields: z.array(customFieldValueSchema),
+  /** The person's directory choices; only for callers who may change them. */
+  privacy: personPrivacySchema.nullable(),
+  /** Contact fields hidden from the caller by the person's privacy choices. */
+  hiddenFields: z.array(z.enum(PERSON_PRIVACY_FIELDS)),
+  /** Counts from other modules, present only when the caller may open them. */
+  links: z.object({
+    care: z.object({ open: z.number().int().nonnegative() }).nullable(),
+    giving: z.object({ count: z.number().int().nonnegative() }).nullable(),
+    records: z.object({ count: z.number().int().nonnegative() }).nullable(),
+  }),
+  canEditPrivacy: z.boolean(),
+  canEditTags: z.boolean(),
+  canEditFields: z.boolean(),
+  canManageHousehold: z.boolean(),
+  canAddFamily: z.boolean(),
+  canAssignArea: z.boolean(),
+  canMerge: z.boolean(),
+  canViewAttendance: z.boolean(),
+});
+export type PersonProfile = z.infer<typeof personProfileSchema>;
+
+export const directoryPersonResponseSchema = z.object({ person: directoryPersonSchema });
+export const personPrivacyResponseSchema = z.object({ privacy: personPrivacySchema });
+
+/** What the caller coordinates and leads, for scoping actions in the interface. */
+export const directoryMeSchema = z.object({
+  personId: idSchema.nullable(),
+  coordinatedAreaIds: z.array(idSchema),
+  leaderGroupIds: z.array(idSchema),
+  /** Pending join requests in the groups the caller decides on. */
+  pendingJoinRequests: z.number().int().nonnegative(),
+});
+export type DirectoryMe = z.infer<typeof directoryMeSchema>;
+
+export const mergeResultSchema = z.object({
+  person: directoryPersonSchema,
+  /** Rows moved to the kept record, by table. */
+  moved: z.record(z.string(), z.number().int().nonnegative()),
+});
+export type MergeResult = z.infer<typeof mergeResultSchema>;
+
+export const GROUP_MEMBER_STATES = ['leader', 'member', 'pending', 'none'] as const;
+export type GroupMemberState = (typeof GROUP_MEMBER_STATES)[number];
+
+export const groupDetailsSchema = groupSchema.extend({
+  ...groupScheduleSchema.shape,
+  /** The caller's relationship to the group. */
+  myState: z.enum(GROUP_MEMBER_STATES),
+  /** Pending join requests; 0 for callers who cannot decide on them. */
+  pendingRequestCount: z.number().int().nonnegative(),
+});
+export type GroupDetails = z.infer<typeof groupDetailsSchema>;
+
+export const groupDetailsListSchema = z.object({ items: z.array(groupDetailsSchema) });
+export type GroupDetailsList = z.infer<typeof groupDetailsListSchema>;
+
+export const groupDetailsResponseSchema = z.object({ group: groupDetailsSchema });
+
+export const groupDetailsListQuerySchema = groupListQuerySchema.extend({
+  type: z.enum(GROUP_TYPES).optional(),
+  /** Only the groups the caller belongs to or leads. */
+  mine: booleanQuery,
+});
+export type GroupDetailsListQuery = z.infer<typeof groupDetailsListQuerySchema>;
+
+/** Partial update: only the fields sent change. */
+export const groupDetailsPatchSchema = z.object({
+  name: requiredText(2, LIMITS.nameMax).optional(),
+  description: optionalText(LIMITS.longTextMax).optional(),
+  type: z.enum(GROUP_TYPES).optional(),
+  meetingSchedule: optionalText(LIMITS.shortTextMax).optional(),
+  isActive: z.boolean().optional(),
+  meetingDay: z.number().int().min(0).max(6).nullable().optional(),
+  meetingTime: meetingTimeSchema.nullable().optional(),
+  meetingFrequency: z.enum(MEETING_FREQUENCIES).nullable().optional(),
+  location: optionalText(LIMITS.shortTextMax).optional(),
+  capacity: z.number().int().min(1).max(PEOPLE_LIMITS.groupCapacityMax).nullable().optional(),
+  coverColor: optionalHexColor.optional(),
+  visibility: z.enum(GROUP_VISIBILITIES).optional(),
+  joinPolicy: z.enum(GROUP_JOIN_POLICIES).optional(),
+});
+export type GroupDetailsPatch = z.infer<typeof groupDetailsPatchSchema>;
+
+export const groupRosterMemberSchema = groupMemberSchema.extend({
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  isLeader: z.boolean(),
+});
+export type GroupRosterMember = z.infer<typeof groupRosterMemberSchema>;
+
+export const groupPageSchema = z.object({
+  group: groupDetailsSchema,
+  members: z.array(groupRosterMemberSchema),
+  myRequest: groupJoinRequestSchema.nullable(),
+  /** Pending requests, for callers who decide on them. */
+  joinRequests: z.array(groupJoinRequestSchema),
+  stats: z.object({
+    upcomingEvents: z.array(
+      z.object({ id: idSchema, title: z.string(), startsAt: isoDateTimeSchema }),
+    ),
+    eventCount: z.number().int().nonnegative(),
+    attendance: z
+      .object({
+        sessions: z.number().int().nonnegative(),
+        /** Present ÷ marked over the last sessions, 0–1; null without records. */
+        rate: z.number().min(0).max(1).nullable(),
+        lastSessionAt: isoDateTimeSchema.nullable(),
+      })
+      .nullable(),
+    recentAnnouncements: z.array(
+      z.object({ id: idSchema, title: z.string(), publishedAt: isoDateTimeSchema.nullable() }),
+    ),
+  }),
+  canManage: z.boolean(),
+  canDelete: z.boolean(),
+  canAssignLeaders: z.boolean(),
+  canRequestToJoin: z.boolean(),
+  canLeave: z.boolean(),
+  canExport: z.boolean(),
+});
+export type GroupPage = z.infer<typeof groupPageSchema>;
+
+export const groupJoinRequestResponseSchema = z.object({ request: groupJoinRequestSchema });
+
+// ---------------------------------------------------------------------------------------------
+// Rules shared by the API and the interface
+// ---------------------------------------------------------------------------------------------
+
+const isSelfPerson = (access: AccessLike, person: { id: string; userId: string | null }) =>
+  person.userId === access.userId || (access.personId !== null && access.personId === person.id);
+
+/**
+ * Who may edit a person's basic profile: `people.edit`, the person themselves, leaders of their
+ * groups, and coordinators of their area.
+ */
+export const canEditPersonProfile = (
+  access: AccessLike,
+  person: { id: string; userId: string | null },
+  scope: {
+    groupIds: readonly string[];
+    coordinatedAreaIds: readonly string[];
+    areaId: string | null;
+  },
+): boolean =>
+  has(access, 'people.edit') ||
+  isSelfPerson(access, person) ||
+  scope.groupIds.some((groupId) => access.leaderGroupIds.includes(groupId)) ||
+  canManageAreaPerson(access, scope.coordinatedAreaIds, scope.areaId);
+
+/** Each person controls their own directory privacy; `people.private.edit` can change it too. */
+export const canEditPersonPrivacy = (
+  access: AccessLike,
+  person: { id: string; userId: string | null },
+): boolean => has(access, 'people.private.edit') || isSelfPerson(access, person);
+
+/** Private custom fields follow the private details rules. */
+export const canViewPrivateField = (
+  access: AccessLike,
+  person: { id: string; userId: string | null },
+): boolean => has(access, 'people.private.view') || isSelfPerson(access, person);
+
+export const canEditPrivateField = (
+  access: AccessLike,
+  person: { id: string; userId: string | null },
+): boolean => has(access, 'people.private.edit') || isSelfPerson(access, person);
+
+/** Private groups are visible to their members and leaders and to `groups.manage`. */
+export const canSeeGroup = (
+  access: AccessLike,
+  group: { id: string; visibility: GroupVisibility },
+  isMember: boolean,
+): boolean =>
+  group.visibility === 'public' ||
+  isMember ||
+  has(access, 'groups.manage') ||
+  access.leaderGroupIds.includes(group.id);
+
+/** A member with a person record may ask to join an active public group that accepts requests. */
+export const canRequestToJoinGroup = (
+  access: AccessLike,
+  group: { visibility: GroupVisibility; joinPolicy: GroupJoinPolicy; isActive: boolean },
+  state: GroupMemberState,
+): boolean =>
+  has(access, 'groups.view') &&
+  access.personId !== null &&
+  group.isActive &&
+  group.visibility === 'public' &&
+  group.joinPolicy === 'request' &&
+  state === 'none';
+
+/** Leaders of the group and holders of `groups.manage` decide on join requests. */
+export const canDecideJoinRequests = (access: AccessLike, groupId: string): boolean =>
+  has(access, 'groups.manage') || access.leaderGroupIds.includes(groupId);
+
+// ---------------------------------------------------------------------------------------------
+// Person form and CSV import helpers
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The person form: the profile plus, optionally, tags and custom field values saved in the same
+ * request. Omitted extras are left unchanged.
+ */
+export const personFormSchema = personInputSchema.extend({
+  tagIds: setPersonTagsBodySchema.shape.tagIds.optional(),
+  customFields: setCustomFieldValuesBodySchema.shape.values.optional(),
+});
+export type PersonFormInput = z.infer<typeof personFormSchema>;
+
+/** CSV columns the export writes and the import understands, in order. */
+export const PERSON_CSV_COLUMNS = [
+  'firstName',
+  'lastName',
+  'gender',
+  'birthDate',
+  'email',
+  'phone',
+  'address',
+  'membershipStatus',
+  'joinedAt',
+  'weddingDate',
+  'householdName',
+  'relationship',
+  'areaName',
+  'tags',
+  'notes',
+] as const;
+export type PersonCsvColumn = (typeof PERSON_CSV_COLUMNS)[number];
+
+const IMPORT_VALUE_ALIASES: Record<string, Record<string, string>> = {
+  gender: {
+    l: 'male',
+    'laki-laki': 'male',
+    'laki laki': 'male',
+    pria: 'male',
+    m: 'male',
+    male: 'male',
+    p: 'female',
+    perempuan: 'female',
+    wanita: 'female',
+    f: 'female',
+    female: 'female',
+  },
+  membershipStatus: {
+    anggota: 'member',
+    'anggota jemaat': 'member',
+    member: 'member',
+    jemaat: 'member',
+    simpatisan: 'visitor',
+    tamu: 'visitor',
+    visitor: 'visitor',
+    tetap: 'regular',
+    'jemaat tetap': 'regular',
+    regular: 'regular',
+    'tidak aktif': 'inactive',
+    inactive: 'inactive',
+  },
+  relationship: {
+    'kepala keluarga': 'head',
+    kk: 'head',
+    head: 'head',
+    suami: 'spouse',
+    istri: 'spouse',
+    pasangan: 'spouse',
+    spouse: 'spouse',
+    anak: 'child',
+    child: 'child',
+    'orang tua': 'parent',
+    ayah: 'parent',
+    ibu: 'parent',
+    parent: 'parent',
+    kerabat: 'relative',
+    saudara: 'relative',
+    relative: 'relative',
+    lainnya: 'other',
+    other: 'other',
+  },
+};
+
+const DATE_COLUMNS = new Set(['birthDate', 'joinedAt', 'weddingDate']);
+
+/** `25/12/1990`, `25-12-1990` and `1990/12/25` become `1990-12-25`; other text is kept. */
+export const normalizeImportDate = (value: string): string => {
+  const trimmed = value.trim();
+  const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(trimmed);
+  if (dmy) return `${dmy[3]}-${dmy[2]?.padStart(2, '0')}-${dmy[1]?.padStart(2, '0')}`;
+  const ymd = /^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/.exec(trimmed);
+  if (ymd) return `${ymd[1]}-${ymd[2]?.padStart(2, '0')}-${ymd[3]?.padStart(2, '0')}`;
+  return trimmed;
+};
+
+/**
+ * Turns one mapped CSV row (strings keyed by column, custom fields as `field:<key>`) into the
+ * shape `personImportRowSchema` validates: Indonesian values such as "L"/"P" or "Anggota" are
+ * understood, dates in day/month/year order are converted, and tags are split on `;` or `,`.
+ */
+export const normalizeImportRow = (raw: Record<string, unknown>): Record<string, unknown> => {
+  const row: Record<string, unknown> = {};
+  const customFields: Record<string, string> = {};
+  for (const [key, input] of Object.entries(raw)) {
+    if (input === null || input === undefined) continue;
+    if (key === 'customFields' && typeof input === 'object') {
+      for (const [fieldKey, value] of Object.entries(input as Record<string, unknown>)) {
+        if (value !== null && value !== undefined && String(value).trim() !== '') {
+          customFields[fieldKey] = String(value).trim();
+        }
+      }
+      continue;
+    }
+    if (key === 'tags') {
+      row.tags = Array.isArray(input)
+        ? input.map(String)
+        : String(input)
+            .split(/[;,]/)
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+      continue;
+    }
+    if (typeof input !== 'string') {
+      row[key] = input;
+      continue;
+    }
+    const value = input.trim();
+    if (key.startsWith('field:')) {
+      if (value) customFields[key.slice('field:'.length)] = value;
+      continue;
+    }
+    if (!value) continue;
+    const aliases = IMPORT_VALUE_ALIASES[key];
+    if (aliases) row[key] = aliases[value.toLowerCase()] ?? value;
+    else if (DATE_COLUMNS.has(key)) row[key] = normalizeImportDate(value);
+    else row[key] = value;
+  }
+  if (Object.keys(customFields).length > 0) row.customFields = customFields;
+  return row;
+};
+
+/** Phone numbers compared without spaces or punctuation, with +62 and a leading 0 treated alike. */
+export const normalizePhone = (phone: string | null | undefined): string | null => {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  return digits.startsWith('62') ? digits.slice(2) : digits.replace(/^0/, '');
+};
+
+/** Names compared case- and accent-insensitively with single spaces. */
+export const normalizeName = (person: { firstName: string; lastName?: string | null }): string =>
+  [person.firstName, person.lastName ?? '']
+    .join(' ')
+    .toLocaleLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
