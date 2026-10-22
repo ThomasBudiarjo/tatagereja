@@ -65,7 +65,7 @@ export const groupListQuerySchema = z.object({
 });
 
 export const addGroupMembersBodySchema = z.object({
-  personIds: z.array(idSchema).min(1).max(500),
+  personIds: z.array(idSchema).min(1).max(LIMITS.bulkIdsMax),
 });
 export type AddGroupMembersBody = z.infer<typeof addGroupMembersBodySchema>;
 

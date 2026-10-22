@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LIMITS } from '../constants';
+import { CURRENCY_CODES, isValidTimeZone, type CurrencyCode } from '../money';
 
 export const idSchema = z.uuid();
 export const isoDateTimeSchema = z.iso.datetime({ offset: true });
@@ -80,6 +81,20 @@ export type Paginated<T> = {
   page: number;
   limit: number;
 };
+
+/** A non-negative amount in integer minor units of the church currency. */
+export const moneySchema = z.number().int().min(0).max(LIMITS.moneyMax);
+/** A signed amount in minor units, for adjustments and balances. */
+export const signedMoneySchema = z.number().int().min(-LIMITS.moneyMax).max(LIMITS.moneyMax);
+
+export const currencySchema = z.enum(CURRENCY_CODES as [CurrencyCode, ...CurrencyCode[]]);
+
+export const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(LIMITS.timezoneMax)
+  .refine(isValidTimeZone, 'Must be a time zone such as Asia/Jakarta');
 
 export const idParamsSchema = z.object({ id: idSchema });
 export const churchParamsSchema = z.object({ churchId: idSchema });

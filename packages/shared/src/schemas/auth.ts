@@ -31,8 +31,8 @@ export const registerBodySchema = z.object({
   name: requiredText(LIMITS.nameMin, LIMITS.nameMax),
   email: emailSchema,
   password: passwordSchema,
-  invitationToken: z.string().trim().min(1).max(200).optional(),
-  turnstileToken: z.string().trim().min(1).max(4096).optional(),
+  invitationToken: z.string().trim().min(1).max(LIMITS.tokenMax).optional(),
+  turnstileToken: z.string().trim().min(1).max(LIMITS.turnstileTokenMax).optional(),
 });
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 

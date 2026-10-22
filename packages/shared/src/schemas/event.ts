@@ -78,7 +78,7 @@ export const eventDetailSchema = z.object({
 export type EventDetail = z.infer<typeof eventDetailSchema>;
 
 export const setParticipantsBodySchema = z.object({
-  personIds: z.array(idSchema).min(1).max(1000),
+  personIds: z.array(idSchema).min(1).max(LIMITS.bulkIdsMax),
   status: z.enum(PARTICIPANT_STATUSES).default('invited'),
 });
 export type SetParticipantsBody = z.infer<typeof setParticipantsBodySchema>;

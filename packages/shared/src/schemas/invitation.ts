@@ -32,7 +32,7 @@ export const createInvitationBodySchema = z.object({
 export type CreateInvitationBody = z.infer<typeof createInvitationBodySchema>;
 
 export const invitationTokenParamsSchema = z.object({
-  token: z.string().trim().min(1).max(200),
+  token: z.string().trim().min(1).max(LIMITS.tokenMax),
 });
 
 export const publicInvitationSchema = z.object({

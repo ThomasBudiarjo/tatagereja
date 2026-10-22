@@ -1,6 +1,9 @@
 import { z } from 'zod';
-import { CHURCH_ROLES, LIMITS } from '../constants';
+import { CHURCH_ROLES, LIMITS, MEMBERSHIP_STATUSES } from '../constants';
+import { isModuleId, type ModuleId } from '../modules';
+import { isPermission, type Permission } from '../permissions';
 import {
+  currencySchema,
   idSchema,
   isoDateTimeSchema,
   optionalEmail,
@@ -8,10 +11,23 @@ import {
   optionalText,
   optionalUrl,
   requiredText,
+  timezoneSchema,
 } from './common';
 import { userSummarySchema } from './auth';
 
 export const churchRoleSchema = z.enum(CHURCH_ROLES);
+export const membershipStatusSchema = z.enum(MEMBERSHIP_STATUSES);
+
+/**
+ * Lists of permission keys and module ids coming from a server. Unknown values are dropped
+ * rather than rejected, so an older app keeps working against a newer server.
+ */
+export const permissionListSchema = z
+  .array(z.string())
+  .transform((values): Permission[] => values.filter(isPermission));
+export const moduleListSchema = z
+  .array(z.string())
+  .transform((values): ModuleId[] => values.filter(isModuleId));
 
 export const churchSchema = z.object({
   id: idSchema,
@@ -24,6 +40,12 @@ export const churchSchema = z.object({
   website: z.string().nullable(),
   logoUrl: z.string().nullable(),
   brandColor: z.string().nullable(),
+  /** ISO 4217 code; money is stored in its minor units. */
+  currency: z.string(),
+  /** IANA time zone used for dates such as service days and finance periods. */
+  timezone: z.string(),
+  /** Optional modules that are switched on. Required modules are always on. */
+  enabledModules: moduleListSchema,
   ownerUserId: idSchema,
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
@@ -49,6 +71,10 @@ export const churchInputSchema = z.object({
   website: optionalUrl,
   logoUrl: optionalUrl,
   brandColor: optionalHexColor,
+  /** Left unchanged when omitted. */
+  currency: currencySchema.optional(),
+  /** Left unchanged when omitted. */
+  timezone: timezoneSchema.optional(),
 });
 export type ChurchInput = z.infer<typeof churchInputSchema>;
 
@@ -57,17 +83,25 @@ export const membershipSchema = z.object({
   churchId: idSchema,
   userId: idSchema,
   role: churchRoleSchema,
+  status: membershipStatusSchema,
+  /** Assigned custom role ids. */
+  roleIds: z.array(idSchema),
   joinedAt: isoDateTimeSchema,
   user: userSummarySchema,
 });
 export type Membership = z.infer<typeof membershipSchema>;
 
-/** The caller's own access inside a church. Used by both the API and the UI to decide permissions. */
+/**
+ * The caller's own access inside a church. Used by both the API and the UI to decide
+ * permissions: `permissions` are the effective permissions (base role ∪ custom roles).
+ */
 export const accessSchema = z.object({
   userId: idSchema,
   role: churchRoleSchema,
   leaderGroupIds: z.array(idSchema),
   personId: idSchema.nullable(),
+  permissions: permissionListSchema,
+  roleIds: z.array(idSchema),
 });
 export type Access = z.infer<typeof accessSchema>;
 
@@ -84,6 +118,7 @@ export const myChurchesSchema = z.object({
     z.object({
       church: churchSchema,
       role: churchRoleSchema,
+      status: membershipStatusSchema,
       memberCount: z.number().int().nonnegative(),
       joinedAt: isoDateTimeSchema,
     }),
@@ -98,6 +133,18 @@ export const updateMembershipRoleBodySchema = z.object({
   role: z.enum(['administrator', 'member']),
 });
 export type UpdateMembershipRoleBody = z.infer<typeof updateMembershipRoleBodySchema>;
+
+export const updateMembershipStatusBodySchema = z.object({
+  status: membershipStatusSchema,
+});
+export type UpdateMembershipStatusBody = z.infer<typeof updateMembershipStatusBodySchema>;
+
+export const membershipResponseSchema = z.object({ membership: membershipSchema });
+
+export const deleteChurchBodySchema = z.object({
+  password: z.string().min(1).max(LIMITS.passwordMax),
+});
+export type DeleteChurchBody = z.infer<typeof deleteChurchBodySchema>;
 
 export const transferOwnershipBodySchema = z.object({
   userId: idSchema,

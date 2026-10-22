@@ -77,7 +77,7 @@ export const attendanceRecordInputSchema = z.object({
 export type AttendanceRecordInput = z.infer<typeof attendanceRecordInputSchema>;
 
 export const saveAttendanceRecordsBodySchema = z.object({
-  records: z.array(attendanceRecordInputSchema).min(1).max(1000),
+  records: z.array(attendanceRecordInputSchema).min(1).max(LIMITS.bulkIdsMax),
 });
 export type SaveAttendanceRecordsBody = z.infer<typeof saveAttendanceRecordsBodySchema>;
 
