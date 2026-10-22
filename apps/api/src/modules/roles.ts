@@ -25,7 +25,7 @@ import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
-import { toCustomRole } from '../serializers';
+import { toCustomRole, toUserSummary } from '../serializers';
 import { recordAudit, type AuditContext } from '../services/audit';
 import { notify } from '../services/notifications';
 
@@ -361,6 +361,37 @@ export const rolesModule = (deps: Deps) => {
         params: churchIdParamsSchema,
       },
     )
+    .get(
+      '/roles/:id/members',
+      ({ church, params }) => {
+        const role = loadRole(db, church.id, params.id);
+        const rows = db
+          .select({
+            membership: churchMemberships,
+            user: users,
+            assignedAt: membershipRoles.assignedAt,
+          })
+          .from(membershipRoles)
+          .innerJoin(churchMemberships, eq(churchMemberships.id, membershipRoles.membershipId))
+          .innerJoin(users, eq(users.id, churchMemberships.userId))
+          .where(and(eq(membershipRoles.roleId, role.id), eq(membershipRoles.churchId, church.id)))
+          .orderBy(asc(users.name))
+          .all();
+        return {
+          items: rows.map((row) => ({
+            membershipId: row.membership.id,
+            role: row.membership.role,
+            status: row.membership.status,
+            user: toUserSummary(row.user),
+            assignedAt: row.assignedAt,
+          })),
+        };
+      },
+      {
+        church: { permission: ['roles.manage', 'members.view', 'members.manage'] },
+        params: churchIdParamsSchema,
+      },
+    )
     .patch(
       '/roles/:id',
       ({ church, access, audit, params, body }) => {
@@ -422,6 +453,13 @@ export const rolesModule = (deps: Deps) => {
           );
         }
         const assigned = memberCounts(church.id).get(role.id) ?? 0;
+        const assignees = db
+          .select({ userId: churchMemberships.userId })
+          .from(membershipRoles)
+          .innerJoin(churchMemberships, eq(churchMemberships.id, membershipRoles.membershipId))
+          .where(eq(membershipRoles.roleId, role.id))
+          .all()
+          .map((row) => row.userId);
         db.transaction((tx) => {
           recordAudit(tx, audit, {
             module: 'core',
@@ -433,6 +471,19 @@ export const rolesModule = (deps: Deps) => {
           });
           // Assignments cascade with the role.
           tx.delete(churchRoles).where(eq(churchRoles.id, role.id)).run();
+          if (assignees.length > 0) {
+            notify(tx, {
+              churchId: church.id,
+              userIds: assignees,
+              excludeUserIds: [access.userId],
+              type: 'membership.roles_changed',
+              title: `Your roles in ${church.name} changed`,
+              body: `The role ${role.name} was deleted.`,
+              link: `/c/${church.id}`,
+              entityType: 'role',
+              entityId: role.id,
+            });
+          }
         });
         return { ok: true as const };
       },

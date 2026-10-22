@@ -1,34 +1,50 @@
 import {
+  BASE_ROLE_PERMISSIONS,
   ROLE_LABELS,
   can,
   canGrantBaseRole,
+  canViewSecurity,
   churchIdParamsSchema,
   churchInputSchema,
   churchParamsSchema,
+  confirmTransferOwnershipBodySchema,
   deleteChurchBodySchema,
   effectivePermissions,
-  transferOwnershipBodySchema,
+  memberListQuerySchema,
+  namesMatch,
   updateChurchModulesBodySchema,
   updateMembershipRoleBodySchema,
   updateMembershipStatusBodySchema,
   type ModuleId,
 } from '@tatagereja/shared';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import {
   churches,
   churchMemberships,
+  churchRoles,
   groupLeaders,
+  groups,
   membershipRoles,
   notifications,
   people,
+  sessions,
   users,
 } from '../db/schema';
 import type { Deps } from '../deps';
-import { HttpError, badRequest, conflict, forbidden, notFound, unauthorized } from '../lib/errors';
+import {
+  HttpError,
+  badRequest,
+  conflict,
+  forbidden,
+  notFound,
+  unauthorized,
+  validationError,
+} from '../lib/errors';
 import { verifyPassword } from '../lib/password';
+import { offsetOf } from '../lib/query';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
@@ -37,6 +53,8 @@ import { customRolesOf, seedRoleTemplates } from '../services/access';
 import { changes, recordAudit, type AuditContext } from '../services/audit';
 import { enabledModulesOf, moduleStates } from '../services/modules';
 import { notify } from '../services/notifications';
+import { filterMembers, loadMemberRows, summarizeMembers } from './admin-security/members';
+import { toMemberListItem } from './admin-security/serializers';
 
 /** Church fields compared and recorded in the audit log when the profile changes. */
 const auditedChurchFields = (row: ChurchRow) => ({
@@ -335,23 +353,85 @@ export const churchesModule = (deps: Deps) => {
     )
     .get(
       '/:churchId/members',
-      ({ church, access }) => {
+      ({ church, access, query }) => {
         if (!can.viewMembers(access)) throw forbidden('Only administrators can view members');
-        const rows = db
-          .select({ membership: churchMemberships, user: users })
-          .from(churchMemberships)
-          .innerJoin(users, eq(users.id, churchMemberships.userId))
-          .where(eq(churchMemberships.churchId, church.id))
-          .orderBy(asc(users.name))
-          .all();
-        const roleIds = roleIdsByMembership(church.id);
+        const showSecurity = canViewSecurity(access);
+        if (query.twoFactor && !showSecurity) {
+          throw forbidden('You cannot see the two-step verification of members');
+        }
+        const rows = loadMemberRows(db, church.id);
+        const filtered = filterMembers(rows, query);
+        const start = offsetOf(query);
         return {
-          items: rows.map((row) =>
-            toMembership(row.membership, row.user, roleIds.get(row.membership.id) ?? []),
-          ),
+          items: filtered
+            .slice(start, start + query.limit)
+            .map((row) => toMemberListItem(row, showSecurity)),
+          total: filtered.length,
+          page: query.page,
+          limit: query.limit,
+          summary: summarizeMembers(rows, showSecurity),
         };
       },
-      { church: true, params: churchParamsSchema },
+      { church: true, params: churchParamsSchema, query: memberListQuerySchema },
+    )
+    .get(
+      '/:churchId/members/:id',
+      ({ church, access, membership: own, params }) => {
+        if (own.id !== params.id && !can.viewMembers(access)) {
+          throw forbidden('You cannot view this member');
+        }
+        const row = loadMemberRows(db, church.id).find(
+          (candidate) => candidate.membership.id === params.id,
+        );
+        if (!row) throw notFound('Membership');
+        const showSecurity = canViewSecurity(access) || own.id === params.id;
+        const roles = db
+          .select({ id: churchRoles.id, name: churchRoles.name })
+          .from(membershipRoles)
+          .innerJoin(churchRoles, eq(churchRoles.id, membershipRoles.roleId))
+          .where(eq(membershipRoles.membershipId, row.membership.id))
+          .orderBy(asc(churchRoles.name))
+          .all();
+        const leaderGroups = db
+          .select({ id: groups.id, name: groups.name })
+          .from(groupLeaders)
+          .innerJoin(groups, eq(groups.id, groupLeaders.groupId))
+          .where(and(eq(groupLeaders.churchId, church.id), eq(groupLeaders.userId, row.user.id)))
+          .orderBy(asc(groups.name))
+          .all();
+        const person = row.personId
+          ? db
+              .select({ id: people.id, firstName: people.firstName, lastName: people.lastName })
+              .from(people)
+              .where(and(eq(people.id, row.personId), eq(people.churchId, church.id)))
+              .get()
+          : undefined;
+        const lastSession = showSecurity
+          ? db
+              .select({ lastUsedAt: sessions.lastUsedAt })
+              .from(sessions)
+              .where(eq(sessions.userId, row.user.id))
+              .orderBy(desc(sessions.lastUsedAt))
+              .get()
+          : undefined;
+        return {
+          membership: toMemberListItem(row, showSecurity),
+          permissions: {
+            membershipId: row.membership.id,
+            role: row.membership.role,
+            roles,
+            permissions: row.permissions,
+            basePermissions: [...BASE_ROLE_PERMISSIONS[row.membership.role]],
+            isLeader: row.isLeader,
+          },
+          leaderGroups,
+          person: person
+            ? { id: person.id, name: [person.firstName, person.lastName].filter(Boolean).join(' ') }
+            : null,
+          lastActiveAt: lastSession?.lastUsedAt ?? null,
+        };
+      },
+      { church: true, params: churchIdParamsSchema },
     )
     .patch(
       '/:churchId/members/:id',
@@ -474,6 +554,17 @@ export const churchesModule = (deps: Deps) => {
             null,
           );
           detachUserFromChurch(tx, church.id, row.membership.userId);
+          // Account-level: the person no longer belongs to the church's inbox.
+          notify(tx, {
+            churchId: null,
+            userIds: [row.user.id],
+            type: 'membership.status_changed',
+            title: `You were removed from ${church.name}`,
+            body: 'Ask a church administrator for a new invitation if this was a mistake.',
+            link: '/churches',
+            entityType: 'church',
+            entityId: church.id,
+          });
         });
         return { ok: true as const };
       },
@@ -507,6 +598,10 @@ export const churchesModule = (deps: Deps) => {
         if (!can.transferOwnership(access))
           throw forbidden('Only the owner can transfer ownership');
         if (body.userId === auth.user.id) throw badRequest('You already own this church');
+        if (body.confirmName !== undefined && !namesMatch(body.confirmName, church.name)) {
+          const message = 'Type the church name exactly as shown';
+          throw validationError(message, [{ path: 'confirmName', message }]);
+        }
         await verifyOwnPassword(auth.user.id, body.password);
         const target = db
           .select({ membership: churchMemberships, user: users })
@@ -566,6 +661,6 @@ export const churchesModule = (deps: Deps) => {
         if (!updated) throw notFound('Church');
         return { church: toChurch(updated) };
       },
-      { church: true, params: churchParamsSchema, body: transferOwnershipBodySchema },
+      { church: true, params: churchParamsSchema, body: confirmTransferOwnershipBodySchema },
     );
 };
