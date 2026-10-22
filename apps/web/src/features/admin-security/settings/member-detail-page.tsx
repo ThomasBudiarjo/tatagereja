@@ -236,8 +236,13 @@ export function MemberDetailPage() {
       }
     >
       <Card className="animate-rise-in">
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <EntityAvatar name={membership.user.name} src={membership.user.avatarUrl} size="xl" />
+        <CardContent className="flex flex-wrap items-start gap-4 sm:flex-nowrap sm:items-center">
+          <EntityAvatar
+            name={membership.user.name}
+            src={membership.user.avatarUrl}
+            size="lg"
+            className="sm:size-20 sm:text-2xl"
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-muted-foreground">{membership.user.email}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -270,7 +275,7 @@ export function MemberDetailPage() {
             </dl>
           </div>
           {detail.person ? (
-            <Button asChild variant="outline" size="sm" className="self-start sm:self-center">
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto sm:self-center">
               <Link to={`${base}/people/${detail.person.id}`}>
                 <UserRound />
                 {t('admin-security.openProfile')}

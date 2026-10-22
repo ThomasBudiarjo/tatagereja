@@ -79,19 +79,14 @@ function PolicyCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {canManage && !policy.data.twoFactorEnabled ? (
-          <Alert
-            variant="warning"
-            title={t('admin-security.policyOwnFirstTitle')}
-            action={
-              <Button asChild size="sm" variant="outline">
-                <Link to="/profile?tab=security&setup=1">
-                  <Smartphone />
-                  {t('admin-security.setUpNow')}
-                </Link>
-              </Button>
-            }
-          >
-            {t('admin-security.policyOwnFirstBody')}
+          <Alert variant="warning" title={t('admin-security.policyOwnFirstTitle')}>
+            <p>{t('admin-security.policyOwnFirstBody')}</p>
+            <Button asChild size="sm" variant="outline" className="mt-2.5">
+              <Link to="/profile?tab=security&setup=1">
+                <Smartphone />
+                {t('admin-security.setUpNow')}
+              </Link>
+            </Button>
           </Alert>
         ) : null}
         {policy.data.appliesToYou ? (
@@ -232,13 +227,13 @@ export function SecuritySettingsPage() {
       {canViewSecurity(access) ? <ManagersWithoutTwoFactor /> : null}
       {has(access, 'backup.export') ? <BackupCard /> : null}
       <Card>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <CardContent className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <ToneIcon icon={Smartphone} tone="sky" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">{t('admin-security.ownAccountTitle')}</p>
             <p className="text-sm text-muted-foreground">{t('admin-security.ownAccountBody')}</p>
           </div>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link to="/profile?tab=security">{t('admin-security.openAccountSecurity')}</Link>
           </Button>
         </CardContent>

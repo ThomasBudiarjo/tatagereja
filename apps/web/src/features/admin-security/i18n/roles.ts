@@ -3,8 +3,7 @@ import { messages } from './section';
 /** Roles list, role editor, permission matrix and preview. */
 export const rolesMessages = messages(
   {
-    rolesDescription:
-      'Base roles are fixed. Custom roles add permissions on top, for Pendeta, Majelis, Bendahara and other ministries.',
+    rolesDescription: 'Base roles are fixed; custom roles add permissions on top.',
     newRole: 'New role',
     createRole: 'Create role',
     baseRoles: 'Base roles',
@@ -84,8 +83,7 @@ export const rolesMessages = messages(
     roleUnassigned: '{role} removed from {name}',
   },
   {
-    rolesDescription:
-      'Peran dasar bersifat tetap. Peran khusus menambah hak akses, untuk Pendeta, Majelis, Bendahara, dan pelayanan lain.',
+    rolesDescription: 'Peran dasar bersifat tetap; peran khusus menambah hak akses.',
     newRole: 'Peran baru',
     createRole: 'Buat peran',
     baseRoles: 'Peran dasar',

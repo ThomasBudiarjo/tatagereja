@@ -327,7 +327,12 @@ export function MembersSettingsPage() {
                     {t('admin-security.leader')}
                   </StatusBadge>
                 ) : null}
-                <RoleBadge role={member.role} size="sm" />
+                {/* "Member" is the default; phones only show the roles that stand out. */}
+                <span
+                  className={member.role === 'member' ? 'hidden sm:inline-flex' : 'inline-flex'}
+                >
+                  <RoleBadge role={member.role} size="sm" />
+                </span>
               </span>
             )}
             actions={(member) => actionsFor(member, { includeOpen: false })}

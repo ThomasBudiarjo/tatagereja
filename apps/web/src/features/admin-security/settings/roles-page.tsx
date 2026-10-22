@@ -69,7 +69,8 @@ export function RolesSettingsPage() {
           <Button asChild size="sm">
             <Link to={`${base}/settings/roles/new`}>
               <Plus />
-              {t('admin-security.newRole')}
+              <span className="hidden sm:inline">{t('admin-security.newRole')}</span>
+              <span className="sm:hidden">{t('common.add')}</span>
             </Link>
           </Button>
         ) : null

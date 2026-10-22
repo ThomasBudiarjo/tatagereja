@@ -7,7 +7,7 @@ import { Section } from '@/components/layout/page';
 import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { ErrorState } from '@/components/ui/misc';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
+import { ToneIcon } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { moduleManifest } from '@/features/registry';
 import { getErrorMessage } from '@/lib/api';
@@ -55,9 +55,10 @@ function ModuleRow({
           aria-describedby={`${switchId}-state`}
         />
       ) : (
-        <StatusBadge tone="neutral" size="sm" icon={Lock}>
-          {t('admin-security.moduleAlwaysOn')}
-        </StatusBadge>
+        <Lock
+          className="size-4 shrink-0 text-muted-foreground"
+          aria-label={t('admin-security.moduleAlwaysOn')}
+        />
       )}
       <span id={`${switchId}-state`} className="sr-only">
         {module.enabled ? t('admin-security.moduleOn') : t('admin-security.moduleOff')}

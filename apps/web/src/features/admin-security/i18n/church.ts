@@ -83,6 +83,7 @@ export const churchMessages = messages(
     setUpNow: 'Set up now',
     managersTitle: 'Managers and two-step verification',
     managersProgress: '{done} of {total} managers protected',
+    managersShort: '{done}/{total} managers',
     allManagersProtected: 'Every manager is protected',
     allManagersProtectedHint: 'All members with management permissions use two-step verification.',
     backupTitle: 'Church backup',
@@ -249,6 +250,7 @@ export const churchMessages = messages(
     setUpNow: 'Aktifkan sekarang',
     managersTitle: 'Pengurus dan verifikasi dua langkah',
     managersProgress: '{done} dari {total} pengurus terlindungi',
+    managersShort: '{done}/{total} pengurus',
     allManagersProtected: 'Semua pengurus terlindungi',
     allManagersProtectedHint:
       'Semua anggota dengan hak pengelolaan sudah memakai verifikasi dua langkah.',

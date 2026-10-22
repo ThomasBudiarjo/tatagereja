@@ -112,16 +112,14 @@ export function SecurityHomePage() {
         <Alert
           variant={mine.data.requiredByChurchIds.includes(churchId) ? 'error' : 'warning'}
           title={t('admin-security.centerYouWithout')}
-          action={
-            <Button asChild size="sm">
-              <Link to="/profile?tab=security&setup=1">
-                <Smartphone />
-                {t('admin-security.setUpNow')}
-              </Link>
-            </Button>
-          }
         >
-          {t('admin-security.centerYouWithoutBody')}
+          <p>{t('admin-security.centerYouWithoutBody')}</p>
+          <Button asChild size="sm" className="mt-2.5">
+            <Link to="/profile?tab=security&setup=1">
+              <Smartphone />
+              {t('admin-security.setUpNow')}
+            </Link>
+          </Button>
         </Alert>
       ) : null}
 
@@ -142,7 +140,7 @@ export function SecurityHomePage() {
           <StatCard
             label={t('admin-security.statCoverage')}
             value={coverage === null ? '—' : formatPercent(coverage)}
-            hint={t('admin-security.managersProgress', {
+            hint={t('admin-security.managersShort', {
               done: data.twoFactor.managersWithTwoFactor,
               total: data.twoFactor.managers,
             })}

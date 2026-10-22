@@ -221,7 +221,8 @@ export function InvitationsSettingsPage() {
       actions={
         <Button size="sm" onClick={() => setState({ new: true }, { push: true })}>
           <Plus />
-          {t('admin-security.newInvitation')}
+          <span className="hidden sm:inline">{t('admin-security.newInvitation')}</span>
+          <span className="sm:hidden">{t('common.add')}</span>
         </Button>
       }
     >
@@ -284,11 +285,14 @@ export function InvitationsSettingsPage() {
               t('admin-security.inviteBy', { name: invitation.createdByName }),
             ].join(' · ')
           }
-          trailing={(invitation) => (
-            <StatusBadge tone={STATUS_LOOK[invitation.status].tone} dot size="sm">
-              {t(STATUS_LOOK[invitation.status].key)}
-            </StatusBadge>
-          )}
+          trailing={(invitation) =>
+            // Active is the usual case; only ended invitations carry a badge.
+            invitation.status !== 'active' ? (
+              <StatusBadge tone={STATUS_LOOK[invitation.status].tone} dot size="sm">
+                {t(STATUS_LOOK[invitation.status].key)}
+              </StatusBadge>
+            ) : null
+          }
           actions={(invitation) => [
             {
               id: 'revoke',

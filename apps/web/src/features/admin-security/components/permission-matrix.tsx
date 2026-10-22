@@ -1,5 +1,6 @@
 import { PERMISSION_GROUPS, localize, type Permission } from '@tatagereja/shared';
-import { Lock } from 'lucide-react';
+import { ChevronDown, Lock } from 'lucide-react';
+import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useI18n } from '@/lib/i18n';
@@ -48,6 +49,17 @@ export function PermissionMatrix({
   const { t, locale } = useI18n();
   const needle = normalize(search.trim());
   const selected = new Set(value);
+  // Groups start folded unless they hold a selected permission; searching unfolds them all.
+  const [open, setOpen] = useState<Set<string>>(() => {
+    const initial = new Set(
+      PERMISSION_GROUPS.filter((group) =>
+        group.permissions.some((definition) => value.includes(definition.key)),
+      ).map((group) => group.module),
+    );
+    if (initial.size === 0 && PERMISSION_GROUPS[0]) initial.add(PERMISSION_GROUPS[0].module);
+    return initial;
+  });
+  const forceOpen = !!needle || onlySelected;
 
   const groups = PERMISSION_GROUPS.map((group) => ({
     ...group,
@@ -91,6 +103,14 @@ export function PermissionMatrix({
               ? 'indeterminate'
               : false;
         const groupId = `matrix-${group.module}`;
+        const expanded = forceOpen || open.has(group.module);
+        const flip = () =>
+          setOpen((current) => {
+            const next = new Set(current);
+            if (next.has(group.module)) next.delete(group.module);
+            else next.add(group.module);
+            return next;
+          });
         return (
           <fieldset
             key={group.module}
@@ -98,19 +118,48 @@ export function PermissionMatrix({
             aria-describedby={`${groupId}-count`}
           >
             <legend className="sr-only">{localize(group.label, locale)}</legend>
-            <div className="flex items-center gap-3 border-b border-border/60 bg-muted/30 px-3.5 py-2.5">
-              <GroupIcon module={group.module} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold tracking-tight">
-                  {localize(group.label, locale)}
-                </p>
-                <p id={`${groupId}-count`} className="text-xs text-muted-foreground tabular">
-                  {t('admin-security.matrixGroupCount', {
-                    selected: checkedCount,
-                    total: group.permissions.length,
-                  })}
-                </p>
-              </div>
+            <div
+              className={cn(
+                'flex items-center gap-2 bg-muted/30 py-1.5 pr-3.5 pl-1.5',
+                expanded && 'border-b border-border/60',
+              )}
+            >
+              <button
+                type="button"
+                onClick={flip}
+                disabled={forceOpen}
+                aria-expanded={expanded}
+                aria-controls={`${groupId}-list`}
+                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30"
+              >
+                <GroupIcon module={group.module} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold tracking-tight">
+                    {localize(group.label, locale)}
+                  </span>
+                  <span
+                    id={`${groupId}-count`}
+                    className={cn(
+                      'block text-xs tabular',
+                      checkedCount > 0 ? 'font-medium text-primary' : 'text-muted-foreground',
+                    )}
+                  >
+                    {t('admin-security.matrixGroupCount', {
+                      selected: checkedCount,
+                      total: group.permissions.length,
+                    })}
+                  </span>
+                </span>
+                {!forceOpen ? (
+                  <ChevronDown
+                    className={cn(
+                      'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                      expanded && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
+                ) : null}
+              </button>
               {!readOnly && editable.length > 1 ? (
                 <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground">
                   {t('admin-security.matrixSelectAll')}
@@ -131,7 +180,11 @@ export function PermissionMatrix({
                 </label>
               ) : null}
             </div>
-            <ul className="divide-y divide-border/60">
+            <ul
+              id={`${groupId}-list`}
+              hidden={!expanded}
+              className="animate-in divide-y divide-border/60 fade-in-0"
+            >
               {group.permissions.map((definition) => {
                 const allowed = grantable.has(definition.key) && !readOnly;
                 const checked = selected.has(definition.key);

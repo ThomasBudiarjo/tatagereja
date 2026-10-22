@@ -139,20 +139,20 @@ export function ProfilePage() {
       <UrlTabs defaultValue="profile" values={TABS}>
         <TabsList>
           <TabsTrigger value="profile">
-            <UserRound />
-            <span className="hidden min-[400px]:inline">{t('profile.tabProfile')}</span>
+            <UserRound className="hidden sm:block" />
+            <span>{t('profile.tabProfile')}</span>
           </TabsTrigger>
           <TabsTrigger value="security">
-            <ShieldCheck />
-            <span className="hidden min-[400px]:inline">{t('profile.tabSecurity')}</span>
+            <ShieldCheck className="hidden sm:block" />
+            <span>{t('profile.tabSecurity')}</span>
           </TabsTrigger>
           <TabsTrigger value="activity">
-            <History />
-            <span className="hidden min-[400px]:inline">{t('profile.tabActivity')}</span>
+            <History className="hidden sm:block" />
+            <span>{t('profile.tabActivity')}</span>
           </TabsTrigger>
           <TabsTrigger value="privacy">
-            <FileLock />
-            <span className="hidden min-[400px]:inline">{t('profile.tabPrivacy')}</span>
+            <FileLock className="hidden sm:block" />
+            <span>{t('profile.tabPrivacy')}</span>
           </TabsTrigger>
         </TabsList>
 
