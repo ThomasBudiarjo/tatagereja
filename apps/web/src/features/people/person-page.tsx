@@ -238,16 +238,21 @@ export function PersonPage() {
       <ProfileHero profile={profile} today={today} />
 
       {links.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div
+          className="grid gap-2 sm:gap-3"
+          style={{ gridTemplateColumns: `repeat(${links.length}, minmax(0, 1fr))` }}
+        >
           {links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="pressable flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3.5 shadow-soft outline-none hover:border-border focus-visible:ring-[3px] focus-visible:ring-ring/40"
+              className="pressable flex min-h-11 flex-col items-start gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft outline-none hover:border-border focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:flex-row sm:items-center sm:gap-3 sm:p-3.5"
             >
               <ToneIcon icon={link.icon} tone={link.tone} size="sm" />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">{link.label}</span>
+              <span className="w-full min-w-0">
+                <span className="block text-xs leading-snug font-semibold sm:text-sm">
+                  {link.label}
+                </span>
                 <span className="block truncate text-xs text-muted-foreground">{link.value}</span>
               </span>
             </Link>
@@ -377,8 +382,13 @@ function ProfileHero({ profile, today }: { profile: PersonProfile; today: string
         aria-hidden
         className="h-16 bg-gradient-to-r from-sky-500/15 via-primary/10 to-violet-500/15 sm:h-20"
       />
-      <CardContent className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end">
-        <EntityAvatar name={name} src={person.photoUrl} size="xl" className="ring-4 ring-card" />
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <EntityAvatar
+          name={name}
+          src={person.photoUrl}
+          size="xl"
+          className="-mt-12 shrink-0 ring-4 ring-card"
+        />
         <div className="min-w-0 flex-1">
           {/* The page heading (for screen readers) is in the header above. */}
           <p
@@ -423,7 +433,7 @@ function ProfileHero({ profile, today }: { profile: PersonProfile; today: string
             ))}
           </div>
         </div>
-        <ContactButtons phone={person.phone} email={person.email} />
+        <ContactButtons phone={person.phone} email={person.email} className="sm:self-center" />
       </CardContent>
       {profile.hiddenFields.length > 0 ? (
         <p className="flex items-center gap-2 border-t border-border/60 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground sm:px-5">

@@ -233,57 +233,61 @@ function MergeDialog({
                     ) : null,
                   )}
                 </div>
-                <div className="overflow-hidden rounded-xl border border-border/70">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/45 text-left text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 font-semibold">{t('people.mergeField')}</th>
-                        <th className="px-3 py-2 font-semibold">{t('people.mergeKept')}</th>
-                        <th className="px-3 py-2 font-semibold">{t('people.mergeUseOther')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {MERGE_FIELDS.map(({ key, label }) => {
-                        const kept = display(keep, key);
-                        const incoming = display(other, key);
-                        const differs = kept !== incoming && incoming !== '—';
-                        return (
-                          <tr key={key} className="border-t border-border/60">
-                            <td className="px-3 py-2 text-muted-foreground">{t(label)}</td>
-                            <td
-                              className={cn(
-                                'px-3 py-2 break-words',
-                                take.includes(key) && 'text-muted-foreground line-through',
-                              )}
-                            >
-                              {kept}
-                            </td>
-                            <td className="px-3 py-2">
-                              {differs ? (
-                                <label className="flex cursor-pointer items-center gap-2 break-words">
-                                  <Checkbox
-                                    checked={take.includes(key)}
-                                    onCheckedChange={(checked) =>
-                                      setTake((current) =>
-                                        checked
-                                          ? [...current, key]
-                                          : current.filter((value) => value !== key),
-                                      )
-                                    }
-                                  />
-                                  {incoming}
-                                </label>
-                              ) : (
-                                <span className="text-muted-foreground">
-                                  {incoming === '—' ? '—' : t('people.mergeSame')}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="overflow-hidden rounded-xl border border-border/70 text-sm">
+                  <div
+                    aria-hidden
+                    className="grid grid-cols-2 gap-3 bg-muted/45 px-3 py-2 text-xs font-semibold text-muted-foreground sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)]"
+                  >
+                    <span className="hidden sm:block">{t('people.mergeField')}</span>
+                    <span>{t('people.mergeKept')}</span>
+                    <span>{t('people.mergeUseOther')}</span>
+                  </div>
+                  <ul>
+                    {MERGE_FIELDS.map(({ key, label }) => {
+                      const kept = display(keep, key);
+                      const incoming = display(other, key);
+                      const differs = kept !== incoming && incoming !== '—';
+                      return (
+                        <li
+                          key={key}
+                          className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)]"
+                        >
+                          <span className="col-span-2 text-xs text-muted-foreground sm:col-span-1 sm:text-sm">
+                            {t(label)}
+                          </span>
+                          <span
+                            className={cn(
+                              'min-w-0 break-words',
+                              take.includes(key) && 'text-muted-foreground line-through',
+                            )}
+                          >
+                            {kept}
+                          </span>
+                          {differs ? (
+                            <label className="flex min-w-0 cursor-pointer items-start gap-2 break-words">
+                              <Checkbox
+                                className="mt-0.5"
+                                checked={take.includes(key)}
+                                aria-label={t('people.mergeTakeField', { field: t(label) })}
+                                onCheckedChange={(checked) =>
+                                  setTake((current) =>
+                                    checked
+                                      ? [...current, key]
+                                      : current.filter((value) => value !== key),
+                                  )
+                                }
+                              />
+                              <span className="min-w-0">{incoming}</span>
+                            </label>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {incoming === '—' ? '—' : t('people.mergeSame')}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
                 <Alert variant="info">{t('people.mergeMoves')}</Alert>
               </>

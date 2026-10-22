@@ -88,7 +88,7 @@ export function FamilyTab({
         <div className="flex items-center gap-1">
           {onAddFamily ? (
             <Button size="sm" variant="ghost" onClick={onAddFamily}>
-              <UserPlus /> <span className="hidden sm:inline">{t('people.addFamily')}</span>
+              <UserPlus /> <span className="sr-only sm:not-sr-only">{t('people.addFamily')}</span>
             </Button>
           ) : null}
           <Button asChild size="sm" variant="outline">

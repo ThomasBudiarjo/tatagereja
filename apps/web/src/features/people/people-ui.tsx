@@ -58,11 +58,14 @@ export function TagChip({
   );
 }
 
+/** The area of a person or household; the code shows on hover. */
 export function AreaChip({ area, className }: { area: AreaSummary; className?: string }) {
+  const full = area.code ? `${area.code} · ${area.name}` : area.name;
   return (
     <span
+      title={full}
       className={cn(
-        'inline-flex h-6 max-w-44 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground',
+        'inline-flex h-6 max-w-64 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground',
         className,
       )}
     >
@@ -71,7 +74,7 @@ export function AreaChip({ area, className }: { area: AreaSummary; className?: s
         className="size-2 shrink-0 rounded-[3px] bg-emerald-600/70"
         style={area.color ? { backgroundColor: area.color } : undefined}
       />
-      <span className="truncate">{area.code ? `${area.code} · ${area.name}` : area.name}</span>
+      <span className="truncate">{area.name}</span>
     </span>
   );
 }

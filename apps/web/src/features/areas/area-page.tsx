@@ -129,7 +129,7 @@ export function AreaPage() {
           canManage ? (
             <>
               <Button size="sm" variant="outline" onClick={() => setDialog('edit')}>
-                <Pencil /> <span className="hidden sm:inline">{t('common.edit')}</span>
+                <Pencil /> <span className="sr-only sm:not-sr-only">{t('common.edit')}</span>
               </Button>
               <RowActions
                 className="size-9 border border-input bg-card"
@@ -199,48 +199,60 @@ export function AreaPage() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardContent>
-            <DonutChart
-              title={t('people.byStatus')}
-              centerLabel={t('people.statPeople')}
-              data={stats.byStatus
-                .filter((row) => row.count > 0)
-                .map((row) => ({
-                  label: localize(PERSON_STATUS_TEXT[row.key as PersonMembershipStatus], locale),
+      {stats.people > 0 ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card>
+            <CardContent>
+              <h2 className="mb-3 text-sm font-semibold">{t('people.byStatus')}</h2>
+              <DonutChart
+                title={t('people.byStatus')}
+                centerLabel={t('people.statPeople')}
+                data={stats.byStatus
+                  .filter((row) => row.count > 0)
+                  .map((row) => ({
+                    label: localize(PERSON_STATUS_TEXT[row.key as PersonMembershipStatus], locale),
+                    value: row.count,
+                  }))}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <h2 className="mb-3 text-sm font-semibold">{t('people.byAge')}</h2>
+              <BarChart
+                title={t('people.byAge')}
+                height={200}
+                data={stats.byAge.map((row) => ({
+                  label: localize(PEOPLE_AGE_BAND_LABELS[row.key as PeopleAgeBand], locale).replace(
+                    / \(.*\)$/,
+                    '',
+                  ),
                   value: row.count,
                 }))}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <BarChart
-              title={t('people.byAge')}
-              height={200}
-              data={stats.byAge.map((row) => ({
-                label: localize(PEOPLE_AGE_BAND_LABELS[row.key as PeopleAgeBand], locale).replace(
-                  / \(.*\)$/,
-                  '',
-                ),
-                value: row.count,
-              }))}
-            />
-          </CardContent>
-        </Card>
-      </div>
+              />
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Section
             title={t('people.areaPeople')}
             action={
-              <Button asChild variant="link" size="sm">
-                <Link to={`${base}/people?area=${area.id}`}>
-                  {t('common.seeAll')} <ArrowRight />
-                </Link>
-              </Button>
+              <div className="flex items-center gap-1">
+                {canManage && people.data && people.data.items.length > 0 ? (
+                  <Button variant="ghost" size="sm" onClick={() => setDialog('assign')}>
+                    <Plus />{' '}
+                    <span className="sr-only sm:not-sr-only">{t('people.assignShort')}</span>
+                  </Button>
+                ) : null}
+                <Button asChild variant="link" size="sm">
+                  <Link to={`${base}/people?area=${area.id}`}>
+                    {t('common.seeAll')} <ArrowRight />
+                  </Link>
+                </Button>
+              </div>
             }
           >
             {people.isPending ? (

@@ -184,6 +184,12 @@ export function FieldsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 truncate font-medium">
                     {field.label}
+                    {field.isPrivate ? (
+                      <EyeOff
+                        className="size-3.5 shrink-0 text-muted-foreground sm:hidden"
+                        aria-label={t('people.privateField')}
+                      />
+                    ) : null}
                     {!field.isActive ? (
                       <StatusBadge size="sm">{t('people.inactiveField')}</StatusBadge>
                     ) : null}

@@ -10,6 +10,7 @@ import {
   type DirectoryPerson,
   type DirectorySort,
   type Gender,
+  type PeopleStats,
   type PersonMembershipStatus,
 } from '@tatagereja/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -48,6 +49,7 @@ import { FilterBar, type FilterDefinition } from '@/components/ui/filter-bar';
 import { Pagination } from '@/components/ui/pagination';
 import { SkeletonList, SkeletonStats } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
+import { ToneIcon } from '@/components/ui/status-badge';
 import { ErrorState } from '@/components/ui/states';
 import { groupsQuery } from '@/features/groups/api';
 import { getErrorMessage } from '@/lib/api';
@@ -115,7 +117,7 @@ const DEFAULTS = {
 
 export function PeoplePage() {
   const { churchId, base, access, church } = useChurch();
-  const { t, locale, formatNumber } = useI18n();
+  const { t, locale } = useI18n();
   const [state, setState, reset] = useUrlState(DEFAULTS);
   const [exporting, setExporting] = useState(false);
   const listTop = useRef<HTMLDivElement>(null);
@@ -382,43 +384,7 @@ export function PeoplePage() {
       {summary.isPending ? (
         <SkeletonStats />
       ) : summary.data ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard
-            label={t('people.statPeople')}
-            value={formatNumber(summary.data.people)}
-            hint={
-              summary.data.newThisMonth > 0
-                ? t('people.statNewThisMonth', { count: summary.data.newThisMonth })
-                : undefined
-            }
-            icon={Users}
-            tone="sky"
-          />
-          <StatCard
-            label={t('people.statMembers')}
-            value={formatNumber(
-              summary.data.byStatus.find((row) => row.key === 'member')?.count ?? 0,
-            )}
-            icon={UserCheck}
-            tone="emerald"
-            to={`${base}/people?status=member`}
-          />
-          <StatCard
-            label={t('people.statHouseholds')}
-            value={formatNumber(summary.data.households)}
-            icon={Home}
-            tone="amber"
-            to={`${base}/households`}
-          />
-          <StatCard
-            label={t('people.statCelebrations')}
-            value={formatNumber(summary.data.celebrations.length)}
-            hint={t('people.statCelebrationsHint')}
-            icon={Cake}
-            tone="rose"
-            to={`${base}/people?celebration=week&sort=birthday`}
-          />
-        </div>
+        <DirectoryStats stats={summary.data} />
       ) : null}
 
       <div ref={listTop} className="scroll-mt-20" />
@@ -609,5 +575,100 @@ function DirectoryList({
         </section>
       ))}
     </div>
+  );
+}
+
+/** Stat cards from `sm`; on phones a compact two-by-two grid so the list stays in view. */
+function DirectoryStats({ stats }: { stats: PeopleStats }) {
+  const { base } = useChurch();
+  const { t, formatNumber } = useI18n();
+  const tiles = [
+    {
+      id: 'people',
+      label: t('people.statPeople'),
+      value: formatNumber(stats.people),
+      hint:
+        stats.newThisMonth > 0
+          ? t('people.statNewThisMonth', { count: stats.newThisMonth })
+          : undefined,
+      icon: Users,
+      tone: 'sky' as const,
+      to: undefined,
+    },
+    {
+      id: 'members',
+      label: t('people.statMembers'),
+      value: formatNumber(stats.byStatus.find((row) => row.key === 'member')?.count ?? 0),
+      hint: undefined,
+      icon: UserCheck,
+      tone: 'emerald' as const,
+      to: `${base}/people?status=member`,
+    },
+    {
+      id: 'households',
+      label: t('people.statHouseholds'),
+      value: formatNumber(stats.households),
+      hint: undefined,
+      icon: Home,
+      tone: 'amber' as const,
+      to: `${base}/households`,
+    },
+    {
+      id: 'celebrations',
+      label: t('people.statCelebrations'),
+      value: formatNumber(stats.celebrations.length),
+      hint: t('people.statCelebrationsHint'),
+      icon: Cake,
+      tone: 'rose' as const,
+      to: `${base}/people?celebration=week&sort=birthday`,
+    },
+  ];
+  const tile =
+    'flex min-h-14 items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-soft';
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2 sm:hidden">
+        {tiles.map((item) => {
+          const body = (
+            <>
+              <ToneIcon icon={item.icon} tone={item.tone} size="sm" />
+              <span className="min-w-0">
+                <span className="block text-lg leading-tight font-bold tabular">{item.value}</span>
+                <span className="block truncate text-xs text-muted-foreground">{item.label}</span>
+              </span>
+            </>
+          );
+          return item.to ? (
+            <Link
+              key={item.id}
+              to={item.to}
+              className={cn(
+                tile,
+                'pressable outline-none hover:border-border focus-visible:ring-[3px] focus-visible:ring-ring/40',
+              )}
+            >
+              {body}
+            </Link>
+          ) : (
+            <div key={item.id} className={tile}>
+              {body}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden grid-cols-2 gap-3 sm:grid lg:grid-cols-4">
+        {tiles.map((item) => (
+          <StatCard
+            key={item.id}
+            label={item.label}
+            value={item.value}
+            hint={item.hint}
+            icon={item.icon}
+            tone={item.tone}
+            to={item.to}
+          />
+        ))}
+      </div>
+    </>
   );
 }

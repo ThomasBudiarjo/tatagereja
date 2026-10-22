@@ -78,7 +78,8 @@ export function GroupsPage() {
         actions={
           canCreate ? (
             <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus /> {t('groups.new')}
+              <Plus /> <span className="sm:hidden">{t('common.add')}</span>
+              <span className="hidden sm:inline">{t('groups.new')}</span>
             </Button>
           ) : null
         }
@@ -310,7 +311,6 @@ function GroupCard({ group }: { group: GroupDetails }) {
                 name: leader.name,
                 src: leader.avatarUrl,
               }))}
-              size="xs"
               max={3}
             />
           ) : null}

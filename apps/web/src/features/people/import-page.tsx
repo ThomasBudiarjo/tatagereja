@@ -26,8 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Alert, Segmented } from '@/components/ui/misc';
 import { Select } from '@/components/ui/select';
-import { StatCard } from '@/components/ui/stat-card';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import { Stepper } from '@/components/ui/stepper';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -86,6 +85,38 @@ export function ImportPeoplePage() {
   const definitions = fields.data?.items ?? [];
   const mapped = useMemo(() => (parsed ? mapRows(parsed, targets) : []), [parsed, targets]);
   const hasName = targets.includes('firstName') || targets.includes('fullName');
+
+  /** The API's issue codes in the interface language, named by column. */
+  const issueText = (
+    issue: PersonImportResult['rows'][number]['issues'][number],
+    source: Record<string, string>,
+  ) => {
+    const [head = '', key = ''] = issue.path.split('.');
+    const field =
+      head in COLUMN_LABELS
+        ? t(COLUMN_LABELS[head as keyof typeof COLUMN_LABELS])
+        : head === 'customFields'
+          ? (definitions.find((definition) => definition.key === key)?.label ?? key)
+          : issue.path;
+    switch (issue.code) {
+      case 'missing':
+        return t('people.importIssueMissing', { field });
+      case 'unknown_area':
+        return t('people.importIssueUnknownArea', { value: source.areaName ?? '' });
+      case 'household_ignored':
+        return t('people.importIssueHouseholdIgnored');
+      case 'unknown_tag':
+        return t('people.importIssueUnknownTag');
+      case 'unknown_field':
+        return t('people.importIssueUnknownField', { field });
+      case 'invalid_field_value':
+        return t('people.importIssueInvalidFieldValue', { field });
+      case 'duplicate_in_file':
+        return t('people.importIssueInFile');
+      case 'invalid':
+        return t('people.importIssueInvalid', { field });
+    }
+  };
 
   const readFile = async (file: File) => {
     if (
@@ -312,25 +343,25 @@ export function ImportPeoplePage() {
 
       {step === 2 && preview && counts ? (
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard
-              label={t('people.importReady')}
-              value={counts.ok}
-              icon={CheckCircle2}
-              tone="success"
-            />
-            <StatCard
-              label={t('people.importDuplicates')}
-              value={counts.duplicate}
-              icon={AlertTriangle}
-              tone="warning"
-            />
-            <StatCard
-              label={t('people.importInvalid')}
-              value={counts.invalid}
-              icon={XCircle}
-              tone="danger"
-            />
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {(
+              [
+                ['importReady', counts.ok, CheckCircle2, 'success'],
+                ['importDuplicates', counts.duplicate, AlertTriangle, 'warning'],
+                ['importInvalid', counts.invalid, XCircle, 'danger'],
+              ] as const
+            ).map(([key, value, icon, tone]) => (
+              <div
+                key={key}
+                className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft sm:flex-row sm:items-center sm:gap-3 sm:p-4"
+              >
+                <ToneIcon icon={icon} tone={tone} size="sm" />
+                <div className="min-w-0">
+                  <p className="text-xl leading-tight font-bold tabular sm:text-2xl">{value}</p>
+                  <p className="text-xs leading-snug text-muted-foreground">{t(`people.${key}`)}</p>
+                </div>
+              </div>
+            ))}
           </div>
           <Segmented<RowFilter>
             aria-label={t('common.filters')}
@@ -371,7 +402,7 @@ export function ImportPeoplePage() {
                       <p className="truncate text-sm font-medium">{name}</p>
                       {row.issues.map((issue, index) => (
                         <p key={index} className="text-xs text-muted-foreground">
-                          <span className="font-mono">{issue.path}</span>: {issue.message}
+                          {issueText(issue, source)}
                         </p>
                       ))}
                       {row.status === 'duplicate' ? (

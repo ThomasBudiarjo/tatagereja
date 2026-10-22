@@ -191,7 +191,7 @@ function HouseholdCard({ household }: { household: Household }) {
       </div>
       <div className="mt-auto flex items-center justify-between gap-3">
         {household.members.length > 0 ? (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <AvatarGroup
               people={household.members.map((member) => ({
                 id: member.id,
@@ -199,16 +199,15 @@ function HouseholdCard({ household }: { household: Household }) {
                 src: member.photoUrl,
               }))}
               max={4}
-              size="xs"
             />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs whitespace-nowrap text-muted-foreground">
               {t('people.memberCount', { count: household.members.length })}
             </span>
           </div>
         ) : (
           <span />
         )}
-        {household.area ? <AreaChip area={household.area} /> : null}
+        {household.area ? <AreaChip area={household.area} className="min-w-0" /> : null}
       </div>
       {household.phone || household.address ? (
         <div className="flex flex-col gap-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">

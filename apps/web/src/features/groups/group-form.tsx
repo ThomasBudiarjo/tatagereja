@@ -149,7 +149,7 @@ export function GroupFormDialog({
               </Select>
             </Field>
             <Field
-              label={t('groups.description')}
+              label={t('groups.descriptionLabel')}
               htmlFor="group-description"
               error={errors.description?.message}
             >

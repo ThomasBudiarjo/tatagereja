@@ -148,7 +148,7 @@ export function HouseholdPage() {
           canManage ? (
             <>
               <Button size="sm" variant="outline" onClick={() => setDialog('edit')}>
-                <Pencil /> <span className="hidden sm:inline">{t('common.edit')}</span>
+                <Pencil /> <span className="sr-only sm:not-sr-only">{t('common.edit')}</span>
               </Button>
               <RowActions
                 label={t('common.moreActions')}
@@ -212,11 +212,13 @@ export function HouseholdPage() {
           canManage ? (
             <div className="flex items-center gap-1">
               <Button size="sm" variant="ghost" onClick={() => setDialog('pick')}>
-                <UserPlus /> <span className="hidden sm:inline">{t('people.addExisting')}</span>
+                <UserPlus />{' '}
+                <span className="sr-only sm:not-sr-only">{t('people.addExisting')}</span>
               </Button>
               {canAddPeople ? (
                 <Button size="sm" onClick={() => setDialog('new')}>
-                  <UserPlus /> <span className="hidden sm:inline">{t('people.addFamily')}</span>
+                  <UserPlus />{' '}
+                  <span className="sr-only sm:not-sr-only">{t('people.addFamily')}</span>
                 </Button>
               ) : null}
             </div>
@@ -254,9 +256,20 @@ export function HouseholdPage() {
                       <div className="flex items-center gap-2">
                         <span className="truncate font-medium">{name}</span>
                         {member.isPrimaryContact ? (
-                          <StatusBadge tone="amber" size="sm" icon={Star}>
-                            {t('people.primaryContact')}
-                          </StatusBadge>
+                          <>
+                            <Star
+                              className="size-3.5 shrink-0 fill-current text-amber-500 sm:hidden"
+                              aria-label={t('people.primaryContact')}
+                            />
+                            <StatusBadge
+                              tone="amber"
+                              size="sm"
+                              icon={Star}
+                              className="hidden shrink-0 sm:inline-flex"
+                            >
+                              {t('people.primaryContact')}
+                            </StatusBadge>
+                          </>
                         ) : null}
                       </div>
                       <p className="truncate text-sm text-muted-foreground">
@@ -271,7 +284,11 @@ export function HouseholdPage() {
                           .join(' · ')}
                       </p>
                     </div>
-                    <PersonStatusBadge status={member.membershipStatus} size="sm" />
+                    <PersonStatusBadge
+                      status={member.membershipStatus}
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                    />
                   </Link>
                   {canManage ? (
                     <RowActions

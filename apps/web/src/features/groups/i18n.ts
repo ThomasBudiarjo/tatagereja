@@ -5,6 +5,7 @@ export const groupsDictionary = defineDictionary('groups', {
   en: {
     title: 'Groups & komisi',
     description: 'Komisi, ministries, small groups, choirs and committees.',
+    descriptionLabel: 'Description',
     group: 'Group',
     gone: 'This group no longer exists',
     new: 'New group',
@@ -127,6 +128,7 @@ export const groupsDictionary = defineDictionary('groups', {
   id: {
     title: 'Kelompok & komisi',
     description: 'Komisi, pelayanan, kelompok kecil, paduan suara, dan kepanitiaan.',
+    descriptionLabel: 'Deskripsi',
     group: 'Kelompok',
     gone: 'Kelompok ini sudah tidak ada',
     new: 'Kelompok baru',

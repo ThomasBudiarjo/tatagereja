@@ -152,7 +152,7 @@ export function AreaFormDialog({
             {t('common.cancel')}
           </Button>
           <Button type="submit" form="area-form" loading={save.isPending}>
-            {area ? t('common.saveChanges') : t('people.newArea')}
+            {area ? t('common.saveChanges') : t('people.createArea')}
           </Button>
         </DialogFooter>
       </DialogContent>

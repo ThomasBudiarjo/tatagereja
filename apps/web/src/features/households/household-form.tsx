@@ -235,7 +235,7 @@ export function HouseholdFormDialog({
             {t('common.cancel')}
           </Button>
           <Button type="submit" form="household-form" loading={pending}>
-            {household ? t('common.saveChanges') : t('people.newHousehold')}
+            {household ? t('common.saveChanges') : t('people.createHousehold')}
           </Button>
         </DialogFooter>
       </DialogContent>

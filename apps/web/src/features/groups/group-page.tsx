@@ -153,7 +153,7 @@ export function GroupPage() {
             <>
               {page.canManage ? (
                 <Button size="sm" variant="outline" onClick={() => setDialog('edit')}>
-                  <Pencil /> <span className="hidden sm:inline">{t('common.edit')}</span>
+                  <Pencil /> <span className="sr-only sm:not-sr-only">{t('common.edit')}</span>
                 </Button>
               ) : null}
               <RowActions
@@ -332,12 +332,12 @@ function GroupHero({
             : undefined
         }
       />
-      <CardContent className="-mt-10 flex flex-col gap-4 sm:-mt-11 sm:flex-row sm:items-end">
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
         <GroupCover
           type={group.type}
           color={group.coverColor}
           size="lg"
-          className="size-16 rounded-2xl ring-4 ring-card [&>svg]:size-8"
+          className="-mt-12 size-16 shrink-0 rounded-2xl ring-4 ring-card sm:-mt-10 [&>svg]:size-8"
         />
         <div className="min-w-0 flex-1">
           <p
@@ -376,7 +376,6 @@ function GroupHero({
                   name: leader.name,
                   src: leader.avatarUrl,
                 }))}
-                size="xs"
               />
               <span className="truncate text-muted-foreground">
                 {t('groups.ledBy', {
@@ -446,7 +445,7 @@ function MembersTab({ page, onAdd }: { page: GroupPageData; onAdd: () => void })
             onClick={onAdd}
             disabled={group.capacity !== null && group.memberCount >= group.capacity}
           >
-            <UserPlus /> <span className="hidden sm:inline">{t('groups.addMembers')}</span>
+            <UserPlus /> <span className="sr-only sm:not-sr-only">{t('groups.addMembers')}</span>
           </Button>
         ) : null}
       </div>

@@ -143,10 +143,10 @@ function AreaCard({ area }: { area: Area }) {
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white"
+          className="flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-xs font-bold tracking-tight text-white tabular"
           style={{ backgroundColor: area.color ?? 'var(--chart-3)' }}
         >
-          {(area.code ?? area.name).slice(0, 3).toUpperCase()}
+          {(area.code ?? area.name).slice(0, area.code ? 5 : 2).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{area.name}</p>
@@ -180,7 +180,6 @@ function AreaCard({ area }: { area: Area }) {
               name: coordinator.name,
               src: coordinator.avatarUrl,
             }))}
-            size="xs"
             max={3}
           />
         ) : (
