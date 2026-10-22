@@ -22,6 +22,13 @@
       "when": 1792700801027,
       "tag": "0002_modules_data_model",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792709639064,
+      "tag": "0003_finance",
+      "breakpoints": true
     }
   ]
 }

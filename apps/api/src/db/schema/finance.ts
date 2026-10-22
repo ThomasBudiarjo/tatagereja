@@ -173,6 +173,9 @@ export const offeringBatches = sqliteTable(
     counter2Name: text('counter2_name'),
     notes: text('notes'),
     submittedAt: text('submitted_at'),
+    submittedBy: text('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+    /** The last person who changed the count; they cannot verify it either. */
+    updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
     verifiedBy: text('verified_by').references(() => users.id, { onDelete: 'set null' }),
     verifiedAt: text('verified_at'),
     voidedAt: text('voided_at'),
@@ -307,6 +310,7 @@ export const financeContributions = sqliteTable(
   (table) => [
     index('finance_contributions_church_received_idx').on(table.churchId, table.receivedAt),
     index('finance_contributions_person_idx').on(table.personId, table.receivedAt),
+    index('finance_contributions_campaign_idx').on(table.campaignId),
     uniqueIndex('finance_contributions_church_receipt_unique').on(
       table.churchId,
       table.receiptNumber,

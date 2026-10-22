@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { LIMITS } from '../constants';
 import type { LocalizedText } from '../localized';
-import { has, type AccessLike } from '../permissions';
+import { has, hasAny, type AccessLike } from '../permissions';
 import {
   idSchema,
   isoDateSchema,
@@ -140,6 +140,20 @@ export const FINANCE_ENTRY_SOURCE_LABELS: Record<FinanceEntrySource, LocalizedTe
 export const CAMPAIGN_STATUSES = ['active', 'closed'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, LocalizedText> = {
+  active: { en: 'Active', id: 'Berjalan' },
+  closed: { en: 'Closed', id: 'Selesai' },
+};
+
+export const FINANCE_PERIOD_STATUSES = ['open', 'closed', 'reopened'] as const;
+export type FinancePeriodStatus = (typeof FINANCE_PERIOD_STATUSES)[number];
+
+export const FINANCE_PERIOD_STATUS_LABELS: Record<FinancePeriodStatus, LocalizedText> = {
+  open: { en: 'Open', id: 'Terbuka' },
+  closed: { en: 'Closed', id: 'Ditutup' },
+  reopened: { en: 'Reopened', id: 'Dibuka kembali' },
+};
+
 /** Rupiah banknotes and coins for the denomination counter (IDR minor unit = 1 rupiah). */
 export const IDR_DENOMINATIONS = [
   100_000, 50_000, 20_000, 10_000, 5_000, 2_000, 1_000, 500, 200, 100,
@@ -164,6 +178,20 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'Pembangunan',
   'Administrasi',
 ] as const;
+export const DEFAULT_CASH_ACCOUNT = 'Kas Tunai' as const;
+
+/** The suggested income category of each kind of individual giving. */
+export const CONTRIBUTION_KIND_CATEGORY: Record<ContributionKind, string | null> = {
+  tithe: 'Perpuluhan',
+  thanksgiving: 'Persembahan Syukur',
+  special: 'Persembahan Khusus',
+  donation: 'Donasi',
+  pledge_payment: 'Persembahan Khusus',
+  other: null,
+};
+
+/** The category suggested for counted service offerings. */
+export const OFFERING_DEFAULT_CATEGORY = 'Persembahan Ibadah' as const;
 
 // ---------------------------------------------------------------------------------------------
 // Helpers and access rules
@@ -179,6 +207,26 @@ export const financePeriodOf = (date: string): { year: number; month: number } =
   month: Number(date.slice(5, 7)),
 });
 
+/** `YYYY-MM` of a period, used as report keys. */
+export const periodKey = (year: number, month: number): string =>
+  `${year}-${String(month).padStart(2, '0')}`;
+
+/** First and last day (YYYY-MM-DD) of a month. */
+export const monthRange = (year: number, month: number): { from: string; to: string } => {
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    from: `${periodKey(year, month)}-01`,
+    to: `${periodKey(year, month)}-${String(last).padStart(2, '0')}`,
+  };
+};
+
+/** A `YYYY-MM-DD` day moved by whole days. */
+export const shiftDate = (date: string, days: number): string => {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+};
+
 /** Whether a date falls in one of the closed periods. */
 export const isInClosedPeriod = (
   date: string,
@@ -188,19 +236,92 @@ export const isInClosedPeriod = (
   return closedPeriods.some((period) => period.year === year && period.month === month);
 };
 
+/** Budget usage as a ratio (0.5 = half spent); null without a budget. */
+export const budgetUsage = (budget: number, actual: number): number | null =>
+  budget > 0 ? actual / budget : null;
+
+/** Campaign or pledge progress as a ratio capped at 1. */
+export const progressRatio = (target: number, received: number): number =>
+  target > 0 ? Math.min(1, Math.max(0, received / target)) : 0;
+
+/** Lists of funds, accounts and categories: everyone who works with finance needs them. */
+export const canUseFinance = (access: Pick<AccessLike, 'permissions'>) =>
+  hasAny(access, [
+    'finance.view',
+    'finance.record',
+    'finance.approve',
+    'finance.manage',
+    'finance.reports',
+  ]);
+
+/** Every expense request, not only the caller's own. */
+export const canViewAllExpenses = (access: Pick<AccessLike, 'permissions'>) =>
+  hasAny(access, ['finance.view', 'finance.approve', 'finance.manage']);
+
 /** Segregation of duties: nobody approves an expense they requested. */
 export const canApproveExpense = (access: AccessLike, expense: { requestedBy: string | null }) =>
   has(access, 'finance.approve') && expense.requestedBy !== access.userId;
 
-/** The verifier of an offering count must not be one of its counters or its creator. */
-export const canVerifyOfferingBatch = (
-  access: AccessLike,
-  batch: { counter1UserId: string | null; counter2UserId: string | null; createdBy: string | null },
-) =>
+type ExpenseLike = { status: ExpenseStatus; requestedBy: string | null };
+
+const isRequester = (access: AccessLike, expense: ExpenseLike) =>
+  expense.requestedBy === access.userId && has(access, 'finance.record');
+
+/** Drafts are edited and submitted by their requester, or by the finance managers. */
+export const canEditExpense = (access: AccessLike, expense: ExpenseLike) =>
+  expense.status === 'draft' && (isRequester(access, expense) || has(access, 'finance.manage'));
+
+export const canDecideExpense = (access: AccessLike, expense: ExpenseLike) =>
+  expense.status === 'submitted' && canApproveExpense(access, expense);
+
+export const canPayExpense = (access: AccessLike, expense: ExpenseLike) =>
+  expense.status === 'approved' && hasAny(access, ['finance.record', 'finance.manage']);
+
+export const canCancelExpense = (access: AccessLike, expense: ExpenseLike) =>
+  EXPENSE_TRANSITIONS[expense.status].includes('cancelled') &&
+  (isRequester(access, expense) || has(access, 'finance.manage'));
+
+type BatchLike = {
+  status: OfferingBatchStatus;
+  counter1UserId: string | null;
+  counter2UserId: string | null;
+  createdBy: string | null;
+  submittedBy?: string | null;
+  updatedBy?: string | null;
+};
+
+/**
+ * The verifier of an offering count must not be one of its counters, its creator, the person
+ * who submitted it or the last person who edited it.
+ */
+export const canVerifyOfferingBatch = (access: AccessLike, batch: Omit<BatchLike, 'status'>) =>
   has(access, 'finance.approve') &&
-  access.userId !== batch.counter1UserId &&
-  access.userId !== batch.counter2UserId &&
-  access.userId !== batch.createdBy;
+  ![
+    batch.counter1UserId,
+    batch.counter2UserId,
+    batch.createdBy,
+    batch.submittedBy ?? null,
+    batch.updatedBy ?? null,
+  ].includes(access.userId);
+
+export const canEditOfferingBatch = (access: AccessLike, batch: BatchLike) =>
+  batch.status === 'draft' && has(access, 'finance.record');
+
+/** A submitted count goes back to counting for corrections. */
+export const canReturnOfferingBatch = (access: AccessLike, batch: BatchLike) =>
+  batch.status === 'submitted' && hasAny(access, ['finance.record', 'finance.approve']);
+
+/** Managers void any batch; a counter may discard their own unverified count. */
+export const canVoidOfferingBatch = (access: AccessLike, batch: BatchLike) =>
+  batch.status !== 'voided' &&
+  (has(access, 'finance.manage') ||
+    (batch.status !== 'verified' &&
+      batch.createdBy === access.userId &&
+      has(access, 'finance.record')));
+
+/** Giving of a person: finance reports, or the person themselves ("my giving"). */
+export const canViewGivingOf = (access: AccessLike, personId: string) =>
+  has(access, 'finance.reports') || access.personId === personId;
 
 // ---------------------------------------------------------------------------------------------
 // Funds, accounts, categories and periods
@@ -214,7 +335,8 @@ export const financeFundSchema = z.object({
   isRestricted: z.boolean(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
-  balance: signedMoneySchema,
+  /** Null for callers without `finance.view`. */
+  balance: signedMoneySchema.nullable(),
 });
 export type FinanceFund = z.infer<typeof financeFundSchema>;
 
@@ -237,7 +359,8 @@ export const financeAccountSchema = z.object({
   openingBalance: signedMoneySchema,
   openingDate: isoDateSchema,
   isActive: z.boolean(),
-  balance: signedMoneySchema,
+  /** Null for callers without `finance.view`. */
+  balance: signedMoneySchema.nullable(),
 });
 export type FinanceAccount = z.infer<typeof financeAccountSchema>;
 
@@ -278,15 +401,45 @@ export const financeSetupSchema = z.object({
 });
 export type FinanceSetup = z.infer<typeof financeSetupSchema>;
 
+export const financeFundResponseSchema = z.object({ fund: financeFundSchema });
+export const financeAccountResponseSchema = z.object({ account: financeAccountSchema });
+export const financeCategoryResponseSchema = z.object({ category: financeCategorySchema });
+
+/** The suggested funds, categories and a cash box; existing names are kept. */
+export const financeDefaultsBodySchema = z.object({
+  openingDate: isoDateSchema,
+  cashOpeningBalance: signedMoneySchema.default(0),
+});
+export type FinanceDefaultsBody = z.infer<typeof financeDefaultsBodySchema>;
+
 export const financePeriodSchema = z.object({
   year: z.number().int(),
   month: z.number().int().min(1).max(12),
-  status: z.enum(['open', 'closed', 'reopened']),
+  status: z.enum(FINANCE_PERIOD_STATUSES),
   closedAt: isoDateTimeSchema.nullable(),
+  closedByName: z.string().nullable(),
   reopenedAt: isoDateTimeSchema.nullable(),
+  reopenedByName: z.string().nullable(),
   reopenReason: z.string().nullable(),
+  income: moneySchema,
+  expense: moneySchema,
+  entryCount: z.number().int().nonnegative(),
+  /** Offering counts still in draft or waiting for verification. */
+  pendingBatches: z.number().int().nonnegative(),
 });
 export type FinancePeriod = z.infer<typeof financePeriodSchema>;
+
+export const financePeriodListQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(3000),
+});
+
+export const financePeriodListSchema = z.object({
+  year: z.number().int(),
+  items: z.array(financePeriodSchema),
+});
+export type FinancePeriodList = z.infer<typeof financePeriodListSchema>;
+
+export const financePeriodResponseSchema = z.object({ period: financePeriodSchema });
 
 export const financePeriodParamsSchema = z.object({
   churchId: idSchema,
@@ -317,9 +470,15 @@ export const financeEntrySchema = z.object({
   /** Account balance after this entry, when listed per account. */
   runningBalance: signedMoneySchema.nullable(),
   voidedAt: isoDateTimeSchema.nullable(),
+  voidReason: z.string().nullable(),
   createdAt: isoDateTimeSchema,
 });
 export type FinanceEntry = z.infer<typeof financeEntrySchema>;
+
+const booleanQuery = z
+  .enum(['true', 'false'])
+  .default('false')
+  .transform((value) => value === 'true');
 
 export const financeEntryListQuerySchema = paginationQuerySchema.extend({
   from: isoDateSchema.optional(),
@@ -328,15 +487,16 @@ export const financeEntryListQuerySchema = paginationQuerySchema.extend({
   fundId: idSchema.optional(),
   categoryId: idSchema.optional(),
   sourceType: z.enum(FINANCE_ENTRY_SOURCES).optional(),
-  includeVoided: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
+  direction: z.enum(['in', 'out']).optional(),
+  includeVoided: booleanQuery,
+  format: z.enum(['json', 'csv']).default('json'),
 });
 export type FinanceEntryListQuery = z.infer<typeof financeEntryListQuerySchema>;
 
 export const financeEntryListSchema = paginatedSchema(financeEntrySchema);
 export type FinanceEntryList = z.infer<typeof financeEntryListSchema>;
+
+export const financeEntryResponseSchema = z.object({ entry: financeEntrySchema });
 
 /** A manual correction posted by `finance.manage`. */
 export const financeAdjustmentInputSchema = z.object({
@@ -370,6 +530,7 @@ export const offeringBatchLineSchema = z.object({
   fundId: idSchema,
   fundName: z.string(),
   categoryId: idSchema.nullable(),
+  categoryName: z.string().nullable(),
   method: z.enum(PAYMENT_METHODS),
   amount: moneySchema,
   denominations: z.record(z.string(), z.number()),
@@ -400,6 +561,7 @@ export const offeringBatchSchema = z.object({
   worshipServiceId: idSchema.nullable(),
   serviceLabel: z.string().nullable(),
   accountId: idSchema,
+  accountName: z.string(),
   status: z.enum(OFFERING_BATCH_STATUSES),
   totalAmount: moneySchema,
   lines: z.array(offeringBatchLineSchema),
@@ -409,13 +571,17 @@ export const offeringBatchSchema = z.object({
   counter2Name: z.string().nullable(),
   notes: z.string().nullable(),
   submittedAt: isoDateTimeSchema.nullable(),
+  submittedBy: idSchema.nullable(),
+  updatedBy: idSchema.nullable(),
   verifiedBy: idSchema.nullable(),
   verifiedByName: z.string().nullable(),
   verifiedAt: isoDateTimeSchema.nullable(),
   voidedAt: isoDateTimeSchema.nullable(),
   voidReason: z.string().nullable(),
   createdBy: idSchema.nullable(),
+  createdByName: z.string().nullable(),
   createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
   canVerify: z.boolean(),
 });
 export type OfferingBatch = z.infer<typeof offeringBatchSchema>;
@@ -446,6 +612,17 @@ export const offeringBatchInputSchema = z
   .refine((value) => !value.counter1UserId || value.counter1UserId !== value.counter2UserId, {
     message: 'The two counters must be different people',
     path: ['counter2UserId'],
+  })
+  .refine(
+    (value) =>
+      !value.counter1Name ||
+      !value.counter2Name ||
+      value.counter1Name.toLocaleLowerCase() !== value.counter2Name.toLocaleLowerCase(),
+    { message: 'The two counters must be different people', path: ['counter2Name'] },
+  )
+  .refine((value) => value.lines.some((line) => line.amount > 0), {
+    message: 'Enter at least one amount',
+    path: ['lines'],
   });
 export type OfferingBatchInput = z.infer<typeof offeringBatchInputSchema>;
 
@@ -453,10 +630,20 @@ export const offeringBatchListQuerySchema = paginationQuerySchema.extend({
   status: z.enum(OFFERING_BATCH_STATUSES).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
+  sort: z
+    .enum(['serviceDate', '-serviceDate', 'totalAmount', '-totalAmount'])
+    .default('-serviceDate'),
 });
 export type OfferingBatchListQuery = z.infer<typeof offeringBatchListQuerySchema>;
 
 export const offeringBatchListSchema = paginatedSchema(offeringBatchSchema);
+export type OfferingBatchList = z.infer<typeof offeringBatchListSchema>;
+
+export const offeringBatchResponseSchema = z.object({ batch: offeringBatchSchema });
+
+export const returnOfferingBatchBodySchema = z.object({
+  reason: optionalText(LIMITS.shortTextMax),
+});
 
 // ---------------------------------------------------------------------------------------------
 // Contributions, campaigns and pledges
@@ -470,14 +657,18 @@ export const financeContributionSchema = z.object({
   fundId: idSchema,
   fundName: z.string(),
   accountId: idSchema,
+  accountName: z.string(),
   categoryId: idSchema.nullable(),
+  categoryName: z.string().nullable(),
   campaignId: idSchema.nullable(),
+  campaignName: z.string().nullable(),
   method: z.enum(PAYMENT_METHODS),
   amount: moneySchema,
   receivedAt: isoDateSchema,
   reference: z.string().nullable(),
   receiptNumber: z.string().nullable(),
   note: z.string().nullable(),
+  recordedByName: z.string().nullable(),
   voidedAt: isoDateTimeSchema.nullable(),
   voidReason: z.string().nullable(),
   createdAt: isoDateTimeSchema,
@@ -505,21 +696,46 @@ export const financeContributionListQuerySchema = paginationQuerySchema.extend({
   personId: idSchema.optional(),
   kind: z.enum(CONTRIBUTION_KINDS).optional(),
   fundId: idSchema.optional(),
+  campaignId: idSchema.optional(),
+  method: z.enum(PAYMENT_METHODS).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
+  includeVoided: booleanQuery,
+  sort: z.enum(['receivedAt', '-receivedAt', 'amount', '-amount']).default('-receivedAt'),
 });
 export type FinanceContributionListQuery = z.infer<typeof financeContributionListQuerySchema>;
 
-export const financeContributionListSchema = paginatedSchema(financeContributionSchema);
+export const financeContributionListSchema = paginatedSchema(financeContributionSchema).extend({
+  /** Sum of the matching, non-voided contributions. */
+  totalAmount: moneySchema,
+});
+export type FinanceContributionList = z.infer<typeof financeContributionListSchema>;
+
+export const financeContributionResponseSchema = z.object({
+  contribution: financeContributionSchema,
+});
+
+export const financeDonorQuerySchema = z.object({
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const financeDonorListSchema = z.object({ items: z.array(personSummarySchema) });
+
+export const financeMemberOptionSchema = z.object({ userId: idSchema, name: z.string() });
+export type FinanceMemberOption = z.infer<typeof financeMemberOptionSchema>;
+export const financeMemberListSchema = z.object({ items: z.array(financeMemberOptionSchema) });
 
 export const financeCampaignSchema = z.object({
   id: idSchema,
   name: z.string(),
   description: z.string().nullable(),
   fundId: idSchema,
+  fundName: z.string(),
   targetAmount: moneySchema,
   pledgedAmount: moneySchema,
   receivedAmount: moneySchema,
+  pledgeCount: z.number().int().nonnegative(),
   startDate: isoDateSchema,
   endDate: isoDateSchema.nullable(),
   status: z.enum(CAMPAIGN_STATUSES),
@@ -542,9 +758,16 @@ export const financeCampaignInputSchema = z
   });
 export type FinanceCampaignInput = z.infer<typeof financeCampaignInputSchema>;
 
+export const financeCampaignListQuerySchema = z.object({
+  status: z.enum(CAMPAIGN_STATUSES).optional(),
+});
+
+export const financeCampaignListSchema = z.object({ items: z.array(financeCampaignSchema) });
+
 export const financePledgeSchema = z.object({
   id: idSchema,
   campaignId: idSchema,
+  campaignName: z.string(),
   person: personSummarySchema.nullable(),
   donorName: z.string().nullable(),
   amount: moneySchema,
@@ -554,13 +777,33 @@ export const financePledgeSchema = z.object({
 });
 export type FinancePledge = z.infer<typeof financePledgeSchema>;
 
-export const financePledgeInputSchema = z.object({
-  personId: idSchema.nullable().default(null),
-  donorName: optionalText(LIMITS.nameMax),
-  amount: moneySchema.refine((value) => value > 0, 'Enter an amount'),
-  note: optionalText(LIMITS.shortTextMax),
-});
+export const financePledgeInputSchema = z
+  .object({
+    personId: idSchema.nullable().default(null),
+    donorName: optionalText(LIMITS.nameMax),
+    amount: moneySchema.refine((value) => value > 0, 'Enter an amount'),
+    note: optionalText(LIMITS.shortTextMax),
+  })
+  .refine((value) => value.personId || value.donorName, {
+    message: 'Choose a person or enter a name',
+    path: ['donorName'],
+  });
 export type FinancePledgeInput = z.infer<typeof financePledgeInputSchema>;
+
+export const financeCampaignDetailSchema = z.object({
+  campaign: financeCampaignSchema,
+  pledges: z.array(financePledgeSchema),
+});
+export type FinanceCampaignDetail = z.infer<typeof financeCampaignDetailSchema>;
+
+export const financeCampaignResponseSchema = z.object({ campaign: financeCampaignSchema });
+export const financePledgeResponseSchema = z.object({ pledge: financePledgeSchema });
+
+export const financePledgeParamsSchema = z.object({
+  churchId: idSchema,
+  id: idSchema,
+  pledgeId: idSchema,
+});
 
 // ---------------------------------------------------------------------------------------------
 // Expenses, budgets and transfers
@@ -588,36 +831,44 @@ export const expenseRequestSchema = z.object({
   decidedByName: z.string().nullable(),
   decidedAt: isoDateTimeSchema.nullable(),
   decisionNote: z.string().nullable(),
-  paidAt: isoDateTimeSchema.nullable(),
+  paidAt: isoDateSchema.nullable(),
+  paidByName: z.string().nullable(),
   paidFromAccountId: idSchema.nullable(),
+  paidFromAccountName: z.string().nullable(),
   paymentReference: z.string().nullable(),
   createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
   canApprove: z.boolean(),
 });
 export type ExpenseRequest = z.infer<typeof expenseRequestSchema>;
 
-export const expenseRequestInputSchema = z.object({
-  title: requiredText(2, LIMITS.nameMax),
-  description: optionalText(LIMITS.longTextMax),
-  categoryId: idSchema,
-  fundId: idSchema,
-  amount: moneySchema.refine((value) => value > 0, 'Enter an amount'),
-  payeeName: optionalText(LIMITS.nameMax),
-  neededBy: optionalDate,
-  attachmentUrls: z
-    .array(
-      z
-        .string()
-        .trim()
-        .max(LIMITS.urlMax)
-        .pipe(z.url({ protocol: /^https?$/ })),
-    )
-    .max(FINANCE_LIMITS.attachmentsMax)
-    .default([]),
-  isReimbursement: z.boolean().default(false),
-  reimbursePersonId: idSchema.nullable().default(null),
-  submit: z.boolean().default(false),
-});
+export const expenseRequestInputSchema = z
+  .object({
+    title: requiredText(2, LIMITS.nameMax),
+    description: optionalText(LIMITS.longTextMax),
+    categoryId: idSchema,
+    fundId: idSchema,
+    amount: moneySchema.refine((value) => value > 0, 'Enter an amount'),
+    payeeName: optionalText(LIMITS.nameMax),
+    neededBy: optionalDate,
+    attachmentUrls: z
+      .array(
+        z
+          .string()
+          .trim()
+          .max(LIMITS.urlMax)
+          .pipe(z.url({ protocol: /^https?$/ })),
+      )
+      .max(FINANCE_LIMITS.attachmentsMax)
+      .default([]),
+    isReimbursement: z.boolean().default(false),
+    reimbursePersonId: idSchema.nullable().default(null),
+    submit: z.boolean().default(false),
+  })
+  .refine((value) => !value.isReimbursement || !!value.reimbursePersonId, {
+    message: 'Choose who is reimbursed',
+    path: ['reimbursePersonId'],
+  });
 export type ExpenseRequestInput = z.infer<typeof expenseRequestInputSchema>;
 
 export const decideExpenseBodySchema = z
@@ -638,21 +889,26 @@ export const payExpenseBodySchema = z.object({
 });
 export type PayExpenseBody = z.infer<typeof payExpenseBodySchema>;
 
+export const cancelExpenseBodySchema = z.object({ reason: optionalText(LIMITS.shortTextMax) });
+
 export const expenseRequestListQuerySchema = paginationQuerySchema.extend({
   status: z.enum(EXPENSE_STATUSES).optional(),
-  mine: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
+  categoryId: idSchema.optional(),
+  mine: booleanQuery,
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
+  sort: z.enum(['createdAt', '-createdAt', 'amount', '-amount']).default('-createdAt'),
 });
 export type ExpenseRequestListQuery = z.infer<typeof expenseRequestListQuerySchema>;
 
 export const expenseRequestListSchema = paginatedSchema(expenseRequestSchema);
+export type ExpenseRequestList = z.infer<typeof expenseRequestListSchema>;
+
+export const expenseRequestResponseSchema = z.object({ expense: expenseRequestSchema });
 
 export const financeBudgetSchema = z.object({
-  id: idSchema,
+  /** Null for a category without a budget line yet. */
+  id: idSchema.nullable(),
   year: z.number().int(),
   categoryId: idSchema,
   categoryName: z.string(),
@@ -665,6 +921,19 @@ export const financeBudgetSchema = z.object({
 });
 export type FinanceBudget = z.infer<typeof financeBudgetSchema>;
 
+export const financeBudgetQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(3000),
+});
+
+const budgetTotalsSchema = z.object({ budget: moneySchema, actual: moneySchema });
+
+export const financeBudgetListSchema = z.object({
+  year: z.number().int(),
+  items: z.array(financeBudgetSchema),
+  totals: z.object({ income: budgetTotalsSchema, expense: budgetTotalsSchema }),
+});
+export type FinanceBudgetList = z.infer<typeof financeBudgetListSchema>;
+
 export const saveBudgetBodySchema = z.object({
   year: z.number().int().min(2000).max(3000),
   items: z
@@ -675,9 +944,30 @@ export const saveBudgetBodySchema = z.object({
         notes: optionalText(LIMITS.shortTextMax),
       }),
     )
-    .max(500),
+    .max(500)
+    .refine(
+      (items) => new Set(items.map((item) => item.categoryId)).size === items.length,
+      'Each category appears once',
+    ),
 });
 export type SaveBudgetBody = z.infer<typeof saveBudgetBodySchema>;
+
+export const financeTransferSchema = z.object({
+  id: idSchema,
+  fromAccountId: idSchema,
+  fromAccountName: z.string(),
+  toAccountId: idSchema,
+  toAccountName: z.string(),
+  fundId: idSchema,
+  fundName: z.string(),
+  amount: moneySchema,
+  transferDate: isoDateSchema,
+  note: z.string().nullable(),
+  voidedAt: isoDateTimeSchema.nullable(),
+  voidReason: z.string().nullable(),
+  createdAt: isoDateTimeSchema,
+});
+export type FinanceTransfer = z.infer<typeof financeTransferSchema>;
 
 export const financeTransferInputSchema = z
   .object({
@@ -693,6 +983,14 @@ export const financeTransferInputSchema = z
     path: ['toAccountId'],
   });
 export type FinanceTransferInput = z.infer<typeof financeTransferInputSchema>;
+
+export const financeTransferListQuerySchema = paginationQuerySchema.extend({
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+  accountId: idSchema.optional(),
+});
+export const financeTransferListSchema = paginatedSchema(financeTransferSchema);
+export const financeTransferResponseSchema = z.object({ transfer: financeTransferSchema });
 
 // ---------------------------------------------------------------------------------------------
 // Reports and giving statements
@@ -712,8 +1010,13 @@ export const FINANCE_REPORT_LABELS: Record<FinanceReportKind, LocalizedText> = {
   by_fund: { en: 'By fund', id: 'Per kas' },
   by_category: { en: 'By category', id: 'Per mata anggaran' },
   cash_flow: { en: 'Cash flow per account', id: 'Arus kas per rekening' },
-  trend: { en: 'Trend', id: 'Tren' },
+  trend: { en: 'Weekly trend', id: 'Tren mingguan' },
 };
+
+export const financeReportParamsSchema = z.object({
+  churchId: idSchema,
+  kind: z.enum(FINANCE_REPORT_KINDS),
+});
 
 export const financeReportQuerySchema = z
   .object({
@@ -741,6 +1044,9 @@ export const financeReportRowSchema = z.object({
   income: moneySchema,
   expense: moneySchema,
   net: signedMoneySchema,
+  /** Cash flow only: the account balance before and after the range. */
+  opening: signedMoneySchema.nullable(),
+  closing: signedMoneySchema.nullable(),
 });
 export type FinanceReportRow = z.infer<typeof financeReportRowSchema>;
 
@@ -750,16 +1056,16 @@ export const financeReportSchema = z.object({
   to: isoDateSchema,
   currency: z.string(),
   rows: z.array(financeReportRowSchema),
-  totals: financeReportRowSchema.omit({ key: true, label: true }),
+  totals: financeReportRowSchema.pick({ income: true, expense: true, net: true }),
 });
 export type FinanceReport = z.infer<typeof financeReportSchema>;
 
 export const givingStatementQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(3000),
-  /** Omitted for "my giving"; another person needs `finance.reports`. */
-  personId: idSchema.optional(),
 });
 export type GivingStatementQuery = z.infer<typeof givingStatementQuerySchema>;
+
+export const givingStatementParamsSchema = z.object({ churchId: idSchema, personId: idSchema });
 
 export const givingStatementSchema = z.object({
   year: z.number().int(),
@@ -767,6 +1073,7 @@ export const givingStatementSchema = z.object({
   currency: z.string(),
   total: moneySchema,
   byKind: z.array(z.object({ kind: z.enum(CONTRIBUTION_KINDS), amount: moneySchema })),
+  byFund: z.array(z.object({ fundName: z.string(), amount: moneySchema })),
   items: z.array(
     financeContributionSchema.pick({
       id: true,
@@ -778,17 +1085,67 @@ export const givingStatementSchema = z.object({
       receiptNumber: true,
     }),
   ),
+  pledges: z.array(
+    financePledgeSchema.pick({
+      id: true,
+      campaignId: true,
+      campaignName: true,
+      amount: true,
+      paidAmount: true,
+    }),
+  ),
 });
 export type GivingStatement = z.infer<typeof givingStatementSchema>;
+
+export const givingStatementResponseSchema = z.object({ statement: givingStatementSchema });
+
+/** "My giving": null when the caller has no person record in the church. */
+export const myGivingSchema = z.object({ statement: givingStatementSchema.nullable() });
+export type MyGiving = z.infer<typeof myGivingSchema>;
+
+export const givingStatementListQuerySchema = paginationQuerySchema.extend({
+  year: z.coerce.number().int().min(2000).max(3000),
+  format: z.enum(['json', 'csv']).default('json'),
+});
+export type GivingStatementListQuery = z.infer<typeof givingStatementListQuerySchema>;
+
+export const givingSummarySchema = z.object({
+  person: personSummarySchema,
+  total: moneySchema,
+  count: z.number().int().nonnegative(),
+  lastGiftAt: isoDateSchema.nullable(),
+});
+export type GivingSummary = z.infer<typeof givingSummarySchema>;
+
+export const givingStatementListSchema = paginatedSchema(givingSummarySchema).extend({
+  year: z.number().int(),
+  /** Gifts without a person (NN) in the year. */
+  anonymousTotal: moneySchema,
+});
+export type GivingStatementList = z.infer<typeof givingStatementListSchema>;
 
 export const financeSummarySchema = z.object({
   currency: z.string(),
   totalBalance: signedMoneySchema,
   accounts: z.array(financeAccountSchema),
+  funds: z.array(financeFundSchema),
   monthIncome: moneySchema,
   monthExpense: moneySchema,
+  previousMonthIncome: moneySchema,
+  previousMonthExpense: moneySchema,
+  /** The last six months, oldest first. */
+  trend: z.array(z.object({ month: z.string(), income: moneySchema, expense: moneySchema })),
   pendingBatches: z.number().int().nonnegative(),
   pendingExpenses: z.number().int().nonnegative(),
+  approvedExpenses: z.number().int().nonnegative(),
   recentEntries: z.array(financeEntrySchema),
 });
 export type FinanceSummary = z.infer<typeof financeSummarySchema>;
+
+/** Items waiting for the caller: counts to verify and requests to decide. */
+export const financePendingSchema = z.object({
+  batches: z.number().int().nonnegative(),
+  expenses: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+export type FinancePending = z.infer<typeof financePendingSchema>;
