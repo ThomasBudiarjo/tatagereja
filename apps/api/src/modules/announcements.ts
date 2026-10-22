@@ -4,7 +4,6 @@ import {
   can,
   churchIdParamsSchema,
   churchParamsSchema,
-  isAdmin,
 } from '@tatagereja/shared';
 import { and, count, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
@@ -53,7 +52,7 @@ export const announcementsModule = (deps: Deps) => {
       '/',
       ({ church, access, query }) => {
         const conditions: SQL[] = [eq(announcements.churchId, church.id)];
-        if (!isAdmin(access)) {
+        if (!can.viewAllAnnouncementDrafts(access)) {
           // Members see published posts; leaders additionally see drafts for their groups.
           const visible =
             access.leaderGroupIds.length > 0
@@ -85,7 +84,11 @@ export const announcementsModule = (deps: Deps) => {
           limit: query.limit,
         };
       },
-      { church: true, params: churchParamsSchema, query: announcementListQuerySchema },
+      {
+        church: { permission: 'announcements.view' },
+        params: churchParamsSchema,
+        query: announcementListQuerySchema,
+      },
     )
     .post(
       '/',
@@ -124,7 +127,7 @@ export const announcementsModule = (deps: Deps) => {
         if (row.status !== 'published' && !canManage) throw notFound('Announcement');
         return { announcement: hydrateOne(row), canManage };
       },
-      { church: true, params: churchIdParamsSchema },
+      { church: { permission: 'announcements.view' }, params: churchIdParamsSchema },
     )
     .patch(
       '/:id',

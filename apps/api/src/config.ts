@@ -1,4 +1,4 @@
-import { REGISTRATION_MODES, type RegistrationMode } from '@tatagereja/shared';
+import { LIMITS, REGISTRATION_MODES, type RegistrationMode } from '@tatagereja/shared';
 import { z } from 'zod';
 
 const booleanString = z
@@ -21,6 +21,7 @@ const envSchema = z
     APP_URL: z.string().trim().default('http://localhost:5173').pipe(z.url()),
     SERVER_NAME: z.string().trim().min(1).max(120).default('TataGereja'),
     LOG_REQUESTS: booleanString,
+    MAX_BODY_KB: z.coerce.number().int().min(16).max(51200).default(LIMITS.bodyKbDefault),
   })
   .superRefine((env, ctx) => {
     if (env.TURNSTILE_ENABLED && (!env.TURNSTILE_SITE_KEY || !env.TURNSTILE_SECRET_KEY)) {
@@ -51,6 +52,8 @@ export type AppConfig = {
   appUrl: string;
   serverName: string;
   logRequests: boolean;
+  /** Largest accepted request body, in bytes. Larger requests get 413 PAYLOAD_TOO_LARGE. */
+  maxBodyBytes: number;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -80,6 +83,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     appUrl: value.APP_URL.replace(/\/+$/, ''),
     serverName: value.SERVER_NAME,
     logRequests: value.LOG_REQUESTS,
+    maxBodyBytes: value.MAX_BODY_KB * 1024,
   };
 }
 
@@ -97,6 +101,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appUrl: 'http://localhost:5173',
     serverName: 'TataGereja Test',
     logRequests: false,
+    maxBodyBytes: LIMITS.bodyKbDefault * 1024,
     ...overrides,
   };
 }

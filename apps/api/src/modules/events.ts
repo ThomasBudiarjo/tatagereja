@@ -103,7 +103,11 @@ export const eventsModule = (deps: Deps) => {
           .all();
         return { items: hydrateEvents(db, rows), total, page: query.page, limit: query.limit };
       },
-      { church: true, params: churchParamsSchema, query: eventListQuerySchema },
+      {
+        church: { permission: 'events.view' },
+        params: churchParamsSchema,
+        query: eventListQuerySchema,
+      },
     )
     .post(
       '/',
@@ -173,7 +177,7 @@ export const eventsModule = (deps: Deps) => {
           canRecordAttendance,
         };
       },
-      { church: true, params: churchIdParamsSchema },
+      { church: { permission: 'events.view' }, params: churchIdParamsSchema },
     )
     .patch(
       '/:id',

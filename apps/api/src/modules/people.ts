@@ -2,7 +2,7 @@ import {
   can,
   churchIdParamsSchema,
   churchParamsSchema,
-  isAdmin,
+  fullName,
   linkPersonUserBodySchema,
   personInputSchema,
   personListQuerySchema,
@@ -27,6 +27,16 @@ import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toPerson, toPrivateDetails } from '../serializers';
+import { changes, recordAudit, redact } from '../services/audit';
+
+/** Private detail fields whose values never reach the audit log; only the change is noted. */
+const PRIVATE_REDACTED_FIELDS = [
+  'nationalId',
+  'emergencyContactName',
+  'emergencyContactPhone',
+  'medicalNotes',
+  'privateNotes',
+];
 
 export const peopleModule = (deps: Deps) => {
   const { db } = deps;
@@ -89,7 +99,11 @@ export const peopleModule = (deps: Deps) => {
           .all();
         return { items: rows.map(toPerson), total, page: query.page, limit: query.limit };
       },
-      { church: true, params: churchParamsSchema, query: personListQuerySchema },
+      {
+        church: { permission: 'people.view' },
+        params: churchParamsSchema,
+        query: personListQuerySchema,
+      },
     )
     .post(
       '/',
@@ -152,7 +166,7 @@ export const peopleModule = (deps: Deps) => {
           canLinkUser: can.linkPersonUser(access),
         };
       },
-      { church: true, params: churchIdParamsSchema },
+      { church: { permission: 'people.view' }, params: churchIdParamsSchema },
     )
     .patch(
       '/:id',
@@ -162,7 +176,7 @@ export const peopleModule = (deps: Deps) => {
           throw forbidden('You cannot edit this person');
         }
         // Membership status and join date are administrative fields.
-        const patch = isAdmin(access)
+        const patch = can.editPersonAdminFields(access)
           ? body
           : { ...body, membershipStatus: person.membershipStatus, joinedAt: person.joinedAt };
         const updated = db
@@ -178,38 +192,77 @@ export const peopleModule = (deps: Deps) => {
     )
     .delete(
       '/:id',
-      ({ church, access, params }) => {
+      ({ church, access, audit, params }) => {
         const person = loadPerson(church.id, params.id);
         if (!can.deletePerson(access)) throw forbidden('Only administrators can delete people');
-        db.delete(people).where(eq(people.id, person.id)).run();
+        db.transaction((tx) => {
+          recordAudit(tx, audit, {
+            module: 'people',
+            action: 'person.delete',
+            entityType: 'person',
+            entityId: person.id,
+            summary: `Deleted ${fullName(person)}`,
+            before: {
+              firstName: person.firstName,
+              lastName: person.lastName,
+              membershipStatus: person.membershipStatus,
+              userId: person.userId,
+            },
+          });
+          tx.delete(people).where(eq(people.id, person.id)).run();
+        });
         return { ok: true as const };
       },
       { church: true, params: churchIdParamsSchema },
     )
     .put(
       '/:id/private',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const person = loadPerson(church.id, params.id);
         if (!can.editPrivateDetails(access, person)) {
           throw forbidden('You cannot edit private details for this person');
         }
         const now = nowIso();
-        const row = db
-          .insert(personPrivateDetails)
-          .values({ personId: person.id, churchId: church.id, ...body, updatedAt: now })
-          .onConflictDoUpdate({
-            target: personPrivateDetails.personId,
-            set: { ...body, updatedAt: now },
-          })
-          .returning()
-          .get();
+        const row = db.transaction((tx) => {
+          const existing = tx
+            .select()
+            .from(personPrivateDetails)
+            .where(eq(personPrivateDetails.personId, person.id))
+            .get();
+          const saved = tx
+            .insert(personPrivateDetails)
+            .values({ personId: person.id, churchId: church.id, ...body, updatedAt: now })
+            .onConflictDoUpdate({
+              target: personPrivateDetails.personId,
+              set: { ...body, updatedAt: now },
+            })
+            .returning()
+            .get();
+          const { updatedAt: _before, ...previous } = existing
+            ? toPrivateDetails(existing)
+            : { updatedAt: null };
+          const { updatedAt: _after, personId: _id, ...next } = toPrivateDetails(saved);
+          const diff = changes(previous as Record<string, unknown>, next);
+          if (diff.after) {
+            recordAudit(tx, audit, {
+              module: 'people',
+              action: 'person.private_update',
+              entityType: 'person',
+              entityId: person.id,
+              summary: `Updated private details of ${fullName(person)} (${Object.keys(diff.after).join(', ')})`,
+              before: diff.before && redact(diff.before, PRIVATE_REDACTED_FIELDS),
+              after: redact(diff.after, PRIVATE_REDACTED_FIELDS),
+            });
+          }
+          return saved;
+        });
         return { privateDetails: toPrivateDetails(row) };
       },
       { church: true, params: churchIdParamsSchema, body: personPrivateDetailsInputSchema },
     )
     .put(
       '/:id/user',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const person = loadPerson(church.id, params.id);
         if (!can.linkPersonUser(access)) throw forbidden('Only administrators can link accounts');
         if (body.userId) {
@@ -233,13 +286,29 @@ export const peopleModule = (deps: Deps) => {
             throw conflict('This account is already linked to another person');
           }
         }
-        const updated = db
-          .update(people)
-          .set({ userId: body.userId, updatedAt: nowIso() })
-          .where(eq(people.id, person.id))
-          .returning()
-          .get();
-        if (!updated) throw notFound('Person');
+        const updated = db.transaction((tx) => {
+          const row = tx
+            .update(people)
+            .set({ userId: body.userId, updatedAt: nowIso() })
+            .where(eq(people.id, person.id))
+            .returning()
+            .get();
+          if (!row) throw notFound('Person');
+          if (person.userId !== body.userId) {
+            recordAudit(tx, audit, {
+              module: 'people',
+              action: body.userId ? 'person.link_user' : 'person.unlink_user',
+              entityType: 'person',
+              entityId: person.id,
+              summary: body.userId
+                ? `Linked ${fullName(person)} to a member account`
+                : `Unlinked ${fullName(person)} from their member account`,
+              before: { userId: person.userId },
+              after: { userId: body.userId },
+            });
+          }
+          return row;
+        });
         return { person: toPerson(updated) };
       },
       { church: true, params: churchIdParamsSchema, body: linkPersonUserBodySchema },
@@ -248,11 +317,9 @@ export const peopleModule = (deps: Deps) => {
       '/:id/attendance',
       ({ church, access, params }) => {
         const person = loadPerson(church.id, params.id);
-        const groupIds = groupIdsOf(person.id);
-        const allowed =
-          can.viewPrivateDetails(access, person) ||
-          groupIds.some((groupId) => access.leaderGroupIds.includes(groupId));
-        if (!allowed) throw forbidden("You cannot view this person's attendance");
+        if (!can.viewPersonAttendance(access, person, groupIdsOf(person.id))) {
+          throw forbidden("You cannot view this person's attendance");
+        }
         const rows = db
           .select({
             sessionId: attendanceSessions.id,

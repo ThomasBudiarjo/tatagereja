@@ -11,7 +11,7 @@ import { sessions, users } from '../db/schema';
 import type { Deps } from '../deps';
 import { HttpError, conflict, notFound, rateLimited, unauthorized } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
-import { clientIp } from '../lib/request';
+import { clientIp, requestMeta } from '../lib/request';
 import { addDays, nowIso } from '../lib/time';
 import { generateToken, hashToken, newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
@@ -105,7 +105,12 @@ export const authModule = (deps: Deps) => {
 
         let joinedChurchId: string | null = null;
         if (body.invitationToken) {
-          joinedChurchId = acceptInvitation(db, body.invitationToken, user.id).churchId;
+          joinedChurchId = acceptInvitation(
+            db,
+            body.invitationToken,
+            user.id,
+            requestMeta(request, server ?? undefined),
+          ).churchId;
         }
         const session = createSession(user.id, request.headers.get('user-agent'));
         set.status = 201;

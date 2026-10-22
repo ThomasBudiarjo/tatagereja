@@ -10,12 +10,13 @@ import { and, desc, eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import { churches, invitations, users } from '../db/schema';
 import type { Deps } from '../deps';
-import { forbidden, notFound, rateLimited } from '../lib/errors';
-import { clientIp } from '../lib/request';
+import { HttpError, forbidden, notFound, rateLimited } from '../lib/errors';
+import { clientIp, requestMeta } from '../lib/request';
 import { addDays, nowIso } from '../lib/time';
 import { generateToken, newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toInvitation } from '../serializers';
+import { recordAudit } from '../services/audit';
 import { acceptInvitation, findInvitationByToken } from '../services/invitations';
 
 export const invitationsModule = (deps: Deps) => {
@@ -43,27 +44,50 @@ export const invitationsModule = (deps: Deps) => {
     )
     .post(
       '/',
-      ({ church, access, auth, body, set }) => {
+      ({ church, access, audit, auth, body, set }) => {
         if (!can.createInvitations(access))
           throw forbidden('Only administrators can create invitations');
+        if (!can.inviteWithRole(access, body.role)) {
+          throw new HttpError(
+            403,
+            'ESCALATION_DENIED',
+            'Only someone with every administrator permission can invite administrators',
+          );
+        }
         const now = new Date();
-        const row = db
-          .insert(invitations)
-          .values({
-            id: newId(),
-            churchId: church.id,
-            token: generateToken(24),
-            role: body.role,
-            label: body.label,
-            expiresAt: body.expiresInDays ? addDays(now, body.expiresInDays).toISOString() : null,
-            maxUses: body.maxUses,
-            useCount: 0,
-            revokedAt: null,
-            createdBy: auth.user.id,
-            createdAt: now.toISOString(),
-          })
-          .returning()
-          .get();
+        const row = db.transaction((tx) => {
+          const created = tx
+            .insert(invitations)
+            .values({
+              id: newId(),
+              churchId: church.id,
+              token: generateToken(24),
+              role: body.role,
+              label: body.label,
+              expiresAt: body.expiresInDays ? addDays(now, body.expiresInDays).toISOString() : null,
+              maxUses: body.maxUses,
+              useCount: 0,
+              revokedAt: null,
+              createdBy: auth.user.id,
+              createdAt: now.toISOString(),
+            })
+            .returning()
+            .get();
+          recordAudit(tx, audit, {
+            module: 'core',
+            action: 'invitation.create',
+            entityType: 'invitation',
+            entityId: created.id,
+            summary: `Created ${created.role} invitation${created.label ? ` "${created.label}"` : ''}`,
+            after: {
+              role: created.role,
+              label: created.label,
+              expiresAt: created.expiresAt,
+              maxUses: created.maxUses,
+            },
+          });
+          return created;
+        });
         set.status = 201;
         return { invitation: toInvitation(row, auth.user.name, config.appUrl) };
       },
@@ -71,7 +95,7 @@ export const invitationsModule = (deps: Deps) => {
     )
     .delete(
       '/:id',
-      ({ church, access, params }) => {
+      ({ church, access, audit, params }) => {
         if (!can.createInvitations(access))
           throw forbidden('Only administrators can revoke invitations');
         const row = db
@@ -81,10 +105,19 @@ export const invitationsModule = (deps: Deps) => {
           .get();
         if (!row) throw notFound('Invitation');
         if (!row.revokedAt) {
-          db.update(invitations)
-            .set({ revokedAt: nowIso() })
-            .where(eq(invitations.id, row.id))
-            .run();
+          const revokedAt = nowIso();
+          db.transaction((tx) => {
+            tx.update(invitations).set({ revokedAt }).where(eq(invitations.id, row.id)).run();
+            recordAudit(tx, audit, {
+              module: 'core',
+              action: 'invitation.revoke',
+              entityType: 'invitation',
+              entityId: row.id,
+              summary: `Revoked ${row.role} invitation${row.label ? ` "${row.label}"` : ''}`,
+              before: { revokedAt: null },
+              after: { revokedAt },
+            });
+          });
         }
         return { ok: true as const };
       },
@@ -122,9 +155,14 @@ export const invitationsModule = (deps: Deps) => {
     )
     .post(
       '/:token/accept',
-      ({ params, auth }) => {
+      ({ params, auth, request, server }) => {
         if (!findInvitationByToken(db, params.token)) throw notFound('Invitation');
-        const result = acceptInvitation(db, params.token, auth.user.id);
+        const result = acceptInvitation(
+          db,
+          params.token,
+          auth.user.id,
+          requestMeta(request, server ?? undefined),
+        );
         return { churchId: result.churchId, alreadyMember: result.alreadyMember };
       },
       { auth: true, params: invitationTokenParamsSchema },

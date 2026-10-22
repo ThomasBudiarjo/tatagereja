@@ -6,18 +6,32 @@ import type { AppConfig } from './config';
 import type { Db } from './db/client';
 import type { Deps } from './deps';
 import { HttpError } from './lib/errors';
-import { createRateLimiter } from './lib/rate-limit';
+import { createRateLimiter, type Limiters } from './lib/rate-limit';
+import { securityHeaders } from './lib/security-headers';
 import { createTurnstileVerifier } from './lib/turnstile';
+import { adminSecurityModule } from './modules/admin-security';
 import { announcementsModule } from './modules/announcements';
 import { attendanceModule } from './modules/attendance';
+import { auditModule } from './modules/audit';
 import { authModule } from './modules/auth';
+import { careModule } from './modules/care';
+import { checkinModule } from './modules/checkin';
 import { churchesModule } from './modules/churches';
+import { commsModule } from './modules/comms';
 import { dashboardModule } from './modules/dashboard';
 import { eventsModule } from './modules/events';
+import { facilitiesModule } from './modules/facilities';
+import { financeModule } from './modules/finance';
 import { groupsModule } from './modules/groups';
+import { insightsModule } from './modules/insights';
 import { invitationsModule } from './modules/invitations';
 import { metaModule } from './modules/meta';
+import { notificationsModule } from './modules/notifications';
 import { peopleModule } from './modules/people';
+import { peopleExtensionsModule } from './modules/people/index';
+import { recordsModule } from './modules/records';
+import { rolesModule } from './modules/roles';
+import { worshipModule } from './modules/worship';
 
 type ValidationIssueLike = { path?: unknown; summary?: unknown; message?: unknown };
 
@@ -40,7 +54,7 @@ function normaliseIssues(all: unknown): { path: string; message: string }[] {
 }
 
 /** Production rate limits. Registration is generous because many members share one IP (carrier NAT, church wifi). */
-export function defaultLimiters(): Deps['limiters'] {
+export function defaultLimiters(): Limiters {
   return {
     login: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }),
     register: createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 }),
@@ -62,16 +76,31 @@ export function createApp(deps: Deps) {
   const { config } = deps;
 
   const api = new Elysia({ prefix: '/api' })
+    // core
     .use(metaModule(deps))
     .use(authModule(deps))
     .use(churchesModule(deps))
+    .use(rolesModule(deps))
+    .use(auditModule(deps))
     .use(invitationsModule(deps))
+    .use(notificationsModule(deps))
+    // feature modules: each registers its own routers in modules/<id>/index.ts
+    .use(adminSecurityModule(deps))
     .use(peopleModule(deps))
     .use(groupsModule(deps))
+    .use(peopleExtensionsModule(deps))
     .use(eventsModule(deps))
-    .use(attendanceModule(deps))
     .use(announcementsModule(deps))
-    .use(dashboardModule(deps));
+    .use(commsModule(deps))
+    .use(attendanceModule(deps))
+    .use(dashboardModule(deps))
+    .use(insightsModule(deps))
+    .use(worshipModule(deps))
+    .use(careModule(deps))
+    .use(recordsModule(deps))
+    .use(financeModule(deps))
+    .use(facilitiesModule(deps))
+    .use(checkinModule(deps));
 
   const app = new Elysia()
     .use(
@@ -82,11 +111,23 @@ export function createApp(deps: Deps) {
         credentials: false,
       }),
     )
-    .onRequest(({ request }) => {
+    .onRequest(({ request, set }) => {
       if (config.logRequests) {
         console.log(
           `${new Date().toISOString()} ${request.method} ${new URL(request.url).pathname}`,
         );
+      }
+      Object.assign(set.headers, securityHeaders(request));
+      // Bun also enforces `maxRequestBodySize`; this answers with a clear JSON error first.
+      const length = Number(request.headers.get('content-length') ?? 0);
+      if (length > config.maxBodyBytes) {
+        set.status = 413;
+        return {
+          error: {
+            code: 'PAYLOAD_TOO_LARGE',
+            message: `Request body is larger than ${Math.max(1, Math.floor(config.maxBodyBytes / 1024))} KB`,
+          },
+        };
       }
     })
     .onError(({ code, error, set, request }) => {

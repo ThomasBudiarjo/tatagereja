@@ -1,13 +1,18 @@
 import {
   invitationStatusOf,
+  isRoleTemplateKey,
+  normalizePermissions,
   type Announcement,
   type AttendanceSession,
+  type AuditLog,
   type Church,
+  type CustomRole,
   type Event,
   type Group,
   type GroupLeader,
   type Invitation,
   type Membership,
+  type Notification,
   type Person,
   type PersonPrivateDetails,
   type PersonSummary,
@@ -17,15 +22,19 @@ import {
 import type {
   AnnouncementRow,
   AttendanceSessionRow,
+  AuditLogRow,
+  ChurchRoleRow,
   ChurchRow,
   EventRow,
   GroupRow,
   InvitationRow,
   MembershipRow,
+  NotificationRow,
   PersonPrivateDetailsRow,
   PersonRow,
   UserRow,
 } from './db/schema';
+import { enabledModulesOf } from './services/modules';
 
 export const toUser = (row: UserRow): User => ({
   id: row.id,
@@ -56,6 +65,9 @@ export const toChurch = (row: ChurchRow): Church => ({
   website: row.website,
   logoUrl: row.logoUrl,
   brandColor: row.brandColor,
+  currency: row.currency,
+  timezone: row.timezone,
+  enabledModules: enabledModulesOf(row),
   ownerUserId: row.ownerUserId,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
@@ -64,11 +76,14 @@ export const toChurch = (row: ChurchRow): Church => ({
 export const toMembership = (
   row: MembershipRow,
   user: Pick<UserRow, 'id' | 'name' | 'email' | 'avatarUrl'>,
+  roleIds: string[] = [],
 ): Membership => ({
   id: row.id,
   churchId: row.churchId,
   userId: row.userId,
   role: row.role,
+  status: row.status,
+  roleIds,
   joinedAt: row.joinedAt,
   user: toUserSummary(user),
 });
@@ -219,4 +234,47 @@ export const toAnnouncement = (
   authorName,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
+});
+
+export const toCustomRole = (row: ChurchRoleRow, memberCount: number): CustomRole => ({
+  id: row.id,
+  churchId: row.churchId,
+  name: row.name,
+  description: row.description,
+  permissions: normalizePermissions(Array.isArray(row.permissions) ? row.permissions : []),
+  isTemplate: row.isTemplate,
+  templateKey: isRoleTemplateKey(row.templateKey) ? row.templateKey : null,
+  memberCount,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toAuditLog = (row: AuditLogRow, actorName: string | null): AuditLog => ({
+  id: row.id,
+  churchId: row.churchId,
+  actorUserId: row.actorUserId,
+  actorName,
+  module: row.module,
+  action: row.action,
+  entityType: row.entityType,
+  entityId: row.entityId,
+  summary: row.summary,
+  before: row.before ?? null,
+  after: row.after ?? null,
+  ip: row.ip,
+  userAgent: row.userAgent,
+  createdAt: row.createdAt,
+});
+
+export const toNotification = (row: NotificationRow): Notification => ({
+  id: row.id,
+  churchId: row.churchId,
+  type: row.type,
+  title: row.title,
+  body: row.body,
+  link: row.link,
+  entityType: row.entityType,
+  entityId: row.entityId,
+  readAt: row.readAt,
+  createdAt: row.createdAt,
 });

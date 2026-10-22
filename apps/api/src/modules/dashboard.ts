@@ -1,4 +1,4 @@
-import { churchParamsSchema, fullName } from '@tatagereja/shared';
+import { can, churchParamsSchema, fullName } from '@tatagereja/shared';
 import { and, asc, count, desc, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import {
@@ -56,10 +56,9 @@ export const dashboardModule = (deps: Deps) => {
         db.select().from(events).where(upcomingWhere).orderBy(asc(events.startsAt)).limit(5).all(),
       );
 
-      const announcementVisibility =
-        access.role === 'owner' || access.role === 'administrator'
-          ? eq(announcements.churchId, church.id)
-          : and(eq(announcements.churchId, church.id), eq(announcements.status, 'published'));
+      const announcementVisibility = can.viewAllAnnouncementDrafts(access)
+        ? eq(announcements.churchId, church.id)
+        : and(eq(announcements.churchId, church.id), eq(announcements.status, 'published'));
       const recentAnnouncements = hydrateAnnouncements(
         db,
         db

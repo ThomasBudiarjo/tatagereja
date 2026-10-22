@@ -1,3 +1,5 @@
+import { rateLimited } from './errors';
+
 export type RateLimiter = {
   /** Returns the number of seconds to wait, or 0 when the request is allowed. */
   check: (key: string) => number;
@@ -38,4 +40,45 @@ export function createRateLimiter(options: { windowMs: number; max: number }): R
       else hits.delete(key);
     },
   };
+}
+
+export type RateLimitOptions = { windowMs: number; max: number };
+
+/**
+ * Named limiters shared by the whole server. The three built-in ones are always present;
+ * modules add their own lazily through `enforceRateLimit`, and tests can pre-register a
+ * permissive or strict limiter under the same name.
+ */
+export type Limiters = {
+  login: RateLimiter;
+  register: RateLimiter;
+  invitation: RateLimiter;
+  [name: string]: RateLimiter | undefined;
+};
+
+/** Returns the named limiter, creating it with `options` the first time it is used. */
+export function limiterFor(
+  limiters: Limiters,
+  name: string,
+  options: RateLimitOptions,
+): RateLimiter {
+  const existing = limiters[name];
+  if (existing) return existing;
+  const created = createRateLimiter(options);
+  limiters[name] = created;
+  return created;
+}
+
+/**
+ * Counts one attempt for `key` and throws 429 RATE_LIMITED when the window is full.
+ * Example: `enforceRateLimit(deps.limiters, 'checkin.checkout', `${church.id}:${ip}`, { windowMs: 15 * 60_000, max: 10 })`.
+ */
+export function enforceRateLimit(
+  limiters: Limiters,
+  name: string,
+  key: string,
+  options: RateLimitOptions,
+): void {
+  const wait = limiterFor(limiters, name, options).check(key);
+  if (wait > 0) throw rateLimited(wait);
 }

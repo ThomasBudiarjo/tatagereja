@@ -20,6 +20,7 @@ import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toGroup, toPersonSummary } from '../serializers';
+import { recordAudit } from '../services/audit';
 
 const memberParamsSchema = churchIdParamsSchema.extend({ personId: idSchema });
 const leaderParamsSchema = churchIdParamsSchema.extend({ userId: idSchema });
@@ -92,7 +93,11 @@ export const groupsModule = (deps: Deps) => {
           .all();
         return { items: hydrate(rows) };
       },
-      { church: true, params: churchParamsSchema, query: groupListQuerySchema },
+      {
+        church: { permission: 'groups.view' },
+        params: churchParamsSchema,
+        query: groupListQuerySchema,
+      },
     )
     .post(
       '/',
@@ -132,7 +137,7 @@ export const groupsModule = (deps: Deps) => {
           canAssignLeaders: can.assignGroupLeaders(access),
         };
       },
-      { church: true, params: churchIdParamsSchema },
+      { church: { permission: 'groups.view' }, params: churchIdParamsSchema },
     )
     .patch(
       '/:id',
@@ -152,10 +157,20 @@ export const groupsModule = (deps: Deps) => {
     )
     .delete(
       '/:id',
-      ({ church, access, params }) => {
+      ({ church, access, audit, params }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.deleteGroup(access)) throw forbidden('Only administrators can delete groups');
-        db.delete(groups).where(eq(groups.id, group.id)).run();
+        db.transaction((tx) => {
+          recordAudit(tx, audit, {
+            module: 'people',
+            action: 'group.delete',
+            entityType: 'group',
+            entityId: group.id,
+            summary: `Deleted the group ${group.name}`,
+            before: { name: group.name, type: group.type },
+          });
+          tx.delete(groups).where(eq(groups.id, group.id)).run();
+        });
         return { ok: true as const };
       },
       { church: true, params: churchIdParamsSchema },
@@ -208,13 +223,14 @@ export const groupsModule = (deps: Deps) => {
     )
     .post(
       '/:id/leaders',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.assignGroupLeaders(access))
           throw forbidden('Only administrators can assign leaders');
         const membership = db
-          .select({ id: churchMemberships.id })
+          .select({ id: churchMemberships.id, name: users.name })
           .from(churchMemberships)
+          .innerJoin(users, eq(users.id, churchMemberships.userId))
           .where(
             and(
               eq(churchMemberships.churchId, church.id),
@@ -223,32 +239,56 @@ export const groupsModule = (deps: Deps) => {
           )
           .get();
         if (!membership) throw notFound('Church member');
-        db.insert(groupLeaders)
-          .values({
-            id: newId(),
-            groupId: group.id,
-            userId: body.userId,
-            churchId: church.id,
-            assignedAt: nowIso(),
-          })
-          .onConflictDoNothing()
-          .run();
+        db.transaction((tx) => {
+          const added = tx
+            .insert(groupLeaders)
+            .values({
+              id: newId(),
+              groupId: group.id,
+              userId: body.userId,
+              churchId: church.id,
+              assignedAt: nowIso(),
+            })
+            .onConflictDoNothing()
+            .returning({ id: groupLeaders.id })
+            .get();
+          if (added) {
+            recordAudit(tx, audit, {
+              module: 'people',
+              action: 'group.leader_assign',
+              entityType: 'group',
+              entityId: group.id,
+              summary: `Made ${membership.name} a leader of ${group.name}`,
+              after: { userId: body.userId },
+            });
+          }
+        });
         return { group: hydrateOne(group) };
       },
       { church: true, params: churchIdParamsSchema, body: groupLeaderBodySchema },
     )
     .delete(
       '/:id/leaders/:userId',
-      ({ church, access, params }) => {
+      ({ church, access, audit, params }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.assignGroupLeaders(access))
           throw forbidden('Only administrators can remove leaders');
-        const deleted = db
-          .delete(groupLeaders)
-          .where(and(eq(groupLeaders.groupId, group.id), eq(groupLeaders.userId, params.userId)))
-          .returning({ id: groupLeaders.id })
-          .get();
-        if (!deleted) throw notFound('Group leader');
+        db.transaction((tx) => {
+          const deleted = tx
+            .delete(groupLeaders)
+            .where(and(eq(groupLeaders.groupId, group.id), eq(groupLeaders.userId, params.userId)))
+            .returning({ id: groupLeaders.id })
+            .get();
+          if (!deleted) throw notFound('Group leader');
+          recordAudit(tx, audit, {
+            module: 'people',
+            action: 'group.leader_remove',
+            entityType: 'group',
+            entityId: group.id,
+            summary: `Removed a leader from ${group.name}`,
+            before: { userId: params.userId },
+          });
+        });
         return { group: hydrateOne(group) };
       },
       { church: true, params: leaderParamsSchema },

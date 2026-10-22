@@ -2,10 +2,13 @@ import { invitationStatusOf } from '@tatagereja/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Db, Queryable } from '../db/client';
 import type { InvitationRow } from '../db/schema';
-import { churchMemberships, invitations } from '../db/schema';
+import { churchMemberships, invitations, users } from '../db/schema';
 import { HttpError } from '../lib/errors';
+import type { RequestMeta } from '../lib/request';
 import { newId } from '../lib/tokens';
 import { nowIso } from '../lib/time';
+import { recordAudit } from './audit';
+import { notify } from './notifications';
 
 export function findInvitationByToken(db: Queryable, token: string): InvitationRow | undefined {
   return db.select().from(invitations).where(eq(invitations.token, token)).get();
@@ -36,6 +39,7 @@ export function acceptInvitation(
   db: Db,
   token: string,
   userId: string,
+  meta: RequestMeta = { ip: null, userAgent: null },
 ): { churchId: string; alreadyMember: boolean; role: 'member' | 'administrator' } {
   return db.transaction((tx) => {
     const invitation = assertInvitationUsable(findInvitationByToken(tx, token));
@@ -52,9 +56,10 @@ export function acceptInvitation(
     if (existing) {
       return { churchId: invitation.churchId, alreadyMember: true, role: invitation.role };
     }
+    const membershipId = newId();
     tx.insert(churchMemberships)
       .values({
-        id: newId(),
+        id: membershipId,
         churchId: invitation.churchId,
         userId,
         role: invitation.role,
@@ -65,6 +70,34 @@ export function acceptInvitation(
       .set({ useCount: sql`${invitations.useCount} + 1` })
       .where(eq(invitations.id, invitation.id))
       .run();
+    const name = tx
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .get()?.name;
+    recordAudit(
+      tx,
+      { ...meta, churchId: invitation.churchId, actorUserId: userId },
+      {
+        module: 'core',
+        action: 'invitation.accept',
+        entityType: 'invitation',
+        entityId: invitation.id,
+        summary: `${name ?? 'Someone'} joined as ${invitation.role} through an invitation`,
+        after: { membershipId, role: invitation.role },
+      },
+    );
+    notify(tx, {
+      churchId: invitation.churchId,
+      userIds: [invitation.createdBy],
+      excludeUserIds: [userId],
+      type: 'invitation.accepted',
+      title: `${name ?? 'Someone'} joined through your invitation`,
+      body: invitation.label,
+      link: `/c/${invitation.churchId}/settings`,
+      entityType: 'invitation',
+      entityId: invitation.id,
+    });
     return { churchId: invitation.churchId, alreadyMember: false, role: invitation.role };
   });
 }

@@ -5,7 +5,6 @@ import {
   can,
   churchIdParamsSchema,
   churchParamsSchema,
-  isAdmin,
   saveAttendanceRecordsBodySchema,
   type AttendanceRecord,
 } from '@tatagereja/shared';
@@ -129,7 +128,7 @@ export const attendanceModule = (deps: Deps) => {
       ({ church, access, query }) => {
         if (!can.viewAttendanceOverview(access)) throw forbidden('You cannot view attendance');
         const conditions: SQL[] = [eq(attendanceSessions.churchId, church.id)];
-        if (!isAdmin(access)) {
+        if (!can.viewAllAttendance(access)) {
           if (access.leaderGroupIds.length === 0) {
             return { items: [], total: 0, page: query.page, limit: query.limit };
           }

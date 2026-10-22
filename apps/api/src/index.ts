@@ -9,7 +9,12 @@ const app = createApp(createDeps(database.db, config));
 try {
   // `reusePort: false` makes a second instance fail loudly instead of silently
   // sharing the port, which would serve requests from two different databases.
-  app.listen({ hostname: config.host, port: config.port, reusePort: false });
+  app.listen({
+    hostname: config.host,
+    port: config.port,
+    reusePort: false,
+    maxRequestBodySize: config.maxBodyBytes,
+  });
 } catch (error) {
   const code = (error as { code?: string })?.code;
   if (code === 'EADDRINUSE') {

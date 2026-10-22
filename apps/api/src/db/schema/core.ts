@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY, DEFAULT_ENABLED_MODULES, DEFAULT_TIMEZONE } from '@tatagereja/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable(
@@ -44,6 +45,21 @@ export const churches = sqliteTable('churches', {
   website: text('website'),
   logoUrl: text('logo_url'),
   brandColor: text('brand_color'),
+  /** ISO 4217 code; every money column stores integer minor units of this currency. */
+  currency: text('currency').notNull().default(DEFAULT_CURRENCY),
+  timezone: text('timezone').notNull().default(DEFAULT_TIMEZONE),
+  /** JSON array of the optional module ids that are switched on. */
+  enabledModules: text('enabled_modules', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default([...DEFAULT_ENABLED_MODULES]),
+  /** JSON object of per-module settings, keyed by module id. See services/modules.ts. */
+  settings: text('settings', { mode: 'json' })
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
+  /** Set once the suggested role templates were created for this church. */
+  roleTemplatesSeededAt: text('role_templates_seeded_at'),
   ownerUserId: text('owner_user_id')
     .notNull()
     .references(() => users.id),
@@ -62,6 +78,11 @@ export const churchMemberships = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     role: text('role', { enum: ['owner', 'administrator', 'member'] }).notNull(),
+    /** A suspended member keeps their data but cannot open the church. */
+    status: text('status', { enum: ['active', 'suspended'] })
+      .notNull()
+      .default('active'),
+    suspendedAt: text('suspended_at'),
     joinedAt: text('joined_at').notNull(),
   },
   (table) => [
