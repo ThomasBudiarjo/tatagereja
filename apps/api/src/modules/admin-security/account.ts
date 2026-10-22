@@ -46,6 +46,8 @@ import {
 
 const MANAGE_LIMIT = { windowMs: 15 * 60_000, max: 20 };
 const EXPORT_LIMIT = { windowMs: 60 * 60_000, max: 10 };
+/** Insertion order breaks ties between sign-in events written in the same millisecond. */
+const LOGIN_EVENT_ORDER = sql`${loginEvents}.rowid`;
 
 /**
  * Tables left out of "download my data": pastoral care written about a person by caregivers
@@ -273,7 +275,7 @@ export const accountSecurityRouter = (deps: Deps) => {
           .select()
           .from(loginEvents)
           .where(where)
-          .orderBy(desc(loginEvents.createdAt), desc(loginEvents.id))
+          .orderBy(desc(loginEvents.createdAt), desc(LOGIN_EVENT_ORDER))
           .limit(query.limit)
           .offset(offsetOf(query))
           .all();
@@ -380,7 +382,7 @@ export const accountSecurityRouter = (deps: Deps) => {
             .select()
             .from(loginEvents)
             .where(eq(loginEvents.userId, user.id))
-            .orderBy(desc(loginEvents.createdAt))
+            .orderBy(desc(loginEvents.createdAt), desc(LOGIN_EVENT_ORDER))
             .all()
             .map(toLoginEvent),
         };

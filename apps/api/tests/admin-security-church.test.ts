@@ -244,6 +244,60 @@ describe('admin-security: church administration', () => {
       expect(inbox.json.items[0].title).toContain('removed from Seed Church');
       expect((await t.request('GET', base, { token: visitor.token })).status).toBe(403);
     });
+
+    it('suspends and reactivates a member through a custom role with members.manage', async () => {
+      const sexton = await t.register('Koster Timotius');
+      await t.join(sexton.token, s.invitation.token);
+      await refreshMemberships();
+      const target = membershipOf(sexton.user.id);
+      const setStatus = (token: string, id: string, status: string, church = base) =>
+        t.request('PATCH', `${church}/members/${id}/status`, { token, body: { status } });
+
+      // Without members.manage it is refused; an unknown status is a validation error.
+      await grantDeacon(['members.view']);
+      expect((await setStatus(deacon.token, target, 'suspended')).status).toBe(403);
+      await grantDeacon(['members.view', 'members.manage']);
+      expect((await setStatus(deacon.token, target, 'paused')).status).toBe(422);
+      // Nobody suspends the owner, an administrator holding more, or themselves.
+      for (const userId of [s.owner.user.id, s.admin.user.id, deacon.user.id]) {
+        expect((await setStatus(deacon.token, membershipOf(userId), 'suspended')).status).toBe(403);
+      }
+      // Another church's owner reaches neither this church nor this membership through theirs.
+      expect((await setStatus(other.owner.token, target, 'suspended')).status).toBe(403);
+      const foreignBase = `/api/churches/${other.church.id}`;
+      expect((await setStatus(other.owner.token, target, 'suspended', foreignBase)).status).toBe(
+        404,
+      );
+
+      const suspended = await setStatus(deacon.token, target, 'suspended');
+      expect(suspended.status).toBe(200);
+      expect(suspended.json.membership.status).toBe('suspended');
+      const blocked = await t.request('GET', base, { token: sexton.token });
+      expect(blocked.status).toBe(403);
+      expect(blocked.json.error.code).toBe('MEMBERSHIP_SUSPENDED');
+      const listed = await t.request('GET', `${base}/members?status=suspended`, {
+        token: s.owner.token,
+      });
+      expect(listed.json.items.map((item: { userId: string }) => item.userId)).toEqual([
+        sexton.user.id,
+      ]);
+      // Repeating the same status changes nothing and records no second entry.
+      expect((await setStatus(deacon.token, target, 'suspended')).status).toBe(200);
+      const entries = t.db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.entityId, target))
+        .all()
+        .filter((row) => row.action === 'member.suspend');
+      expect(entries).toHaveLength(1);
+      const inbox = await t.request('GET', '/api/notifications', { token: sexton.token });
+      expect(inbox.json.items[0].title).toContain('was suspended');
+
+      const restored = await setStatus(deacon.token, target, 'active');
+      expect(restored.status).toBe(200);
+      expect(restored.json.membership.status).toBe('active');
+      expect((await t.request('GET', base, { token: sexton.token })).status).toBe(200);
+    });
   });
 
   describe('roles', () => {
