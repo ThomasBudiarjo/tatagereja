@@ -175,7 +175,7 @@ export function hydrateBatches(
     .all();
   const people = userNames(
     db,
-    rows.flatMap((row) => [row.verifiedBy, row.createdBy]),
+    rows.flatMap((row) => [row.verifiedBy, row.createdBy, row.counter1UserId, row.counter2UserId]),
   );
   return rows.map((row) => ({
     id: row.id,
@@ -200,9 +200,12 @@ export function hydrateBatches(
         note: line.note,
       })),
     counter1UserId: row.counter1UserId,
-    counter1Name: row.counter1Name,
+    // Counters picked from the members show their account name.
+    counter1Name:
+      row.counter1Name ?? (row.counter1UserId ? (people.get(row.counter1UserId) ?? null) : null),
     counter2UserId: row.counter2UserId,
-    counter2Name: row.counter2Name,
+    counter2Name:
+      row.counter2Name ?? (row.counter2UserId ? (people.get(row.counter2UserId) ?? null) : null),
     notes: row.notes,
     submittedAt: row.submittedAt,
     submittedBy: row.submittedBy,
