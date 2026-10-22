@@ -1,4 +1,4 @@
-import { ROLE_LABELS } from '@tatagereja/shared';
+import { MEMBERSHIP_STATUS_LABELS, ROLE_LABELS } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Church, Link2, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -144,9 +144,13 @@ export function ChurchesPage() {
                 title={item.church.name}
                 subtitle={`${item.memberCount} ${item.memberCount === 1 ? 'account' : 'accounts'}${item.church.city ? ` · ${item.church.city}` : ''}`}
                 trailing={
-                  <Badge variant={item.role === 'member' ? 'muted' : 'secondary'}>
-                    {ROLE_LABELS[item.role]}
-                  </Badge>
+                  item.status === 'suspended' ? (
+                    <Badge variant="destructive">{MEMBERSHIP_STATUS_LABELS.suspended}</Badge>
+                  ) : (
+                    <Badge variant={item.role === 'member' ? 'muted' : 'secondary'}>
+                      {ROLE_LABELS[item.role]}
+                    </Badge>
+                  )
                 }
               />
             ))}

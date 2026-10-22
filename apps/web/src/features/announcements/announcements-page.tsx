@@ -1,4 +1,4 @@
-import { isAdmin } from '@tatagereja/shared';
+import { can } from '@tatagereja/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Megaphone, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -20,7 +20,7 @@ export function AnnouncementsPage() {
   const [search, setSearch] = useState(params.get('q') ?? '');
   const page = Number(params.get('page') ?? '1');
   const debounced = useDebounced(search);
-  const canPost = isAdmin(access) || access.leaderGroupIds.length > 0;
+  const canPost = can.createAnyAnnouncement(access);
 
   const query = useQuery({
     ...announcementsQuery(churchId, {

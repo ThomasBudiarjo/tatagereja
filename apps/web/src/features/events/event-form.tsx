@@ -1,4 +1,4 @@
-import { eventInputSchema, isAdmin, type Event, type EventInput, type Group } from '@tatagereja/shared';
+import { eventInputSchema, has, type Event, type EventInput, type Group } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -16,7 +16,15 @@ import { getErrorMessage } from '@/lib/api';
 import { applyServerErrors } from '@/lib/forms';
 
 type FormInput = z.input<typeof eventInputSchema>;
-const FIELDS = ['title', 'description', 'location', 'groupId', 'startsAt', 'endsAt', 'isAllDay'] as const;
+const FIELDS = [
+  'title',
+  'description',
+  'location',
+  'groupId',
+  'startsAt',
+  'endsAt',
+  'isAllDay',
+] as const;
 
 const inOneHour = () => {
   const date = new Date();
@@ -42,7 +50,9 @@ export function EventForm(props: EventFormProps) {
   const groups = useQuery(groupsQuery(churchId, { includeInactive: true }));
   if (groups.isPending) return <PageLoader />;
   if (groups.isError) {
-    return <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />;
+    return (
+      <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />
+    );
   }
   return <EventFormFields groups={groups.data.items} {...props} />;
 }
@@ -56,8 +66,10 @@ function EventFormFields({
   onCancel,
 }: EventFormProps & { groups: Group[] }) {
   const { access } = useChurch();
-  const admin = isAdmin(access);
-  const selectable = admin ? groups : groups.filter((group) => access.leaderGroupIds.includes(group.id));
+  const admin = has(access, 'events.manage');
+  const selectable = admin
+    ? groups
+    : groups.filter((group) => access.leaderGroupIds.includes(group.id));
 
   const form = useForm<FormInput, unknown, EventInput>({
     resolver: zodResolver(eventInputSchema),
@@ -96,7 +108,11 @@ function EventFormFields({
   }
 
   return (
-    <form onSubmit={(formEvent) => void submit(formEvent)} className="flex flex-col gap-4" noValidate>
+    <form
+      onSubmit={(formEvent) => void submit(formEvent)}
+      className="flex flex-col gap-4"
+      noValidate
+    >
       {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
       <Field label="Title" htmlFor="event-title" error={errors.title?.message} required>
         <Input id="event-title" {...form.register('title')} aria-invalid={!!errors.title} />
@@ -109,7 +125,11 @@ function EventFormFields({
             label="Scope"
             htmlFor="event-group"
             error={errors.groupId?.message}
-            description={admin ? 'Church-wide events are visible to everyone.' : 'You can create events for groups you lead.'}
+            description={
+              admin
+                ? 'Church-wide events are visible to everyone.'
+                : 'You can create events for groups you lead.'
+            }
           >
             <Select
               id="event-group"
@@ -133,7 +153,12 @@ function EventFormFields({
         name="startsAt"
         render={({ field }) => (
           <Field label="Starts" htmlFor="event-starts" error={errors.startsAt?.message} required>
-            <DateTimeInput id="event-starts" value={field.value ?? ''} onChange={field.onChange} aria-invalid={!!errors.startsAt} />
+            <DateTimeInput
+              id="event-starts"
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              aria-invalid={!!errors.startsAt}
+            />
           </Field>
         )}
       />
@@ -141,8 +166,18 @@ function EventFormFields({
         control={form.control}
         name="endsAt"
         render={({ field }) => (
-          <Field label="Ends" htmlFor="event-ends" error={errors.endsAt?.message} description="Optional.">
-            <DateTimeInput id="event-ends" value={field.value ?? ''} onChange={field.onChange} aria-invalid={!!errors.endsAt} />
+          <Field
+            label="Ends"
+            htmlFor="event-ends"
+            error={errors.endsAt?.message}
+            description="Optional."
+          >
+            <DateTimeInput
+              id="event-ends"
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              aria-invalid={!!errors.endsAt}
+            />
           </Field>
         )}
       />

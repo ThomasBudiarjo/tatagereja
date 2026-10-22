@@ -1,4 +1,4 @@
-import { isAdmin } from '@tatagereja/shared';
+import { can } from '@tatagereja/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { CalendarDays, MapPin, Plus, Users } from 'lucide-react';
 import { useState } from 'react';
@@ -42,7 +42,7 @@ export function EventsPage() {
     setParams(next, { replace: true });
   };
 
-  const canCreate = isAdmin(access) || access.leaderGroupIds.length > 0;
+  const canCreate = can.createAnyEvent(access);
   const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / query.data.limit)) : 1;
 
   return (

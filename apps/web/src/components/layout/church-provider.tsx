@@ -1,4 +1,4 @@
-import { isAdminRole, type ChurchWithAccess } from '@tatagereja/shared';
+import { type ChurchWithAccess } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
@@ -8,10 +8,13 @@ import { churchQuery } from '@/features/churches/api';
 import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 
+/**
+ * The current church and the caller's access. Decide what to show with the shared `can.*`
+ * and `has()` rules on `access`, never with the base role.
+ */
 export type ChurchContextValue = ChurchWithAccess & {
   churchId: string;
   base: string;
-  isAdmin: boolean;
 };
 
 const ChurchContext = createContext<ChurchContextValue | null>(null);
@@ -51,7 +54,6 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
     ...query.data,
     churchId: query.data.church.id,
     base: `/c/${query.data.church.id}`,
-    isAdmin: isAdminRole(query.data.access.role),
   };
   return <ChurchContext.Provider value={value}>{children}</ChurchContext.Provider>;
 }

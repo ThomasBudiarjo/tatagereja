@@ -1,4 +1,4 @@
-import { fullName } from '@tatagereja/shared';
+import { can, fullName } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ import { PersonForm } from './person-form';
 
 export function EditPersonPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { churchId, base, isAdmin } = useChurch();
+  const { churchId, base, access } = useChurch();
   const navigate = useNavigate();
   const query = useQuery(personQuery(churchId, id));
   const update = useUpdatePerson(churchId, id);
@@ -45,7 +45,7 @@ export function EditPersonPage() {
         <CardContent>
           <PersonForm
             person={query.data.person}
-            canEditAdminFields={isAdmin}
+            canEditAdminFields={can.editPersonAdminFields(access)}
             submitLabel="Save changes"
             onCancel={() => navigate(`${base}/people/${id}`)}
             onSubmit={async (values) => {

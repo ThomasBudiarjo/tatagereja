@@ -1,4 +1,10 @@
-import { announcementInputSchema, isAdmin, type Announcement, type AnnouncementInput, type Group } from '@tatagereja/shared';
+import {
+  announcementInputSchema,
+  has,
+  type Announcement,
+  type AnnouncementInput,
+  type Group,
+} from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -29,7 +35,9 @@ export function AnnouncementForm(props: AnnouncementFormProps) {
   const groups = useQuery(groupsQuery(churchId, { includeInactive: true }));
   if (groups.isPending) return <PageLoader />;
   if (groups.isError) {
-    return <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />;
+    return (
+      <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />
+    );
   }
   return <AnnouncementFormFields groups={groups.data.items} {...props} />;
 }
@@ -42,15 +50,18 @@ function AnnouncementFormFields({
   onCancel,
 }: AnnouncementFormProps & { groups: Group[] }) {
   const { access } = useChurch();
-  const admin = isAdmin(access);
-  const selectable = admin ? groups : groups.filter((group) => access.leaderGroupIds.includes(group.id));
+  const admin = has(access, 'announcements.manage');
+  const selectable = admin
+    ? groups
+    : groups.filter((group) => access.leaderGroupIds.includes(group.id));
 
   const form = useForm<FormInput, unknown, AnnouncementInput>({
     resolver: zodResolver(announcementInputSchema),
     defaultValues: {
       title: announcement?.title ?? '',
       body: announcement?.body ?? '',
-      groupId: announcement?.groupId ?? defaultGroupId ?? (admin ? null : (selectable[0]?.id ?? null)),
+      groupId:
+        announcement?.groupId ?? defaultGroupId ?? (admin ? null : (selectable[0]?.id ?? null)),
       status: announcement?.status ?? 'draft',
     },
   });
@@ -74,13 +85,18 @@ function AnnouncementFormFields({
   if (!admin && selectable.length === 0) {
     return (
       <Alert variant="warning" title="No audience to publish to">
-        You can publish announcements to groups you lead. Ask an administrator to assign you to a group.
+        You can publish announcements to groups you lead. Ask an administrator to assign you to a
+        group.
       </Alert>
     );
   }
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submitWith('published')(event)}>
+    <form
+      className="flex flex-col gap-4"
+      noValidate
+      onSubmit={(event) => void submitWith('published')(event)}
+    >
       {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
       <Field label="Title" htmlFor="announcement-title" error={errors.title?.message} required>
         <Input id="announcement-title" {...form.register('title')} aria-invalid={!!errors.title} />
@@ -93,7 +109,11 @@ function AnnouncementFormFields({
             label="Audience"
             htmlFor="announcement-group"
             error={errors.groupId?.message}
-            description={admin ? 'Church-wide announcements reach everyone.' : 'You can publish to groups you lead.'}
+            description={
+              admin
+                ? 'Church-wide announcements reach everyone.'
+                : 'You can publish to groups you lead.'
+            }
           >
             <Select
               id="announcement-group"
@@ -113,7 +133,12 @@ function AnnouncementFormFields({
         )}
       />
       <Field label="Message" htmlFor="announcement-body" error={errors.body?.message} required>
-        <Textarea id="announcement-body" rows={8} {...form.register('body')} aria-invalid={!!errors.body} />
+        <Textarea
+          id="announcement-body"
+          rows={8}
+          {...form.register('body')}
+          aria-invalid={!!errors.body}
+        />
       </Field>
       <FormActions>
         {onCancel ? (
@@ -121,7 +146,12 @@ function AnnouncementFormFields({
             Cancel
           </Button>
         ) : null}
-        <Button type="button" variant="outline" loading={form.formState.isSubmitting} onClick={(event) => void submitWith('draft')(event)}>
+        <Button
+          type="button"
+          variant="outline"
+          loading={form.formState.isSubmitting}
+          onClick={(event) => void submitWith('draft')(event)}
+        >
           Save draft
         </Button>
         <Button type="submit" loading={form.formState.isSubmitting}>

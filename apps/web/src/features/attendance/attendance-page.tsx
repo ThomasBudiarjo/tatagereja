@@ -1,4 +1,4 @@
-import { can, isAdmin } from '@tatagereja/shared';
+import { can } from '@tatagereja/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, ClipboardList, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -40,7 +40,8 @@ function NewSessionDialog({
   const navigate = useNavigate();
   const groups = useQuery({ ...groupsQuery(churchId, { includeInactive: true }), enabled: open });
   const create = useCreateAttendanceSession(churchId);
-  const admin = isAdmin(access);
+  // Church-wide recorders may pick any group or none; leaders pick one of their groups.
+  const admin = can.recordAttendance(access, { groupId: null });
   const [title, setTitle] = useState('');
   const [groupId, setGroupId] = useState('');
   const [sessionAt, setSessionAt] = useState(() => new Date().toISOString());

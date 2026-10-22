@@ -63,9 +63,9 @@ import {
 import { ChurchForm } from './church-form';
 
 function ProfilePanel() {
-  const { church, churchId, isAdmin } = useChurch();
+  const { church, churchId, access } = useChurch();
   const update = useUpdateChurch(churchId);
-  if (!isAdmin) {
+  if (!can.editChurch(access)) {
     return (
       <Card>
         <CardContent className="flex flex-col gap-2 text-sm">
@@ -178,7 +178,9 @@ function MembersPanel() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {canChange && membership.role === 'member' ? (
+                        {canChange &&
+                        membership.role === 'member' &&
+                        can.changeMemberRole(access, membership, 'administrator') ? (
                           <DropdownMenuItem
                             onSelect={() => void changeRole(membership, 'administrator')}
                           >
@@ -283,7 +285,7 @@ function MembersPanel() {
 }
 
 function InvitationsPanel() {
-  const { churchId } = useChurch();
+  const { churchId, access } = useChurch();
   const invitations = useQuery(invitationsQuery(churchId));
   const create = useCreateInvitation(churchId);
   const revoke = useRevokeInvitation(churchId);
@@ -402,7 +404,9 @@ function InvitationsPanel() {
                 onChange={(event) => setRole(event.target.value as 'member' | 'administrator')}
               >
                 <option value="member">Member</option>
-                <option value="administrator">Administrator</option>
+                {can.inviteWithRole(access, 'administrator') ? (
+                  <option value="administrator">Administrator</option>
+                ) : null}
               </Select>
             </Field>
             <Field
@@ -626,8 +630,10 @@ function DangerPanel() {
 }
 
 export function ChurchSettingsPage() {
-  const { church, base, isAdmin } = useChurch();
+  const { church, base, access } = useChurch();
   const [params, setParams] = useSearchParams();
+  const showMembers = can.viewMembers(access);
+  const showInvitations = can.createInvitations(access);
   const tab = params.get('tab') ?? 'profile';
   return (
     <Page>
@@ -635,19 +641,19 @@ export function ChurchSettingsPage() {
       <Tabs value={tab} onValueChange={(value) => setParams({ tab: value }, { replace: true })}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          {isAdmin ? <TabsTrigger value="members">Members</TabsTrigger> : null}
-          {isAdmin ? <TabsTrigger value="invitations">Invites</TabsTrigger> : null}
+          {showMembers ? <TabsTrigger value="members">Members</TabsTrigger> : null}
+          {showInvitations ? <TabsTrigger value="invitations">Invites</TabsTrigger> : null}
           <TabsTrigger value="danger">More</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
           <ProfilePanel />
         </TabsContent>
-        {isAdmin ? (
+        {showMembers ? (
           <TabsContent value="members">
             <MembersPanel />
           </TabsContent>
         ) : null}
-        {isAdmin ? (
+        {showInvitations ? (
           <TabsContent value="invitations">
             <InvitationsPanel />
           </TabsContent>

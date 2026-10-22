@@ -1,4 +1,4 @@
-import { GROUP_TYPE_LABELS, isAdmin } from '@tatagereja/shared';
+import { GROUP_TYPE_LABELS, can } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import {
   Cake,
@@ -32,8 +32,8 @@ export function HomePage() {
   const { church, base, access } = useChurch();
   const { user } = useAuth();
   const query = useQuery(dashboardQuery(church.id));
-  const admin = isAdmin(access);
-  const canLead = admin || access.leaderGroupIds.length > 0;
+  const canAddPerson = can.createPerson(access);
+  const canLead = can.createAnyEvent(access) || can.createAnyAnnouncement(access);
 
   return (
     <Page>
@@ -75,9 +75,13 @@ export function HomePage() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-auto flex-col gap-1 py-3 text-xs">
-                <Link to={admin ? `${base}/people/new` : `${base}/attendance`}>
-                  {admin ? <UserPlus className="size-5" /> : <ClipboardCheck className="size-5" />}
-                  {admin ? 'Person' : 'Attendance'}
+                <Link to={canAddPerson ? `${base}/people/new` : `${base}/attendance`}>
+                  {canAddPerson ? (
+                    <UserPlus className="size-5" />
+                  ) : (
+                    <ClipboardCheck className="size-5" />
+                  )}
+                  {canAddPerson ? 'Person' : 'Attendance'}
                 </Link>
               </Button>
             </div>
