@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MODULE_IDS, OPTIONAL_MODULE_IDS, type ModuleId } from '../modules';
+import { permissionListSchema } from './church';
 
 export const churchModuleStateSchema = z.object({
   id: z.enum(MODULE_IDS),
@@ -20,3 +21,14 @@ export const updateChurchModulesBodySchema = z.object({
     .refine((value) => Object.keys(value).length > 0, 'Choose at least one module'),
 });
 export type UpdateChurchModulesBody = z.infer<typeof updateChurchModulesBodySchema>;
+
+/**
+ * `GET /api/churches/:churchId/<module path>/status`: answers 200 when the module is enabled for
+ * the church and lists the module permissions the caller holds (403 MODULE_DISABLED otherwise).
+ */
+export const moduleStatusSchema = z.object({
+  module: z.enum(MODULE_IDS),
+  enabled: z.literal(true),
+  permissions: permissionListSchema,
+});
+export type ModuleStatus = z.infer<typeof moduleStatusSchema>;

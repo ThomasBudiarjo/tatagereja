@@ -104,6 +104,7 @@ export const announcementsModule = (deps: Deps) => {
             id: newId(),
             churchId: church.id,
             groupId: body.groupId,
+            audience: body.groupId ? 'group' : 'church',
             title: body.title,
             body: body.body,
             status: body.status,
@@ -145,6 +146,7 @@ export const announcementsModule = (deps: Deps) => {
           .update(announcements)
           .set({
             groupId: body.groupId,
+            audience: body.groupId ? 'group' : 'church',
             title: body.title,
             body: body.body,
             status: body.status,

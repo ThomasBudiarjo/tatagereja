@@ -3,8 +3,11 @@ import {
   isModuleEnabled,
   isModuleId,
   moduleDefinition,
+  permissionDefinition,
+  type AccessLike,
   type ChurchModuleState,
   type ModuleId,
+  type ModuleStatus,
 } from '@tatagereja/shared';
 import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -44,6 +47,18 @@ export const moduleStates = (church: Pick<ChurchRow, 'enabledModules'>): ChurchM
     enabled: isModuleEnabled(enabled, module.id),
   }));
 };
+
+/** Body of a module's `GET .../status` route: the module's permissions the caller holds. */
+export const moduleStatus = (
+  access: Pick<AccessLike, 'permissions'>,
+  id: ModuleId,
+): ModuleStatus => ({
+  module: id,
+  enabled: true,
+  permissions: access.permissions.filter(
+    (permission) => permissionDefinition(permission).module === id,
+  ),
+});
 
 /**
  * Reads one module's settings from `churches.settings[moduleId]`, applying the module's

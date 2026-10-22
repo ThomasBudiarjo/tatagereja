@@ -9,6 +9,12 @@ export const users = sqliteTable(
     name: text('name').notNull(),
     passwordHash: text('password_hash').notNull(),
     avatarUrl: text('avatar_url'),
+    /** Consecutive failed sign-ins since the last success; drives the progressive lockout. */
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    lastFailedLoginAt: text('last_failed_login_at'),
+    /** Sign-in is refused with ACCOUNT_LOCKED until this time. */
+    lockedUntil: text('locked_until'),
+    passwordChangedAt: text('password_changed_at'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -24,6 +30,7 @@ export const sessions = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull(),
     userAgent: text('user_agent'),
+    ip: text('ip'),
     createdAt: text('created_at').notNull(),
     lastUsedAt: text('last_used_at').notNull(),
     expiresAt: text('expires_at').notNull(),
@@ -139,6 +146,8 @@ export const people = sqliteTable(
       .notNull()
       .default('visitor'),
     joinedAt: text('joined_at'),
+    /** Wedding anniversary shown in the directory and Warta Jemaat (YYYY-MM-DD). */
+    weddingDate: text('wedding_date'),
     notes: text('notes'),
     userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
@@ -146,6 +155,8 @@ export const people = sqliteTable(
   },
   (table) => [
     index('people_church_idx').on(table.churchId),
+    index('people_church_name_idx').on(table.churchId, table.firstName, table.lastName),
+    index('people_church_status_idx').on(table.churchId, table.membershipStatus),
     uniqueIndex('people_church_user_unique').on(table.churchId, table.userId),
   ],
 );
@@ -180,15 +191,38 @@ export const groups = sqliteTable(
       .references(() => churches.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
-    type: text('type', { enum: ['ministry', 'small_group', 'committee', 'other'] })
+    type: text('type', {
+      enum: ['komisi', 'ministry', 'small_group', 'committee', 'choir', 'area', 'other'],
+    })
       .notNull()
       .default('ministry'),
+    /** Free-text schedule kept for older clients; the structured fields below are preferred. */
     meetingSchedule: text('meeting_schedule'),
+    /** 0 = Sunday … 6 = Saturday. */
+    meetingDay: integer('meeting_day'),
+    /** Local time `HH:MM` in the church time zone. */
+    meetingTime: text('meeting_time'),
+    meetingFrequency: text('meeting_frequency', {
+      enum: ['weekly', 'biweekly', 'monthly', 'irregular'],
+    }),
+    location: text('location'),
+    capacity: integer('capacity'),
+    coverColor: text('cover_color'),
+    /** Public groups are listed for every member, who can ask to join; private ones are not. */
+    visibility: text('visibility', { enum: ['public', 'private'] })
+      .notNull()
+      .default('public'),
+    joinPolicy: text('join_policy', { enum: ['request', 'closed'] })
+      .notNull()
+      .default('request'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [index('groups_church_idx').on(table.churchId)],
+  (table) => [
+    index('groups_church_idx').on(table.churchId),
+    index('groups_church_type_idx').on(table.churchId, table.type),
+  ],
 );
 
 export const groupMembers = sqliteTable(
@@ -233,6 +267,38 @@ export const groupLeaders = sqliteTable(
   ],
 );
 
+/** A recurring event. Occurrences are materialised as `events` rows that point back here. */
+export const eventSeries = sqliteTable(
+  'event_series',
+  {
+    id: text('id').primaryKey(),
+    churchId: text('church_id')
+      .notNull()
+      .references(() => churches.id, { onDelete: 'cascade' }),
+    groupId: text('group_id').references(() => groups.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    location: text('location'),
+    frequency: text('frequency', { enum: ['weekly', 'biweekly', 'monthly'] }).notNull(),
+    /** First occurrence; later ones keep its local time of day. */
+    startsAt: text('starts_at').notNull(),
+    durationMinutes: integer('duration_minutes'),
+    isAllDay: integer('is_all_day', { mode: 'boolean' }).notNull().default(false),
+    /** Last date (YYYY-MM-DD) an occurrence may fall on. */
+    untilDate: text('until_date').notNull(),
+    capacity: integer('capacity'),
+    registrationRequired: integer('registration_required', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('event_series_church_idx').on(table.churchId)],
+);
+
 export const events = sqliteTable(
   'events',
   {
@@ -247,6 +313,19 @@ export const events = sqliteTable(
     startsAt: text('starts_at').notNull(),
     endsAt: text('ends_at'),
     isAllDay: integer('is_all_day', { mode: 'boolean' }).notNull().default(false),
+    seriesId: text('series_id').references(() => eventSeries.id, { onDelete: 'cascade' }),
+    /** Edited on its own: "edit all future occurrences" leaves it alone. */
+    isSeriesException: integer('is_series_exception', { mode: 'boolean' }).notNull().default(false),
+    coverColor: text('cover_color'),
+    /** Places available when registration is required; null means unlimited. */
+    capacity: integer('capacity'),
+    registrationRequired: integer('registration_required', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    registrationClosesAt: text('registration_closes_at'),
+    waitlistEnabled: integer('waitlist_enabled', { mode: 'boolean' }).notNull().default(true),
+    checkInEnabled: integer('check_in_enabled', { mode: 'boolean' }).notNull().default(false),
+    cancelledAt: text('cancelled_at'),
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
@@ -256,6 +335,7 @@ export const events = sqliteTable(
   (table) => [
     index('events_church_starts_idx').on(table.churchId, table.startsAt),
     index('events_group_idx').on(table.groupId),
+    index('events_series_idx').on(table.seriesId, table.startsAt),
   ],
 );
 
@@ -294,6 +374,14 @@ export const attendanceSessions = sqliteTable(
     groupId: text('group_id').references(() => groups.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     sessionAt: text('session_at').notNull(),
+    /** `roster` marks people one by one; `headcount` only stores the counts below. */
+    mode: text('mode', { enum: ['roster', 'headcount'] })
+      .notNull()
+      .default('roster'),
+    headcountMen: integer('headcount_men'),
+    headcountWomen: integer('headcount_women'),
+    headcountChildren: integer('headcount_children'),
+    headcountVisitors: integer('headcount_visitors'),
     notes: text('notes'),
     createdBy: text('created_by')
       .notNull()
@@ -347,13 +435,32 @@ export const announcements = sqliteTable(
       .notNull()
       .default('draft'),
     publishedAt: text('published_at'),
+    /**
+     * Who sees it: the whole church, the members of `group_id`, or the holders of the roles in
+     * `announcement_audience_roles`.
+     */
+    audience: text('audience', { enum: ['church', 'group', 'roles'] })
+      .notNull()
+      .default('church'),
+    /** Published posts become visible from this time (scheduled publishing). */
+    publishAt: text('publish_at'),
+    /** Hidden from lists after this time. */
+    expiresAt: text('expires_at'),
+    pinnedAt: text('pinned_at'),
+    coverImageUrl: text('cover_image_url'),
+    /** Set once the audience was notified, so a scheduled post notifies exactly once. */
+    notifiedAt: text('notified_at'),
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [index('announcements_church_idx').on(table.churchId, table.status)],
+  (table) => [
+    index('announcements_church_idx').on(table.churchId, table.status),
+    index('announcements_church_pinned_idx').on(table.churchId, table.pinnedAt),
+    index('announcements_group_idx').on(table.groupId),
+  ],
 );
 
 export type UserRow = typeof users.$inferSelect;
@@ -364,6 +471,7 @@ export type InvitationRow = typeof invitations.$inferSelect;
 export type PersonRow = typeof people.$inferSelect;
 export type PersonPrivateDetailsRow = typeof personPrivateDetails.$inferSelect;
 export type GroupRow = typeof groups.$inferSelect;
+export type EventSeriesRow = typeof eventSeries.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
 export type AttendanceSessionRow = typeof attendanceSessions.$inferSelect;
 export type AttendanceRecordRow = typeof attendanceRecords.$inferSelect;

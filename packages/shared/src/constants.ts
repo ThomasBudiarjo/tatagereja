@@ -28,7 +28,15 @@ export const MARITAL_STATUSES = [
 ] as const;
 export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
 
-export const GROUP_TYPES = ['ministry', 'small_group', 'committee', 'other'] as const;
+export const GROUP_TYPES = [
+  'komisi',
+  'ministry',
+  'small_group',
+  'committee',
+  'choir',
+  'area',
+  'other',
+] as const;
 export type GroupType = (typeof GROUP_TYPES)[number];
 
 export const PARTICIPANT_STATUSES = ['invited', 'going', 'not_going'] as const;
@@ -137,9 +145,12 @@ export const PERSON_MEMBERSHIP_STATUS_LABELS: Record<PersonMembershipStatus, str
 };
 
 export const GROUP_TYPE_LABELS: Record<GroupType, string> = {
+  komisi: 'Commission',
   ministry: 'Ministry',
   small_group: 'Small group',
   committee: 'Committee',
+  choir: 'Choir',
+  area: 'Area group',
   other: 'Other',
 };
 

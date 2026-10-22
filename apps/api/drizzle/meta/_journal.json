@@ -15,6 +15,13 @@
       "when": 1792699117237,
       "tag": "0001_roles_audit_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792700801027,
+      "tag": "0002_modules_data_model",
+      "breakpoints": true
     }
   ]
 }

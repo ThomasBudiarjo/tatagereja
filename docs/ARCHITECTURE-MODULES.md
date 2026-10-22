@@ -221,6 +221,30 @@ cascade`, and every query filters by it. Child rows also carry `church_id`.
 - Registry and finance entries are corrected or voided, never hard-deleted, and every change is
   audited.
 
+### Module tables
+
+Migration `0002_modules_data_model` creates every module's tables up front, so modules can be
+built in parallel. Shared Zod schemas, enums, labels and pure rules for them are in
+`packages/shared/src/schemas/<module>.ts`; module agents own and may extend both files.
+
+| Module           | Tables                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin-security` | `user_two_factor`, `user_recovery_codes`, `two_factor_challenges`, `login_events` (cascade from `users`); `users.failed_login_count`, `last_failed_login_at`, `locked_until`, `password_changed_at`; `sessions.ip`                                                                                                     |
+| `people`         | `areas`, `area_coordinators`, `households`, `household_members`, `person_areas`, `person_tags`, `person_tag_assignments`, `custom_field_definitions`, `custom_field_values`, `person_privacy_settings`, `group_join_requests`; `people.wedding_date`; group meeting, capacity, visibility and join columns on `groups` |
+| `comms`          | `announcement_audience_roles`, `announcement_reads`, `event_registrations` (waitlist is a status), `calendar_feed_tokens`, `bulletins`; `event_series` and registration columns on `events`; audience, schedule, pin and cover columns on `announcements`                                                              |
+| `insights`       | `dashboard_preferences`, `absence_alerts`; `attendance_sessions.mode` and `headcount_*`                                                                                                                                                                                                                                |
+| `worship`        | `service_types`, `worship_services`, `songs`, `liturgy_items`, `serving_teams`, `serving_positions`, `serving_team_members`, `serving_member_positions`, `roster_assignments`, `volunteer_blockouts`                                                                                                                   |
+| `care`           | `care_cases`, `care_case_caregivers`, `care_notes`, `care_visits`, `care_visit_visitors`, `prayer_requests`, `prayer_request_prayers`, `visitor_follow_ups`, `care_tasks`, `diakonia_aid`                                                                                                                              |
+| `records`        | `registry_records`, `registry_record_people`                                                                                                                                                                                                                                                                           |
+| `finance`        | `finance_funds`, `finance_accounts`, `finance_categories`, `finance_periods`, `finance_entries` (the ledger), `offering_batches`, `offering_batch_lines`, `finance_campaigns`, `finance_pledges`, `finance_contributions`, `expense_requests`, `finance_budgets`, `finance_transfers`                                  |
+| `facilities`     | `facility_resources`, `facility_bookings`, `facility_booking_exceptions`, `inventory_assets`, `asset_loans`, `asset_maintenance`                                                                                                                                                                                       |
+| `checkin`        | `checkin_classes`, `checkin_class_teachers`, `checkin_sessions`, `checkin_child_profiles`, `checkin_child_alerts`, `checkin_authorized_pickups`, `checkins`                                                                                                                                                            |
+
+`apps/api/tests/data-model.test.ts` inserts a row into each table and checks that deleting the
+church (or the user, for account-security tables) removes them; add new tables to its lists.
+drizzle-kit drops `ON DELETE` from foreign keys added with `ALTER TABLE ... ADD`; check generated
+`ADD` statements that reference another table and add the clause by hand before committing.
+
 ### Migrations
 
 After changing schema files:
@@ -238,6 +262,12 @@ contains exactly your tables. Data backfills that SQL cannot express are written
 be idempotent (see `seedRoleTemplates`).
 
 ## API modules
+
+Every module folder already registers a status router,
+`GET /api/churches/:churchId/<path>/status`, which answers the module's permissions the caller
+holds, or `403 MODULE_DISABLED`. Paths: `security` (admin-security), `directory` (people), `calendar`
+(comms), `insights`, `worship`, `care`, `records`, `finance`, `facilities`, `checkin`. Keep it and
+add routers next to it in the module's `index.ts`.
 
 ### Skeleton
 
