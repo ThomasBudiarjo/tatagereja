@@ -465,15 +465,217 @@ register a strict limiter under the same name in `createTestApp(..., { limiters 
 
 ## Interface
 
-- `useChurch()` returns `{ church, membership, access, churchId, base }`. Show or hide actions
-  with `can.*` and `has(access, ...)`, and the module with
-  `isModuleEnabled(church.enabledModules, 'finance')`.
-- `PERMISSION_GROUPS`, `ROLE_TEMPLATES`, `MODULES` and `NOTIFICATION_TYPE_GROUPS` carry labels
-  in both languages; render them with `localize(text, locale)`.
-- `formatMoney(minor, church.currency)` formats amounts; `church.timezone` is the church's time
-  zone for service days and finance periods.
-- Responses are parsed with the shared schemas; lists of permissions and modules drop unknown
-  values, so an older app keeps working against a newer server.
+The web app (`apps/web`) is built from the same module boundaries. A module only creates files
+in its own feature folder and edits its own `module.tsx` and `i18n.ts`; the router, sidebar,
+bottom tabs, menu page, home quick actions and command palette are generated from the registry.
+
+### Files each module owns (web)
+
+| File                                    | What it holds                                                   |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `apps/web/src/features/<id>/module.tsx` | The module manifest: routes, menu entries, quick actions, slots |
+| `apps/web/src/features/<id>/i18n.ts`    | The module dictionary (Indonesian and English)                  |
+| `apps/web/src/features/<id>/*`          | Screens, `api.ts` (queries and mutations), module components    |
+
+Existing screens live in older folders owned by a module: `people` and `groups` (people),
+`events` and `announcements` (comms), `dashboard` and `attendance` (insights), `churches`,
+`profile`, `auth` and `invitations` (core and admin-security). Every folder already has an
+`i18n.ts`, and `features/dictionaries.ts` and `features/registry.ts` already list every module, so
+nobody edits a shared index.
+
+### Module manifest
+
+```tsx
+// apps/web/src/features/finance/module.tsx
+import { has } from '@tatagereja/shared';
+import { HandCoins, Wallet } from 'lucide-react';
+import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
+
+const view: AccessRule = { anyOf: ['finance.view', 'finance.record', 'finance.manage'] };
+
+export const financeModule = defineModule({
+  id: 'finance',
+  icon: Wallet,
+  accent: 'emerald', // the module tone: icons, tiles and page headers
+  labelKey: 'finance.nav',
+  descriptionKey: 'finance.description',
+  section: 'admin', // 'main' | 'ministry' | 'admin'
+  routes: [
+    // Paths are relative to /c/:churchId. `handle.access` guards the route.
+    {
+      path: 'finance',
+      lazy: lazyPage(() => import('./finance-home-page'), 'FinanceHomePage'),
+      handle: { access: view },
+    },
+    {
+      path: 'finance/offerings/new',
+      lazy: lazyPage(() => import('./new-offering-page'), 'NewOfferingPage'),
+      handle: { access: { anyOf: ['finance.record'] } },
+    },
+  ],
+  nav: [
+    {
+      id: 'finance',
+      to: 'finance',
+      labelKey: 'finance.nav',
+      icon: Wallet,
+      order: 10, // position inside the section
+      access: view,
+      keywords: ['persembahan', 'kolekte'], // command palette matches
+      // optional count: ({ churchId }) => ({ queryKey, queryFn: () => Promise<number> })
+      badge: ({ churchId }) => pendingExpensesBadge(churchId),
+    },
+  ],
+  quickActions: [
+    {
+      id: 'new-offering',
+      to: 'finance/offerings/new',
+      labelKey: 'finance.newOffering',
+      icon: HandCoins,
+      order: 50,
+      access: { check: ({ access }) => has(access, 'finance.record') },
+    },
+  ],
+  commands: [], // extra command palette entries; every menu entry is already one
+  topBar: [], // small components for the top bar (comms renders the notifications bell)
+});
+```
+
+- Inside a church, `useChurch()` returns `{ church, membership, access, churchId, base }`. Show
+  or hide actions with `can.*` and `has(access, ...)`, and modules with
+  `isModuleEnabled(church.enabledModules, id)`. `church.currency` and `church.timezone` drive
+  `useI18n()` formatting automatically.
+- `AccessRule` is `{ anyOf?, allOf?, check? }`; `check` receives `{ church, access, churchId,
+base, isEnabled }` and should use the shared `can.*` rules. Every condition must hold.
+- Menu entries, tabs, tiles, quick actions and commands of a switched-off module, or whose rule
+  fails, are **hidden**. A direct link to a guarded route renders a friendly "no access" state,
+  and a route of a switched-off module a "module switched off" state (`ModuleRouteGuard`), so a
+  page component can assume its route rule holds. The API still checks every request.
+- A route without `handle.access` is open to every active member (for example a person page:
+  members open their own profile; the API decides what else they see).
+- Phone bottom tabs are Home, People, Events (entries with `mobileTab`), the Ministry hub
+  (`/ministry`: every `ministry` entry) and the Menu (`/more`: tiles of every section).
+- A new module's landing page can start as `ModuleComingSoon` (icon, accent, highlights and the
+  caller's permissions in the module); replace it with the real screens.
+- `/c/:churchId/ui` is a gallery of every shared component with sample data. It is routed in
+  development (`bun run dev:web`) and in builds made with `VITE_UI_GALLERY=1`.
+
+### i18n
+
+`apps/web/src/lib/i18n` is a small typed layer: no runtime dependency, Indonesian (`id`) as the
+primary language and English (`en`). Without a saved choice the app uses English only when the
+browser prefers it, Indonesian otherwise. People switch in the account menu, the Menu page and
+the Account page.
+
+```ts
+// apps/web/src/features/finance/i18n.ts
+import { defineDictionary } from '@/lib/i18n/define';
+
+export const financeDictionary = defineDictionary('finance', {
+  en: {
+    nav: 'Finance',
+    entries: { one: '{count} entry', other: '{count} entries' }, // plural by `count`
+    savedFund: 'Fund {name} saved',
+  },
+  id: { nav: 'Keuangan', entries: '{count} transaksi', savedFund: 'Kas {name} disimpan' },
+});
+```
+
+```tsx
+const {
+  t,
+  formatDate,
+  formatDateTime,
+  formatDateRange,
+  formatRelative,
+  formatNumber,
+  formatCurrency,
+} = useI18n();
+t('finance.entries', { count: 3 }); // typed: unknown keys do not compile
+formatCurrency(150000); // "Rp 150.000" in the church currency (integer minor units)
+formatDate(service.date, 'dateLong'); // church time zone; `YYYY-MM-DD` days never shift
+```
+
+- English defines the keys; the compiler reports an Indonesian key that is missing. Keys are
+  `<namespace>.<key>`; the namespace is the feature or module id.
+- Use the Indonesian church terms: Jemaat, Majelis, Penatua, Diaken, Komisi, Wilayah/Sektor,
+  Baptis, Sidi, Atestasi, Pemberkatan Nikah, Penyerahan Anak, Persembahan, Perpuluhan,
+  Perkunjungan, Warta Jemaat, Jadwal Pelayanan, Liturgi.
+- Labels from the shared package (`PERMISSION_GROUPS`, `MODULES`, `*_TEXT` and `*_LABELS` maps of
+  `LocalizedText`) are rendered with `localize(text, locale)`.
+- Outside components use `t()` from `@/lib/i18n`. `getErrorMessage(error)` translates generic
+  errors (network, rate limit, module off, suspended); specific server messages are shown as sent.
+- Form validation messages follow the language (zod's locale is switched with the interface).
+- The screens still in English (people, groups, events, announcements, attendance, church
+  settings, invitations) are converted by their module owners into their own dictionaries.
+
+### Components
+
+Shared components live in `apps/web/src/components/ui` (primitives) and
+`apps/web/src/components/layout` (shell). Use them instead of building new ones:
+
+| Need                | Component                                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page frame          | `Page` (`size`: narrow, default, wide, full), `PageHeader` (title, description, eyebrow, `breadcrumbs`, `backTo`, `actions`, `icon` + `tone`; sets `document.title`), `Section`                         |
+| Numbers             | `StatCard` (icon, tone, trend, link, loading), `Sparkline`, `LineChart`, `BarChart`, `DonutChart`                                                                                                       |
+| Lists               | `DataList` (row anatomy and row actions), `ResponsiveTable` (table from `md`, cards below; sortable headers), `ListGroup`/`ListRow`, `RowActions`, `Pagination`, `InfiniteListFooter`                   |
+| Finding             | `FilterBar` (debounced search, filter chips, sort) with `useUrlState`, `SearchInput`, `Combobox` (single or multiple, local or server search), command palette                                          |
+| States              | `SkeletonList`, `SkeletonStats`, `SkeletonCards`, `SkeletonTable`, `SkeletonText`, `EmptyState` (illustration, tone, action), `ErrorState` (retry), `NoAccessState`, `Alert`                            |
+| Dialogs             | `Dialog`, `Sheet` (bottom sheet on phones, side panel on desktop), `ConfirmDialog` (`confirmText` makes people type the name), `Popover`, `DropdownMenu`, `Tooltip`                                     |
+| Forms               | `Field`, `Input`, `PasswordInput`, `Textarea`, `Select`, `Switch`, `Checkbox`, `Segmented`, `DateTimeInput`, `DateRangePicker` (presets first), `CurrencyInput` (integer minor units, grouped as typed) |
+| Flow and structure  | `UrlTabs` (tab in the URL), `Tabs` (`variant`: pill, underline), `Stepper`, `Timeline`, `KanbanBoard`/`KanbanColumn`/`KanbanCard`, `MonthGrid` (calendar)                                               |
+| Identity and status | `EntityAvatar`, `AvatarGroup`, `StatusBadge` (tones, dot), `ToneIcon`, `Badge`                                                                                                                          |
+| Sharing             | `CopyButton`, `QrDisplay` (PNG download), `PrintButton`, `PrintHeader`, `PrintSheet`                                                                                                                    |
+
+Hooks: `useUrlState` (list state in the search params; changing a filter resets the page),
+`useMutationToast` (one submit at a time, success toast, `422` issues mapped to fields, API
+message otherwise), `optimistic()` (optimistic cache update with rollback),
+`useUnsavedChangesGuard`, `useDocumentTitle`, `useDebounced`, `useModuleMenu` and
+`useModuleContext` (the registry for the current church), `useI18n`.
+
+Design tokens are in `apps/web/src/index.css`: warm paper surfaces (`background`, `card`,
+`popover`, `sunken`, `sidebar`), one terracotta `primary`, status colours, radii, shadows
+(`shadow-xs`, `shadow-soft`, `shadow-raised`, `shadow-overlay`), motion (`animate-page-in`,
+`animate-rise-in`, `pressable`) and the categorical chart hues `--chart-1..8`. Tones colour a
+module or a status: set `data-tone="emerald"` on an element and use `bg-tone-soft`,
+`text-tone-ink`, `bg-tone` and `border-tone` inside it (`brand`, `slate`, `sky`, `amber`, `teal`,
+`violet`, `rose`, `indigo`, `emerald`, `olive`, `sun`, `neutral`, `success`, `warning`, `danger`,
+`info`). Every tone has the same contrast in light and dark. Animations stop under
+`prefers-reduced-motion`; the app chrome carries `data-print="hide"` so pages print cleanly.
+
+### Quality bar
+
+Every screen a module ships meets this bar:
+
+- **Layout.** Mobile first (no horizontal scroll at 360 px), then tablet and desktop. Touch
+  targets at least 44 px; safe areas respected. Use `Page size="wide"` for tables and dashboards.
+- **Data views.** A skeleton while loading, an `EmptyState` with an action only the caller may
+  take, an `ErrorState` with retry. Lists have search, filters and sort in the URL
+  (`useUrlState`), and pagination or infinite loading.
+- **Mutations.** The button shows its pending state and cannot submit twice; success and error
+  toasts; `422` issues on the fields; every affected query invalidated (lists, details, counts,
+  the dashboard `keys.dashboard`, notifications); optimistic updates for toggles, RSVP and marking,
+  with rollback.
+- **Destructive actions.** A `ConfirmDialog` that says what will be lost; irreversible ones use
+  `confirmText`.
+- **Forms.** React Hook Form with the shared zod schema, sensible defaults, the first field
+  focused, Enter submits, `useUnsavedChangesGuard` on long forms, labels and `aria-invalid`.
+- **Navigation.** Breadcrumbs or a back link on detail pages, a page title, deep links that work
+  on reload; scroll restoration and page transitions come from the shell.
+- **Permissions.** Hide what the caller cannot do (do not just disable it); guard routes with
+  `handle.access`; decide with `can.*` and `has()`, never with the base role.
+- **Language.** Every visible string in both dictionaries; dates, numbers and money through
+  `useI18n()`.
+
+Check screens visually with the screenshot script, which signs in, can seed a demo church, and
+captures each route at 390×844 and 1440×900 in light and dark:
+
+```sh
+bun run build
+WEB_DIST_DIR=$PWD/apps/web/dist PORT=3901 DATABASE_PATH=/tmp/shots.db bun run --cwd apps/api start &
+bun scripts/screenshots.ts --port 3901 --seed --anonymous --out /tmp/shots \
+  --routes "/c/:church,/c/:church/finance" --locales id,en
+```
 
 ## Testing
 
