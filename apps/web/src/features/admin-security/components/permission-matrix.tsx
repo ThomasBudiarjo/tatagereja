@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { GroupCheckbox } from './group-checkbox';
 import { useModuleLook } from './module-look';
 
 const normalize = (value: string) =>
@@ -163,7 +164,7 @@ export function PermissionMatrix({
               {!readOnly && editable.length > 1 ? (
                 <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground">
                   {t('admin-security.matrixSelectAll')}
-                  <Checkbox
+                  <GroupCheckbox
                     checked={allState}
                     onCheckedChange={(state) => {
                       const next = new Set(value);
