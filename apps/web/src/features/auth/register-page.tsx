@@ -1,13 +1,14 @@
 import { registerBodySchema, type RegisterBody } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Field, FormActions } from '@/components/ui/field';
 import { Input, PasswordInput } from '@/components/ui/input';
 import { Alert } from '@/components/ui/misc';
+import { PasswordStrengthMeter } from '@/features/admin-security/account/password-strength';
 import { publicInvitationQuery } from '@/features/invitations/api';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -42,6 +43,7 @@ export function RegisterPage() {
       turnstileToken: undefined,
     },
   });
+  const password = useWatch({ control: form.control, name: 'password' });
 
   const registrationMode = server?.registrationMode ?? 'public';
   const blocked =
@@ -137,10 +139,12 @@ export function RegisterPage() {
             <PasswordInput
               id="password"
               autoComplete="new-password"
+              aria-describedby="password-strength"
               {...form.register('password')}
               aria-invalid={!!form.formState.errors.password}
             />
           </Field>
+          <PasswordStrengthMeter password={password ?? ''} id="password-strength" />
           {server?.turnstileSiteKey ? (
             <Field error={form.formState.errors.turnstileToken?.message}>
               <TurnstileWidget

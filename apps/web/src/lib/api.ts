@@ -78,6 +78,13 @@ api.interceptors.request.use((config) => {
 
 const PUBLIC_401_PATHS = ['/auth/login', '/auth/register'];
 
+/**
+ * A 401 answering a request that re-confirms the password (change password, transfer
+ * ownership, delete church) means a wrong password, not an ended session.
+ */
+const confirmsPassword = (data: unknown) =>
+  typeof data === 'string' && /"(password|currentPassword)"\s*:/.test(data);
+
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
@@ -86,7 +93,11 @@ api.interceptors.response.use(
       const parsed = apiErrorSchema.safeParse(error.response?.data);
       if (parsed.success) {
         const url = error.config?.url ?? '';
-        if (status === 401 && !PUBLIC_401_PATHS.some((path) => url.includes(path))) {
+        if (
+          status === 401 &&
+          !PUBLIC_401_PATHS.some((path) => url.includes(path)) &&
+          !confirmsPassword(error.config?.data)
+        ) {
           signOutLocally();
         }
         throw new ApiClientError(

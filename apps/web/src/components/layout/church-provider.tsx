@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'r
 import { Link, Navigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/states';
+import { TwoFactorRequiredState } from '@/features/admin-security/account/two-factor-required';
 import { churchQuery } from '@/features/churches/api';
 import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { FormatSettingsContext, useI18n } from '@/lib/i18n';
@@ -59,6 +60,10 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
 
   if (!churchId) return <Navigate to="/churches" replace />;
   if (query.isPending) return <AppSplash />;
+  if (isApiClientError(query.error) && query.error.code === 'TWO_FACTOR_SETUP_REQUIRED') {
+    // The church's security policy asks for two-step verification first (admin-security).
+    return <TwoFactorRequiredState churchId={churchId} />;
+  }
   if (query.isError || !value) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 p-6">
