@@ -1,14 +1,31 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import * as React from 'react';
 import { Link } from 'react-router';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ToneIcon } from '@/components/ui/status-badge';
+import type { Tone } from '@/components/ui/tone';
+import { useI18n } from '@/lib/i18n';
+import { useDocumentTitle } from '@/lib/use-document-title';
+import { cn } from '@/lib/utils';
 
-export function Page({ className, ...props }: React.ComponentProps<'div'>) {
+const widths = {
+  narrow: 'max-w-xl',
+  default: 'max-w-3xl',
+  wide: 'max-w-6xl',
+  full: 'max-w-none',
+};
+
+/** Page container. `wide` suits tables, boards and dashboards. */
+export function Page({
+  className,
+  size = 'default',
+  ...props
+}: React.ComponentProps<'div'> & { size?: keyof typeof widths }) {
   return (
     <div
       className={cn(
-        'mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6',
+        'mx-auto flex w-full flex-col gap-5 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:py-8',
+        widths[size],
         className,
       )}
       {...props}
@@ -16,44 +33,122 @@ export function Page({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+export type Breadcrumb = { label: string; to?: string };
+
 type PageHeaderProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   eyebrow?: React.ReactNode;
+  /** Where the back button goes; defaults to the last breadcrumb with a link. */
   backTo?: string;
+  backLabel?: string;
+  breadcrumbs?: Breadcrumb[];
   actions?: React.ReactNode;
+  /** A module icon chip next to the title. */
+  icon?: React.ComponentType<{ className?: string }>;
+  tone?: Tone;
+  /** Sets `document.title`; defaults to the title when it is a string. */
+  documentTitle?: string | false;
   className?: string;
 };
+
+export function Breadcrumbs({ items, className }: { items: Breadcrumb[]; className?: string }) {
+  const { t } = useI18n();
+  return (
+    <nav aria-label={t('common.breadcrumbs')} className={cn('min-w-0', className)}>
+      <ol className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+        {items.map((item, index) => {
+          const last = index === items.length - 1;
+          return (
+            <li key={`${item.label}-${index}`} className="flex min-w-0 items-center gap-1">
+              {item.to && !last ? (
+                <Link
+                  to={item.to}
+                  className="truncate rounded-sm transition-colors hover:text-foreground"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span
+                  className={cn('truncate', last && 'font-medium text-foreground')}
+                  aria-current={last ? 'page' : undefined}
+                >
+                  {item.label}
+                </span>
+              )}
+              {!last ? <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden /> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 export function PageHeader({
   title,
   description,
   eyebrow,
   backTo,
+  backLabel,
+  breadcrumbs,
   actions,
+  icon,
+  tone = 'brand',
+  documentTitle,
   className,
 }: PageHeaderProps) {
+  const { t } = useI18n();
+  useDocumentTitle(
+    documentTitle === false ? null : (documentTitle ?? (typeof title === 'string' ? title : null)),
+  );
+  const back = backTo ?? [...(breadcrumbs ?? [])].reverse().find((item) => item.to)?.to;
+  const hasTrail = !!breadcrumbs && breadcrumbs.length > 1;
+
   return (
-    <header className={cn('flex flex-col gap-3', className)}>
-      {backTo ? (
-        <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground">
-          <Link to={backTo}>
-            <ArrowLeft />
-            Back
-          </Link>
-        </Button>
+    <header className={cn('flex animate-page-in flex-col gap-3', className)}>
+      {back || hasTrail ? (
+        <div className="flex min-h-9 items-center gap-2">
+          {back ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={cn('-ml-2.5 w-fit text-muted-foreground', hasTrail && 'md:hidden')}
+            >
+              <Link to={back}>
+                <ArrowLeft />
+                {backLabel ?? t('common.back')}
+              </Link>
+            </Button>
+          ) : null}
+          {hasTrail ? <Breadcrumbs items={breadcrumbs} className="hidden md:block" /> : null}
+        </div>
       ) : null}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {eyebrow ? (
-            <p className="text-xs font-semibold tracking-wide text-primary uppercase">{eyebrow}</p>
-          ) : null}
-          <h1 className="text-2xl leading-tight font-bold tracking-tight text-balance sm:text-3xl">
-            {title}
-          </h1>
-          {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        <div className="flex min-w-0 items-start gap-3.5">
+          {icon ? <ToneIcon icon={icon} tone={tone} size="lg" className="mt-0.5" /> : null}
+          <div className="min-w-0">
+            {eyebrow ? (
+              <p data-tone={tone} className="text-overline mb-1 text-tone-ink">
+                {eyebrow}
+              </p>
+            ) : null}
+            <h1 className="text-2xl leading-tight font-bold tracking-tight text-balance sm:text-[1.75rem]">
+              {title}
+            </h1>
+            {description ? (
+              <p className="mt-1.5 max-w-2xl text-sm text-pretty text-muted-foreground sm:text-[0.9375rem]">
+                {description}
+              </p>
+            ) : null}
+          </div>
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 pt-0.5">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </header>
   );
@@ -61,27 +156,35 @@ export function PageHeader({
 
 export function Section({
   title,
+  description,
   action,
+  icon: Icon,
   children,
   className,
 }: {
   title?: React.ReactNode;
+  description?: React.ReactNode;
   action?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section className={cn('flex flex-col gap-2.5', className)}>
+    <section className={cn('flex min-w-0 flex-col gap-3', className)}>
       {title || action ? (
-        <div className="flex items-center justify-between gap-2">
-          {title ? (
-            <h2 className="text-sm font-bold tracking-wide text-muted-foreground uppercase">
-              {title}
-            </h2>
-          ) : (
-            <span />
-          )}
-          {action}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            {title ? (
+              <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold tracking-tight">
+                {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}
+                {title}
+              </h2>
+            ) : null}
+            {description ? (
+              <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
       {children}

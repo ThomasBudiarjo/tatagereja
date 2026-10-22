@@ -1,62 +1,44 @@
-import { format, formatDistanceToNow, isSameDay, isThisYear, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { currentLocale, translate } from '@/lib/i18n';
+import * as intl from '@/lib/i18n/format';
+
+/*
+ * Formatting helpers for screens that do not use `useI18n()` yet. They follow the active
+ * interface language; inside components prefer `useI18n().formatDate(...)`, which also
+ * follows the church time zone and currency.
+ */
 
 const safeDate = (value: string | Date): Date | null => {
   const date = typeof value === 'string' ? parseISO(value) : value;
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-export const formatDate = (value: string | null | undefined): string => {
-  if (!value) return '—';
-  const date = safeDate(value);
-  if (!date) return '—';
-  return format(date, isThisYear(date) ? 'EEE, d MMM' : 'd MMM yyyy');
-};
+export const formatDate = (value: string | null | undefined): string =>
+  intl.formatDate(value, currentLocale(), { preset: 'date' });
 
-export const formatLongDate = (value: string | null | undefined): string => {
-  if (!value) return '—';
-  const date = safeDate(value);
-  return date ? format(date, 'EEEE, d MMMM yyyy') : '—';
-};
+export const formatLongDate = (value: string | null | undefined): string =>
+  intl.formatDate(value, currentLocale(), { preset: 'dateLong' });
 
-export const formatTime = (value: string | null | undefined): string => {
-  if (!value) return '';
-  const date = safeDate(value);
-  return date ? format(date, 'HH:mm') : '';
-};
+export const formatTime = (value: string | null | undefined): string =>
+  intl.formatDate(value, currentLocale(), { preset: 'time', fallback: '' });
 
-export const formatDateTime = (value: string | null | undefined): string => {
-  if (!value) return '—';
-  const date = safeDate(value);
-  if (!date) return '—';
-  return format(date, isThisYear(date) ? 'EEE, d MMM · HH:mm' : 'd MMM yyyy · HH:mm');
-};
+export const formatDateTime = (value: string | null | undefined): string =>
+  intl.formatDate(value, currentLocale(), { preset: 'dateTime' });
 
 export const formatEventRange = (
   startsAt: string,
   endsAt: string | null,
   isAllDay: boolean,
 ): string => {
-  const start = safeDate(startsAt);
-  if (!start) return '—';
-  const end = endsAt ? safeDate(endsAt) : null;
-  const dayLabel = format(start, isThisYear(start) ? 'EEE, d MMM' : 'd MMM yyyy');
-  if (isAllDay) {
-    if (end && !isSameDay(start, end)) return `${dayLabel} – ${format(end, 'd MMM')}`;
-    return `${dayLabel} · All day`;
-  }
-  if (end) {
-    if (isSameDay(start, end))
-      return `${dayLabel} · ${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`;
-    return `${dayLabel} ${format(start, 'HH:mm')} – ${format(end, 'd MMM HH:mm')}`;
-  }
-  return `${dayLabel} · ${format(start, 'HH:mm')}`;
+  const locale = currentLocale();
+  return intl.formatDateRange(startsAt, endsAt, locale, {
+    allDay: isAllDay,
+    allDayLabel: translate(locale, 'common.allDay'),
+  });
 };
 
-export const formatRelative = (value: string | null | undefined): string => {
-  if (!value) return '';
-  const date = safeDate(value);
-  return date ? formatDistanceToNow(date, { addSuffix: true }) : '';
-};
+export const formatRelative = (value: string | null | undefined): string =>
+  intl.formatRelative(value, currentLocale());
 
 /** Converts an ISO datetime to the value expected by <input type="datetime-local"> (local time). */
 export const isoToLocalInput = (value: string | null | undefined): string => {

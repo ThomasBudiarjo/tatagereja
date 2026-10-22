@@ -12,12 +12,18 @@ bun run typecheck
 ## Layout
 
 ```text
-src/components/ui/      Button, input, dialog, list and other primitives
-src/components/layout/  App shells, church context, page scaffolding, theme
-src/features/           One folder per feature: API hooks plus screens
-src/lib/                Axios client, query client, formatting, form helpers
+src/components/ui/      Design system: primitives, lists, tables, filters, charts, states
+src/components/layout/  Shells (sidebar, top bar, bottom tabs, command palette), route guard
+src/features/<id>/      One folder per feature or module: module.tsx, i18n.ts, API hooks, screens
+src/features/registry.ts      Every module manifest; router and menus are generated from it
+src/features/dictionaries.ts  Every feature dictionary
+src/lib/i18n/           Typed translations (id, en) and Intl formatting
+src/lib/                Axios client, query client, module types, URL state, form helpers
 src/stores/             Zustand stores for server selection, sessions and preferences
 ```
+
+See [docs/ARCHITECTURE-MODULES.md](../../docs/ARCHITECTURE-MODULES.md#interface) for the module
+registry, i18n, the component list and the quality bar every screen meets.
 
 ## Data flow
 
@@ -38,3 +44,4 @@ a self-hosted server does not disturb a session on another one.
 | `VITE_DEFAULT_SERVER_URL`  | Hosted server offered on the welcome screen (defaults to the current origin) |
 | `VITE_DEFAULT_SERVER_NAME` | Its display name (defaults to "TataGereja Cloud")                            |
 | `VITE_DEV_API_PROXY`       | Where the dev server proxies `/api` (defaults to `http://127.0.0.1:3000`)    |
+| `VITE_UI_GALLERY`          | `1` routes the component gallery at `/c/:churchId/ui` in a production build  |

@@ -1,0 +1,36 @@
+import { defineDictionary } from '@/lib/i18n/define';
+
+export const financeDictionary = defineDictionary('finance', {
+  en: {
+    nav: 'Finance',
+    description: 'Offerings, tithes, expenses, budgets and financial reports.',
+    planOfferings: 'Offerings',
+    planOfferingsBody: 'Count each service collection with two counters and post it to the ledger.',
+    planGiving: 'Tithes and pledges',
+    planGivingBody: 'Perpuluhan and persembahan janji per member, with giving statements.',
+    planExpenses: 'Expenses and approvals',
+    planExpensesBody: 'Requests approved by someone other than the requester.',
+    planBudget: 'Budget (RAPB)',
+    planBudgetBody: 'The yearly budget and how actual income and spending compare.',
+    planReports: 'Financial reports',
+    planReportsBody: 'Monthly reports per fund, ready for the Majelis meeting.',
+    planClosing: 'Closing periods',
+    planClosingBody: 'Close a month so its entries can no longer change.',
+  },
+  id: {
+    nav: 'Keuangan',
+    description: 'Persembahan, perpuluhan, pengeluaran, anggaran (RAPB), dan laporan keuangan.',
+    planOfferings: 'Persembahan',
+    planOfferingsBody: 'Hitung kolekte setiap ibadah oleh dua penghitung lalu bukukan ke jurnal.',
+    planGiving: 'Perpuluhan dan persembahan janji',
+    planGivingBody: 'Perpuluhan dan persembahan janji per jemaat, lengkap dengan rekap pemberian.',
+    planExpenses: 'Pengeluaran dan persetujuan',
+    planExpensesBody: 'Pengajuan disetujui oleh orang lain, bukan oleh pengaju.',
+    planBudget: 'Anggaran (RAPB)',
+    planBudgetBody: 'Rencana anggaran tahunan dan perbandingannya dengan realisasi.',
+    planReports: 'Laporan keuangan',
+    planReportsBody: 'Laporan bulanan per kas/dana, siap dibawa ke rapat Majelis.',
+    planClosing: 'Tutup buku',
+    planClosingBody: 'Tutup buku bulanan agar transaksinya tidak dapat diubah lagi.',
+  },
+});

@@ -1,186 +1,231 @@
-import { GROUP_TYPE_LABELS, can } from '@tatagereja/shared';
+import { GROUP_TYPE_TEXT, localize } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Cake,
-  CalendarDays,
-  CalendarPlus,
-  ClipboardCheck,
-  Megaphone,
-  UserPlus,
-  UsersRound,
-} from 'lucide-react';
+import { Cake, CalendarDays, Megaphone, UserCheck, Users, UsersRound } from 'lucide-react';
 import { Link } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader, Section } from '@/components/layout/page';
+import { QuickActions } from '@/components/layout/quick-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ListGroup, ListRow } from '@/components/ui/list';
-import { EmptyState, ErrorState, Skeleton, Stat } from '@/components/ui/misc';
+import { EmptyState, ErrorState } from '@/components/ui/misc';
+import { SkeletonList, SkeletonStats } from '@/components/ui/skeleton';
+import { StatCard } from '@/components/ui/stat-card';
+import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import { getErrorMessage } from '@/lib/api';
-import { formatEventRange, formatRelative } from '@/lib/format';
+import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useAuth } from '@/stores/auth';
 import { dashboardQuery } from './api';
 
-const monthDay = (birthDate: string) => {
-  const [, month, day] = birthDate.split('-');
-  if (!month || !day) return '';
-  const date = new Date(2000, Number(month) - 1, Number(day));
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-};
+const greetingKey = (hour: number): MessageKey =>
+  hour < 11
+    ? 'dashboard.greetingMorning'
+    : hour < 15
+      ? 'dashboard.greetingMidday'
+      : hour < 18
+        ? 'dashboard.greetingAfternoon'
+        : 'dashboard.greetingEvening';
+
+/** The day of an event as a small calendar chip. */
+function DateChip({ value }: { value: string }) {
+  const { formatDate } = useI18n();
+  return (
+    <span
+      data-tone="amber"
+      className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-tone-soft text-tone-ink"
+      aria-hidden
+    >
+      <span className="text-[10px] leading-none font-semibold uppercase">
+        {formatDate(value, { options: { month: 'short' } })}
+      </span>
+      <span className="text-base leading-tight font-bold tabular">
+        {formatDate(value, { options: { day: 'numeric' } })}
+      </span>
+    </span>
+  );
+}
 
 export function HomePage() {
-  const { church, base, access } = useChurch();
+  const { church, base } = useChurch();
   const { user } = useAuth();
+  const { t, locale, formatDate, formatDateRange, formatRelative } = useI18n();
   const query = useQuery(dashboardQuery(church.id));
-  const canAddPerson = can.createPerson(access);
-  const canLead = can.createAnyEvent(access) || can.createAnyAnnouncement(access);
+  const firstName = user?.name.split(' ')[0] ?? '';
 
   return (
-    <Page>
+    <Page size="wide">
       <PageHeader
         eyebrow={church.name}
-        title={`Hello, ${user?.name.split(' ')[0] ?? 'there'}`}
+        title={t(greetingKey(new Date().getHours()), { name: firstName })}
         description={church.description ?? undefined}
+        documentTitle={t('dashboard.title')}
       />
 
       {query.isPending ? (
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-20" />
-          ))}
-        </div>
+        <>
+          <SkeletonStats />
+          <SkeletonList rows={3} />
+        </>
       ) : query.isError ? (
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
+        <ErrorState
+          error={query.error}
+          message={getErrorMessage(query.error)}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="People" value={query.data.stats.people} />
-            <Stat label="Groups" value={query.data.stats.activeGroups} />
-            <Stat label="Upcoming" value={query.data.stats.upcomingEvents} hint="events" />
-            <Stat label="Accounts" value={query.data.stats.members} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label={t('dashboard.statPeople')}
+              value={query.data.stats.people}
+              icon={Users}
+              tone="sky"
+              to={`${base}/people`}
+            />
+            <StatCard
+              label={t('dashboard.statGroups')}
+              value={query.data.stats.activeGroups}
+              icon={UsersRound}
+              tone="violet"
+              to={`${base}/groups`}
+            />
+            <StatCard
+              label={t('dashboard.statUpcoming')}
+              value={query.data.stats.upcomingEvents}
+              hint={t('dashboard.statUpcomingHint')}
+              icon={CalendarDays}
+              tone="amber"
+              to={`${base}/events`}
+            />
+            <StatCard
+              label={t('dashboard.statAccounts')}
+              value={query.data.stats.members}
+              hint={t('dashboard.statAccountsHint')}
+              icon={UserCheck}
+              tone="teal"
+            />
           </div>
 
-          {canLead ? (
-            <div className="grid grid-cols-3 gap-2">
-              <Button asChild variant="outline" className="h-auto flex-col gap-1 py-3 text-xs">
-                <Link to={`${base}/events/new`}>
-                  <CalendarPlus className="size-5" />
-                  Event
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="h-auto flex-col gap-1 py-3 text-xs">
-                <Link to={`${base}/announcements/new`}>
-                  <Megaphone className="size-5" />
-                  Announce
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="h-auto flex-col gap-1 py-3 text-xs">
-                <Link to={canAddPerson ? `${base}/people/new` : `${base}/attendance`}>
-                  {canAddPerson ? (
-                    <UserPlus className="size-5" />
-                  ) : (
-                    <ClipboardCheck className="size-5" />
-                  )}
-                  {canAddPerson ? 'Person' : 'Attendance'}
-                </Link>
-              </Button>
-            </div>
-          ) : null}
+          <QuickActions />
 
-          <Section
-            title="Upcoming events"
-            action={
-              <Button asChild variant="link" size="sm">
-                <Link to={`${base}/events`}>See all</Link>
-              </Button>
-            }
-          >
-            {query.data.upcomingEvents.length === 0 ? (
-              <EmptyState
-                icon={CalendarDays}
-                title="Nothing scheduled"
-                description="Upcoming events appear here."
-              />
-            ) : (
-              <ListGroup>
-                {query.data.upcomingEvents.map((event) => (
-                  <ListRow
-                    key={event.id}
-                    to={`${base}/events/${event.id}`}
-                    title={event.title}
-                    subtitle={formatEventRange(event.startsAt, event.endsAt, event.isAllDay)}
-                    trailing={
-                      event.groupName ? <Badge variant="secondary">{event.groupName}</Badge> : null
-                    }
-                  />
-                ))}
-              </ListGroup>
-            )}
-          </Section>
-
-          <Section
-            title="Latest announcements"
-            action={
-              <Button asChild variant="link" size="sm">
-                <Link to={`${base}/announcements`}>See all</Link>
-              </Button>
-            }
-          >
-            {query.data.recentAnnouncements.length === 0 ? (
-              <EmptyState icon={Megaphone} title="No announcements yet" />
-            ) : (
-              <ListGroup>
-                {query.data.recentAnnouncements.map((announcement) => (
-                  <ListRow
-                    key={announcement.id}
-                    to={`${base}/announcements/${announcement.id}`}
-                    title={
-                      <span className="flex items-center gap-2">
-                        {announcement.title}
-                        {announcement.status === 'draft' ? (
-                          <Badge variant="warning">Draft</Badge>
-                        ) : null}
-                      </span>
-                    }
-                    subtitle={`${announcement.authorName} · ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
-                  />
-                ))}
-              </ListGroup>
-            )}
-          </Section>
-
-          {query.data.myGroups.length > 0 ? (
-            <Section title="My groups">
-              <ListGroup>
-                {query.data.myGroups.map((group) => (
-                  <ListRow
-                    key={group.id}
-                    to={`${base}/groups/${group.id}`}
-                    leading={<UsersRound className="size-5 text-muted-foreground" />}
-                    title={group.name}
-                    subtitle={GROUP_TYPE_LABELS[group.type]}
-                    trailing={group.isLeader ? <Badge variant="secondary">Leader</Badge> : null}
-                  />
-                ))}
-              </ListGroup>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Section
+              title={t('dashboard.upcomingEvents')}
+              action={
+                <Button asChild variant="link" size="sm">
+                  <Link to={`${base}/events`}>{t('common.seeAll')}</Link>
+                </Button>
+              }
+            >
+              {query.data.upcomingEvents.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={CalendarDays}
+                  tone="amber"
+                  title={t('dashboard.nothingScheduled')}
+                  description={t('dashboard.nothingScheduledHint')}
+                />
+              ) : (
+                <ListGroup>
+                  {query.data.upcomingEvents.map((event) => (
+                    <ListRow
+                      key={event.id}
+                      to={`${base}/events/${event.id}`}
+                      leading={<DateChip value={event.startsAt} />}
+                      title={event.title}
+                      subtitle={formatDateRange(event.startsAt, event.endsAt, event.isAllDay)}
+                      trailing={
+                        event.groupName ? (
+                          <Badge variant="secondary">{event.groupName}</Badge>
+                        ) : null
+                      }
+                    />
+                  ))}
+                </ListGroup>
+              )}
             </Section>
-          ) : null}
 
-          {query.data.birthdaysThisMonth.length > 0 ? (
-            <Section title="Birthdays this month">
-              <ListGroup>
-                {query.data.birthdaysThisMonth.map((birthday) => (
-                  <ListRow
-                    key={birthday.personId}
-                    to={`${base}/people/${birthday.personId}`}
-                    leading={<Cake className="size-5 text-muted-foreground" />}
-                    title={birthday.name}
-                    trailing={monthDay(birthday.birthDate)}
-                  />
-                ))}
-              </ListGroup>
+            <Section
+              title={t('dashboard.latestAnnouncements')}
+              action={
+                <Button asChild variant="link" size="sm">
+                  <Link to={`${base}/announcements`}>{t('common.seeAll')}</Link>
+                </Button>
+              }
+            >
+              {query.data.recentAnnouncements.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={Megaphone}
+                  tone="amber"
+                  title={t('dashboard.noAnnouncements')}
+                  description={t('dashboard.noAnnouncementsHint')}
+                />
+              ) : (
+                <ListGroup>
+                  {query.data.recentAnnouncements.map((announcement) => (
+                    <ListRow
+                      key={announcement.id}
+                      to={`${base}/announcements/${announcement.id}`}
+                      leading={<ToneIcon icon={Megaphone} tone="amber" size="sm" />}
+                      title={
+                        <span className="flex items-center gap-2">
+                          <span className="truncate">{announcement.title}</span>
+                          {announcement.status === 'draft' ? (
+                            <StatusBadge tone="warning" size="sm">
+                              {t('dashboard.draft')}
+                            </StatusBadge>
+                          ) : null}
+                        </span>
+                      }
+                      subtitle={`${announcement.authorName} · ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
+                    />
+                  ))}
+                </ListGroup>
+              )}
             </Section>
-          ) : null}
+
+            {query.data.myGroups.length > 0 ? (
+              <Section title={t('dashboard.myGroups')}>
+                <ListGroup>
+                  {query.data.myGroups.map((group) => (
+                    <ListRow
+                      key={group.id}
+                      to={`${base}/groups/${group.id}`}
+                      leading={<ToneIcon icon={UsersRound} tone="violet" size="sm" />}
+                      title={group.name}
+                      subtitle={localize(GROUP_TYPE_TEXT[group.type], locale)}
+                      trailing={
+                        group.isLeader ? (
+                          <StatusBadge tone="violet">{t('dashboard.leader')}</StatusBadge>
+                        ) : null
+                      }
+                    />
+                  ))}
+                </ListGroup>
+              </Section>
+            ) : null}
+
+            {query.data.birthdaysThisMonth.length > 0 ? (
+              <Section title={t('dashboard.birthdays')}>
+                <ListGroup>
+                  {query.data.birthdaysThisMonth.map((birthday) => (
+                    <ListRow
+                      key={birthday.personId}
+                      to={`${base}/people/${birthday.personId}`}
+                      leading={<ToneIcon icon={Cake} tone="rose" size="sm" />}
+                      title={birthday.name}
+                      trailing={formatDate(birthday.birthDate, {
+                        preset: 'dayMonth',
+                        smartYear: false,
+                      })}
+                    />
+                  ))}
+                </ListGroup>
+              </Section>
+            ) : null}
+          </div>
         </>
       )}
     </Page>

@@ -1,6 +1,7 @@
 import { apiErrorSchema, type ErrorCode, type ValidationIssue } from '@tatagereja/shared';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { z } from 'zod';
+import { currentLocale, t, type MessageKey } from '@/lib/i18n';
 import { currentToken, signOutLocally } from '@/stores/auth';
 import { useServerStore } from '@/stores/server';
 
@@ -28,10 +29,39 @@ export class ApiClientError extends Error {
 export const isApiClientError = (error: unknown): error is ApiClientError =>
   error instanceof ApiClientError;
 
-export const getErrorMessage = (error: unknown, fallback = 'Something went wrong'): string => {
-  if (isApiClientError(error)) return error.message;
+/** Codes whose message is the same whatever the request, so the interface translates them. */
+const GENERIC_MESSAGES: Partial<Record<ClientErrorCode, MessageKey>> = {
+  NETWORK: 'common.errorNetwork',
+  INVALID_RESPONSE: 'common.errorInvalidResponse',
+  UNKNOWN: 'common.errorUnknown',
+  UNAUTHORIZED: 'common.errorUnauthorized',
+  RATE_LIMITED: 'common.errorRateLimited',
+  MODULE_DISABLED: 'common.errorModuleDisabled',
+  MEMBERSHIP_SUSPENDED: 'common.errorSuspended',
+  PAYLOAD_TOO_LARGE: 'common.errorPayloadTooLarge',
+  INTERNAL: 'common.errorInternal',
+};
+
+/** Server messages are English sentences; these get a translated generic message instead. */
+const TRANSLATED_IN_INDONESIAN: Partial<Record<ClientErrorCode, MessageKey>> = {
+  FORBIDDEN: 'common.errorForbidden',
+  NOT_FOUND: 'common.errorNotFound',
+};
+
+/**
+ * A message for an error, in the interface language where the server message is generic.
+ * Specific server messages (validation, conflicts) are shown as sent.
+ */
+export const getErrorMessage = (error: unknown, fallback?: string): string => {
+  if (isApiClientError(error)) {
+    const generic = GENERIC_MESSAGES[error.code];
+    if (generic) return t(generic);
+    const indonesian = TRANSLATED_IN_INDONESIAN[error.code];
+    if (indonesian && currentLocale() === 'id') return t(indonesian);
+    return error.message;
+  }
   if (error instanceof Error && error.message) return error.message;
-  return fallback;
+  return fallback ?? t('common.errorUnknown');
 };
 
 export const api = axios.create({ timeout: 20_000 });

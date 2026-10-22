@@ -11,8 +11,11 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground shadow-soft hover:bg-primary/90',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/70',
-        outline: 'border border-border bg-card text-foreground hover:bg-muted',
+        outline: 'border border-input bg-card text-foreground shadow-xs hover:bg-muted',
         ghost: 'text-foreground hover:bg-muted',
+        soft: 'bg-accent text-accent-foreground hover:bg-accent/75',
+        /** Tinted with the surrounding `data-tone`. */
+        tone: 'bg-tone-soft text-tone-ink hover:bg-tone-soft/70',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         link: 'text-primary underline-offset-4 hover:underline',
       },
@@ -20,8 +23,10 @@ const buttonVariants = cva(
         default: 'h-11 px-4 py-2',
         sm: 'h-9 rounded-md px-3 text-[13px]',
         lg: 'h-12 rounded-xl px-6 text-base',
+        xs: 'h-7 gap-1 rounded-md px-2 text-xs',
         icon: 'size-10',
         'icon-sm': 'size-8 rounded-md',
+        'icon-lg': 'size-11',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
@@ -51,6 +56,7 @@ function Button({
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={asChild ? undefined : disabled || loading}
       aria-disabled={asChild && (disabled || loading) ? true : undefined}
+      aria-busy={loading || undefined}
       {...props}
     >
       {/* Slot needs exactly one child, so the spinner is only added to real buttons. */}

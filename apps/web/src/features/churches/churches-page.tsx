@@ -1,12 +1,10 @@
-import { MEMBERSHIP_STATUS_LABELS, ROLE_LABELS } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Church, Link2, Plus } from 'lucide-react';
+import { Church, ChevronRight, Link2, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { Page, PageHeader, Section } from '@/components/layout/page';
 import { EntityAvatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,8 +17,12 @@ import {
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ListGroup, ListRow } from '@/components/ui/list';
-import { EmptyState, ErrorState, PageLoader } from '@/components/ui/misc';
+import { EmptyState, ErrorState } from '@/components/ui/misc';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import { getErrorMessage } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
+import { ROLE_KEYS } from '@/lib/i18n/labels';
 import { useAuth } from '@/stores/auth';
 import { myChurchesQuery } from './api';
 
@@ -40,13 +42,14 @@ function JoinDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const submit = () => {
     const token = extractInvitationToken(value);
     if (!token) {
-      setError('Paste the invitation link or code you received');
+      setError(t('churches.joinInvalid'));
       return;
     }
     onOpenChange(false);
@@ -56,13 +59,10 @@ function JoinDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Join a church</DialogTitle>
-          <DialogDescription>
-            Paste the invitation link or code from your church administrator. You can also scan
-            their QR code with your camera.
-          </DialogDescription>
+          <DialogTitle>{t('churches.joinDialogTitle')}</DialogTitle>
+          <DialogDescription>{t('churches.joinDialogDescription')}</DialogDescription>
         </DialogHeader>
-        <Field label="Invitation link or code" htmlFor="invite" error={error ?? undefined}>
+        <Field label={t('churches.joinField')} htmlFor="invite" error={error ?? undefined}>
           <Input
             id="invite"
             value={value}
@@ -72,13 +72,20 @@ function JoinDialog({
             }}
             placeholder="https://…/join/abc123"
             autoCapitalize="none"
+            autoFocus
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                submit();
+              }
+            }}
           />
         </Field>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
-          <Button onClick={submit}>Continue</Button>
+          <Button onClick={submit}>{t('common.continue')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -86,46 +93,61 @@ function JoinDialog({
 }
 
 export function ChurchesPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const churches = useQuery(myChurchesQuery());
   const [joinOpen, setJoinOpen] = useState(false);
 
+  const tileClass =
+    'pressable flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4 text-left shadow-soft outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40';
+
   return (
     <Page>
       <PageHeader
-        eyebrow={user ? `Hello, ${user.name.split(' ')[0]}` : undefined}
-        title="My churches"
-        description="Choose a church to open, create a new one, or join with an invitation."
+        eyebrow={user ? t('churches.hello', { name: user.name.split(' ')[0] ?? '' }) : undefined}
+        title={t('churches.title')}
+        description={t('churches.description')}
       />
-      <div className="grid grid-cols-2 gap-3">
-        <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4">
-          <Link to="/churches/new">
-            <Plus className="size-5" />
-            Create a church
-          </Link>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto flex-col gap-1 py-4"
-          onClick={() => setJoinOpen(true)}
-        >
-          <Link2 className="size-5" />
-          Join with a link
-        </Button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link to="/churches/new" className={tileClass}>
+          <ToneIcon icon={Plus} tone="brand" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{t('churches.createTitle')}</span>
+            <span className="block text-sm text-muted-foreground">{t('churches.createHint')}</span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground/60" aria-hidden />
+        </Link>
+        <button type="button" className={tileClass} onClick={() => setJoinOpen(true)}>
+          <ToneIcon icon={Link2} tone="sky" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{t('churches.joinTitle')}</span>
+            <span className="block text-sm text-muted-foreground">{t('churches.joinHint')}</span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground/60" aria-hidden />
+        </button>
       </div>
-      <Section title="Your churches">
+      <Section title={t('churches.yourChurches')}>
         {churches.isPending ? (
-          <PageLoader />
+          <SkeletonList rows={3} />
         ) : churches.isError ? (
           <ErrorState
+            error={churches.error}
             message={getErrorMessage(churches.error)}
             onRetry={() => void churches.refetch()}
+            retrying={churches.isFetching}
           />
         ) : churches.data.items.length === 0 ? (
           <EmptyState
             icon={Church}
-            title="You are not part of a church yet"
-            description="Create a church to become its owner, or join one using an invitation link or QR code."
+            title={t('churches.emptyTitle')}
+            description={t('churches.emptyDescription')}
+            action={
+              <Button asChild>
+                <Link to="/churches/new">
+                  <Plus /> {t('churches.createTitle')}
+                </Link>
+              </Button>
+            }
           />
         ) : (
           <ListGroup>
@@ -142,14 +164,16 @@ export function ChurchesPage() {
                   />
                 }
                 title={item.church.name}
-                subtitle={`${item.memberCount} ${item.memberCount === 1 ? 'account' : 'accounts'}${item.church.city ? ` · ${item.church.city}` : ''}`}
+                subtitle={[t('churches.accounts', { count: item.memberCount }), item.church.city]
+                  .filter(Boolean)
+                  .join(' · ')}
                 trailing={
                   item.status === 'suspended' ? (
-                    <Badge variant="destructive">{MEMBERSHIP_STATUS_LABELS.suspended}</Badge>
+                    <StatusBadge tone="danger">{t('common.statusSuspended')}</StatusBadge>
                   ) : (
-                    <Badge variant={item.role === 'member' ? 'muted' : 'secondary'}>
-                      {ROLE_LABELS[item.role]}
-                    </Badge>
+                    <StatusBadge tone={item.role === 'member' ? 'neutral' : 'brand'}>
+                      {t(ROLE_KEYS[item.role])}
+                    </StatusBadge>
                   )
                 }
               />

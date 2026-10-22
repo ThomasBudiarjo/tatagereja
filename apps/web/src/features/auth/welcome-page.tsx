@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/misc';
 import { getErrorMessage } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { hostLabel } from '@/lib/utils';
 import { DEFAULT_SERVER_NAME, DEFAULT_SERVER_URL, useServerStore } from '@/stores/server';
 import { AuthLayout } from './auth-layout';
 import { probeAndRemember } from './api';
 
 export function WelcomePage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const selectServer = useServerStore((state) => state.selectServer);
   const servers = useServerStore((state) => state.servers);
@@ -24,7 +26,7 @@ export function WelcomePage() {
       selectServer(server);
       navigate('/login');
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not connect to this server'));
+      setError(getErrorMessage(err, t('auth.connectFailed')));
     } finally {
       setLoading(null);
     }
@@ -34,8 +36,8 @@ export function WelcomePage() {
 
   return (
     <AuthLayout
-      title="Welcome to TataGereja"
-      description="Church management that keeps people, groups, events and attendance in one place."
+      title={t('auth.welcomeTitle')}
+      description={t('auth.welcomeDescription')}
       showServer={false}
     >
       <div className="flex flex-col gap-3">
@@ -46,7 +48,7 @@ export function WelcomePage() {
           loading={loading === DEFAULT_SERVER_URL}
           disabled={!!loading}
         >
-          Continue with {DEFAULT_SERVER_NAME}
+          {t('auth.continueWith', { server: DEFAULT_SERVER_NAME })}
           <ArrowRight />
         </Button>
         <Button
@@ -56,13 +58,11 @@ export function WelcomePage() {
           disabled={!!loading}
         >
           <Server />
-          Use another server
+          {t('auth.useAnotherServer')}
         </Button>
         {otherServers.length > 0 ? (
           <div className="mt-4 flex flex-col gap-2">
-            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              Recent servers
-            </p>
+            <p className="text-overline text-muted-foreground">{t('auth.recentServers')}</p>
             {otherServers.map((server) => (
               <Button
                 key={server.url}

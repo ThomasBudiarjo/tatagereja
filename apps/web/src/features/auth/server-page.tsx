@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Field, FormActions } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/misc';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, isApiClientError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { normalizeServerUrl } from '@/lib/utils';
 import { useServerStore } from '@/stores/server';
 import { AuthLayout } from './auth-layout';
 import { probeAndRemember } from './api';
 
 export function ServerPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const selectServer = useServerStore((state) => state.selectServer);
   const [value, setValue] = useState('');
@@ -21,7 +23,7 @@ export function ServerPage() {
     event.preventDefault();
     const url = normalizeServerUrl(value);
     if (!url) {
-      setError('Enter a valid address such as https://church.example.com');
+      setError(t('auth.serverInvalid'));
       return;
     }
     setLoading(true);
@@ -31,7 +33,11 @@ export function ServerPage() {
       selectServer(server);
       navigate('/login');
     } catch (err) {
-      setError(getErrorMessage(err, 'This address does not point to a TataGereja server'));
+      setError(
+        isApiClientError(err) && err.code === 'INVALID_RESPONSE'
+          ? t('auth.serverNotTataGereja')
+          : getErrorMessage(err, t('auth.serverNotTataGereja')),
+      );
     } finally {
       setLoading(false);
     }
@@ -39,13 +45,13 @@ export function ServerPage() {
 
   return (
     <AuthLayout
-      title="Use another server"
-      description="Enter the address of a self-hosted TataGereja server. Your login is stored separately for each server."
+      title={t('auth.serverTitle')}
+      description={t('auth.serverDescription')}
       showServer={false}
     >
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4" noValidate>
         {error ? <Alert variant="error">{error}</Alert> : null}
-        <Field label="Server address" htmlFor="server-url" required error={undefined}>
+        <Field label={t('auth.serverAddress')} htmlFor="server-url" required>
           <Input
             id="server-url"
             type="url"
@@ -60,10 +66,10 @@ export function ServerPage() {
         </Field>
         <FormActions>
           <Button type="button" variant="ghost" asChild>
-            <Link to="/welcome">Back</Link>
+            <Link to="/welcome">{t('common.back')}</Link>
           </Button>
           <Button type="submit" loading={loading}>
-            Connect
+            {t('auth.connect')}
           </Button>
         </FormActions>
       </form>

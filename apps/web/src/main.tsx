@@ -2,9 +2,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
-import { Toaster } from 'sonner';
 import { AppErrorBoundary } from '@/components/layout/error-boundary';
-import { ThemeEffect } from '@/components/layout/theme';
+import { LocaleEffect } from '@/components/layout/locale-effect';
+import { AppToaster, ThemeEffect } from '@/components/layout/theme';
 import { queryClient } from '@/lib/query-client';
 import { router } from '@/router';
 import './index.css';
@@ -17,8 +17,9 @@ createRoot(container).render(
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeEffect />
+        <LocaleEffect />
         <RouterProvider router={router} />
-        <Toaster position="top-center" richColors closeButton toastOptions={{ duration: 4000 }} />
+        <AppToaster />
       </QueryClientProvider>
     </AppErrorBoundary>
   </StrictMode>,

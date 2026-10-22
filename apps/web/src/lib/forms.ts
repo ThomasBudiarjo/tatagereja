@@ -13,9 +13,14 @@ export function applyServerErrors<T extends FieldValues>(
   if (!isApiClientError(error) || error.code !== 'VALIDATION') return false;
   let applied = false;
   for (const issue of error.issues) {
-    const field = issue.path.split('.')[0] ?? '';
+    // Nested paths ("address.city", "lines.0.amount") map to the deepest known field.
+    const field = fields.includes(issue.path) ? issue.path : (issue.path.split('.')[0] ?? '');
     if (fields.includes(field)) {
-      setError(field as Path<T>, { type: 'server', message: issue.message });
+      setError(
+        field as Path<T>,
+        { type: 'server', message: issue.message },
+        { shouldFocus: !applied },
+      );
       applied = true;
     }
   }

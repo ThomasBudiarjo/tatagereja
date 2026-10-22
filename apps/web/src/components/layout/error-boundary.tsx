@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { t } from '@/lib/i18n';
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -20,11 +21,9 @@ export class AppErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <h1 className="text-xl font-bold">Something went wrong</h1>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          The app hit an unexpected error. Reloading usually fixes it.
-        </p>
-        <Button onClick={() => window.location.reload()}>Reload the app</Button>
+        <h1 className="text-xl font-bold">{t('common.crashTitle')}</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">{t('common.crashDescription')}</p>
+        <Button onClick={() => window.location.reload()}>{t('common.reload')}</Button>
       </div>
     );
   }

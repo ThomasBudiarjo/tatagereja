@@ -46,13 +46,17 @@ export function ListRow({
       </div>
       {trailing ? <div className="shrink-0 text-sm text-muted-foreground">{trailing}</div> : null}
       {(chevron ?? !!to) ? (
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+          aria-hidden
+        />
       ) : null}
     </>
   );
   const classes = cn(
-    'flex w-full items-center gap-3 px-4 py-3 text-left',
-    interactive && 'transition-colors hover:bg-muted/60 active:bg-muted',
+    'group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left',
+    interactive &&
+      'outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:ring-inset active:bg-muted',
     className,
   );
   if (to) {
