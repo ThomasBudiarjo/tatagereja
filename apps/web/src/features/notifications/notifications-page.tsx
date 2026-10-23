@@ -143,7 +143,7 @@ export function NotificationsPage() {
             <section
               key={group.day}
               aria-label={dayLabel(group.day)}
-              className="flex flex-col gap-2"
+              className="flex flex-col gap-2 offscreen-lazy"
             >
               <h2 className="text-overline px-1 text-muted-foreground">{dayLabel(group.day)}</h2>
               <ul className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft">

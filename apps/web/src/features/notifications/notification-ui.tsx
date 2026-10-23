@@ -1,5 +1,6 @@
 import type { Notification } from '@tatagereja/shared';
 import { Circle } from 'lucide-react';
+import { memo } from 'react';
 import { useNavigate } from 'react-router';
 import { ToneIcon } from '@/components/ui/status-badge';
 import { useI18n } from '@/lib/i18n';
@@ -9,9 +10,10 @@ import { notificationVisual } from './notification-visuals';
 
 /**
  * One notification: opening it marks it read and follows its in-app link. The trailing
- * button toggles read without opening.
+ * button toggles read without opening. Memoized: loading the next page of a long inbox does
+ * not re-render the rows already shown.
  */
-export function NotificationRow({
+export const NotificationRow = memo(function NotificationRow({
   notification,
   churchName,
   onOpen,
@@ -90,4 +92,4 @@ export function NotificationRow({
       </button>
     </li>
   );
-}
+});

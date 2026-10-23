@@ -37,7 +37,15 @@ import {
   X,
 } from 'lucide-react';
 import * as React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -72,6 +80,7 @@ import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { useUrlState } from '@/lib/use-url-state';
+import { useWindowVirtualizer } from '@/lib/use-window-virtualizer';
 import { cn } from '@/lib/utils';
 import {
   attendanceSessionQuery,
@@ -323,12 +332,26 @@ function RosterSheet({ detail }: { detail: AttendanceSessionDetail }) {
     return result;
   }, [records, statusOf]);
 
-  const needle = search.trim().toLowerCase();
-  const visible = records.filter((record) => {
-    const status = statusOf(record);
-    if (show === 'unmarked' ? status !== null : show !== 'all' && status !== show) return false;
-    return !needle || fullName(record).toLowerCase().includes(needle);
-  });
+  // Typing stays immediate while a roster of thousands filters behind it.
+  const needle = useDeferredValue(search).trim().toLowerCase();
+  const visible = useMemo(
+    () =>
+      records.filter((record) => {
+        const status = statusOf(record);
+        if (show === 'unmarked' ? status !== null : show !== 'all' && status !== show) {
+          return false;
+        }
+        return !needle || fullName(record).toLowerCase().includes(needle);
+      }),
+    [records, statusOf, show, needle],
+  );
+  // A whole congregation's roster: only the rows near the screen are mounted.
+  const { attachList, rows, paddingTop, paddingBottom, measure, scrollToIndex, isMounted } =
+    useWindowVirtualizer({
+      count: visible.length,
+      estimateSize: 65,
+      getKey: useCallback((index: number) => visible[index]!.id, [visible]),
+    });
 
   const runBulk = async (status: AttendanceStatus) => {
     await flush();
@@ -341,8 +364,16 @@ function RosterSheet({ detail }: { detail: AttendanceSessionDetail }) {
   };
 
   const focusRow = (index: number) => {
-    const target = visible[Math.max(0, Math.min(visible.length - 1, index))];
-    if (target) rowRefs.current.get(target.id)?.focus();
+    const clamped = Math.max(0, Math.min(visible.length - 1, index));
+    const target = visible[clamped];
+    if (!target) return;
+    if (!isMounted(clamped)) scrollToIndex(clamped);
+    const focus = (attempts: number) => {
+      const element = rowRefs.current.get(target.id);
+      if (element) element.focus();
+      else if (attempts > 0) requestAnimationFrame(() => focus(attempts - 1));
+    };
+    focus(3);
   };
 
   const onRowKeyDown = (event: React.KeyboardEvent<HTMLLIElement>, index: number) => {
@@ -498,18 +529,31 @@ function RosterSheet({ detail }: { detail: AttendanceSessionDetail }) {
       ) : visible.length === 0 ? (
         <EmptyState compact icon={UserRound} tone="slate" title={t('attendance.rosterNoMatch')} />
       ) : (
-        <ul className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft">
-          {visible.map((record, index) => {
+        <ul
+          ref={attachList}
+          style={{ paddingTop, paddingBottom }}
+          className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft"
+        >
+          {rows.map((index) => {
+            const record = visible[index]!;
             const status = statusOf(record);
             const name = fullName(record);
+            const measureRow = measure(index);
             return (
               <li
                 key={record.id}
                 ref={(element) => {
-                  if (element) rowRefs.current.set(record.id, element);
-                  else rowRefs.current.delete(record.id);
+                  if (!element) return;
+                  rowRefs.current.set(record.id, element);
+                  const stop = measureRow(element);
+                  return () => {
+                    rowRefs.current.delete(record.id);
+                    stop?.();
+                  };
                 }}
-                tabIndex={index === 0 ? 0 : -1}
+                aria-setsize={visible.length}
+                aria-posinset={index + 1}
+                tabIndex={index === rows[0] ? 0 : -1}
                 onKeyDown={(event) => onRowKeyDown(event, index)}
                 onFocus={(event) => {
                   if (event.target !== event.currentTarget) return;

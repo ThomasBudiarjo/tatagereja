@@ -180,6 +180,8 @@ function BulletinHero({ bulletin, to }: { bulletin: BulletinSummary; to: string 
         <img
           src={bulletin.coverImageUrl}
           alt=""
+          loading="lazy"
+          decoding="async"
           className="aspect-[16/9] w-full object-cover sm:aspect-auto sm:w-64"
         />
       ) : (
