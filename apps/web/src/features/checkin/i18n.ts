@@ -70,6 +70,11 @@ export const checkinDictionary = defineDictionary('checkin', {
     sessionNamePlaceholder: 'Ibadah Minggu Pagi',
     defaultSessionName: 'Sekolah Minggu',
     sessionDate: 'Date',
+    sessionService: 'Worship service',
+    sessionServiceHint: 'Link the session to the ibadah it runs alongside.',
+    sessionNoService: 'No worship service is scheduled on this date.',
+    sessionNoServiceOption: 'No service (date only)',
+    sessionNameForService: 'Sekolah Minggu · {service}',
     sessionOpened: '{name} is open for {date}',
     sessionSaved: 'Session {name} saved',
     sessionActions: 'Session actions',
@@ -97,7 +102,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     closedAt: 'Closed {date}',
     viewAttendance: 'Attendance',
     ratioWarningTitle: 'Too many children per teacher',
-    ratioWarningItem: '{name}: {children} children, {teachers} teachers',
+    ratioWarningItem: '{name}: {children}, {teachers}',
     ratioWarningBody:
       '{children} children with {teachers} teachers; the limit is {max} per teacher. Ask for another teacher.',
     ratioWarningShort: 'Over ratio',
@@ -120,7 +125,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     removeCheckin: 'Remove check-in',
     removeCheckinTitle: 'Remove the check-in of {name}?',
     removeCheckinBody:
-      'Use this only for a check-in made by mistake. It disappears from the roster and the history.',
+      'Use this only for a check-in made by mistake. It disappears from the roster, the history and the attendance record.',
     checkinRemoved: 'Check-in removed',
 
     // Roster
@@ -139,6 +144,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     rosterEmptyHint: 'Children appear here as soon as they are checked in.',
     inSince: 'in since {time}',
     outAt: 'out {time} · {name}',
+    outAtTime: 'out {time}',
 
     // Station
     stationTitle: 'Check-in station',
@@ -153,6 +159,9 @@ export const checkinDictionary = defineDictionary('checkin', {
     kioskMode: 'Kiosk mode',
     kioskModeHint: 'Families check themselves in on this device.',
     exitKiosk: 'Leave kiosk mode',
+    exitKioskTitle: 'Leave kiosk mode?',
+    exitKioskBody:
+      'The menu and the other check-in pages come back. Only volunteers should leave kiosk mode.',
     stationClosedBody: 'Ask a coordinator to reopen it to check more children in.',
     stationSearch: 'Family name or last 4 digits of a phone',
     stationSearchShort: 'Family name or phone (4 digits)',
@@ -465,6 +474,11 @@ export const checkinDictionary = defineDictionary('checkin', {
     sessionNamePlaceholder: 'Ibadah Minggu Pagi',
     defaultSessionName: 'Sekolah Minggu',
     sessionDate: 'Tanggal',
+    sessionService: 'Ibadah',
+    sessionServiceHint: 'Hubungkan sesi dengan ibadah yang berlangsung bersamaan.',
+    sessionNoService: 'Belum ada ibadah yang dijadwalkan pada tanggal ini.',
+    sessionNoServiceOption: 'Tanpa ibadah (tanggal saja)',
+    sessionNameForService: 'Sekolah Minggu · {service}',
     sessionOpened: '{name} dibuka untuk {date}',
     sessionSaved: 'Sesi {name} disimpan',
     sessionActions: 'Tindakan sesi',
@@ -491,7 +505,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     closedAt: 'Ditutup {date}',
     viewAttendance: 'Kehadiran',
     ratioWarningTitle: 'Terlalu banyak anak per guru',
-    ratioWarningItem: '{name}: {children} anak, {teachers} guru',
+    ratioWarningItem: '{name}: {children}, {teachers}',
     ratioWarningBody:
       '{children} anak dengan {teachers} guru; batasnya {max} anak per guru. Mintalah tambahan guru.',
     ratioWarningShort: 'Melebihi rasio',
@@ -514,7 +528,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     removeCheckin: 'Hapus check-in',
     removeCheckinTitle: 'Hapus check-in {name}?',
     removeCheckinBody:
-      'Gunakan hanya untuk check-in yang keliru. Data ini hilang dari daftar kelas dan riwayat.',
+      'Gunakan hanya untuk check-in yang keliru. Data ini hilang dari daftar kelas, riwayat, dan catatan kehadiran.',
     checkinRemoved: 'Check-in dihapus',
 
     rosterTitle: 'Daftar kelas',
@@ -532,6 +546,7 @@ export const checkinDictionary = defineDictionary('checkin', {
     rosterEmptyHint: 'Anak muncul di sini begitu di-check-in.',
     inSince: 'masuk {time}',
     outAt: 'keluar {time} · {name}',
+    outAtTime: 'keluar {time}',
 
     stationTitle: 'Meja check-in',
     kioskEyebrow: 'Selamat datang di Sekolah Minggu',
@@ -545,6 +560,9 @@ export const checkinDictionary = defineDictionary('checkin', {
     kioskMode: 'Mode kios',
     kioskModeHint: 'Keluarga melakukan check-in sendiri di perangkat ini.',
     exitKiosk: 'Keluar dari mode kios',
+    exitKioskTitle: 'Keluar dari mode kios?',
+    exitKioskBody:
+      'Menu dan halaman check-in lainnya akan muncul kembali. Hanya petugas yang boleh keluar dari mode kios.',
     stationClosedBody: 'Minta koordinator membukanya kembali untuk check-in anak lain.',
     stationSearch: 'Nama keluarga atau 4 digit terakhir nomor HP',
     stationSearchShort: 'Nama keluarga / 4 digit HP',

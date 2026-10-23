@@ -15,7 +15,7 @@ import {
   type PersonSummary,
   type SessionClassStat,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
 import type {
   CheckinAuthorizedPickupRow,
@@ -37,6 +37,7 @@ import {
   householdMembers,
   households,
   people,
+  worshipServices,
 } from '../db/schema';
 import { conflict, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
@@ -256,11 +257,30 @@ export const hydrateSessions = (db: Queryable, rows: CheckinSessionRow[]): Check
       .all()
       .map((row) => [row.sessionId, row]),
   );
+  const serviceIds = [
+    ...new Set(rows.flatMap((row) => (row.worshipServiceId ? [row.worshipServiceId] : []))),
+  ];
+  const services = new Map(
+    serviceIds.length === 0
+      ? []
+      : db
+          .select({ id: worshipServices.id, title: worshipServices.title })
+          .from(worshipServices)
+          .where(
+            and(
+              eq(worshipServices.churchId, rows[0]!.churchId),
+              inArray(worshipServices.id, serviceIds),
+            ),
+          )
+          .all()
+          .map((row) => [row.id, row.title]),
+  );
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     date: row.date,
     worshipServiceId: row.worshipServiceId,
+    serviceTitle: row.worshipServiceId ? (services.get(row.worshipServiceId) ?? null) : null,
     attendanceSessionId: row.attendanceSessionId,
     status: row.status,
     openedAt: row.openedAt,
@@ -616,6 +636,67 @@ export const uniqueSecurityCode = (
   throw conflict('Could not create a unique security code. Try again');
 };
 
+/** The UTC instant of a wall-clock `date` and `time` (HH:MM) in `timeZone`. */
+export const zonedIso = (date: string, time: string, timeZone: string): string => {
+  const guess = new Date(`${date}T${time}:00Z`);
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(guess);
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((item) => item.type === type)?.value ?? 0);
+    const wall = Date.UTC(
+      part('year'),
+      part('month') - 1,
+      part('day'),
+      part('hour'),
+      part('minute'),
+      part('second'),
+    );
+    return new Date(guess.getTime() - (wall - guess.getTime())).toISOString();
+  } catch {
+    return guess.toISOString();
+  }
+};
+
+/**
+ * When the session took place, for attendance: the linked service's start, the moment it was
+ * opened when that was on the session's date, or 09:00 local time on that date (a session
+ * opened ahead of time or recorded afterwards still counts for its own Sunday).
+ */
+const sessionMoment = (db: Queryable, session: CheckinSessionRow, timezone: string): string => {
+  if (session.worshipServiceId) {
+    const service = db
+      .select({ startsAt: worshipServices.startsAt })
+      .from(worshipServices)
+      .where(
+        and(
+          eq(worshipServices.id, session.worshipServiceId),
+          eq(worshipServices.churchId, session.churchId),
+        ),
+      )
+      .get();
+    if (service) return service.startsAt;
+  }
+  const openedOn = (() => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
+        new Date(session.openedAt),
+      );
+    } catch {
+      return session.openedAt.slice(0, 10);
+    }
+  })();
+  return openedOn === session.date ? session.openedAt : zonedIso(session.date, '09:00', timezone);
+};
+
 /**
  * Copies a session's children to an attendance session (roster mode, everyone present) so
  * Sekolah Minggu attendance shows up in the attendance stats. Idempotent: re-closing a reopened
@@ -624,9 +705,12 @@ export const uniqueSecurityCode = (
 export const syncAttendance = (
   db: Queryable,
   session: CheckinSessionRow,
+  timezone: string,
   userId: string,
 ): string => {
   const now = nowIso();
+  const title = `Sekolah Minggu · ${session.name}`;
+  const sessionAt = sessionMoment(db, session, timezone);
   const childIds = [
     ...new Set(
       db
@@ -652,7 +736,7 @@ export const syncAttendance = (
     : undefined;
   if (existing) {
     db.update(attendanceSessions)
-      .set({ headcountChildren: childIds.length, updatedAt: now })
+      .set({ title, sessionAt, headcountChildren: childIds.length, updatedAt: now })
       .where(eq(attendanceSessions.id, existing.id))
       .run();
   } else {
@@ -661,8 +745,8 @@ export const syncAttendance = (
       .values({
         id: attendanceId,
         churchId: session.churchId,
-        title: `Sekolah Minggu · ${session.name}`,
-        sessionAt: session.openedAt,
+        title,
+        sessionAt,
         mode: 'roster',
         headcountChildren: childIds.length,
         notes: null,
@@ -691,4 +775,46 @@ export const syncAttendance = (
       .run();
   }
   return id;
+};
+
+/**
+ * Undoes `syncAttendance` for one child whose check-in was removed, unless the child has
+ * another check-in in the session. Keeps the attendance headcount in step.
+ */
+export const removeFromAttendance = (
+  db: Queryable,
+  session: CheckinSessionRow,
+  childPersonId: string,
+) => {
+  if (!session.attendanceSessionId) return;
+  const other = db
+    .select({ id: checkins.id })
+    .from(checkins)
+    .where(and(eq(checkins.sessionId, session.id), eq(checkins.childPersonId, childPersonId)))
+    .get();
+  if (other) return;
+  db.delete(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.churchId, session.churchId),
+        eq(attendanceRecords.sessionId, session.attendanceSessionId),
+        eq(attendanceRecords.personId, childPersonId),
+      ),
+    )
+    .run();
+  const children =
+    db
+      .select({ value: countDistinct(checkins.childPersonId) })
+      .from(checkins)
+      .where(eq(checkins.sessionId, session.id))
+      .get()?.value ?? 0;
+  db.update(attendanceSessions)
+    .set({ headcountChildren: children, updatedAt: nowIso() })
+    .where(
+      and(
+        eq(attendanceSessions.id, session.attendanceSessionId),
+        eq(attendanceSessions.churchId, session.churchId),
+      ),
+    )
+    .run();
 };

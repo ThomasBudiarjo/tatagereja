@@ -22,6 +22,7 @@ import { useDocumentTitle } from '@/lib/use-document-title';
 import { isGone } from '@/lib/use-mutation-toast';
 import { labelsQuery } from './api';
 import { CHECKIN_TONE, useCheckinAccess } from './checkin-lib';
+import { KioskFrame } from './checkin-ui';
 
 /** Labels print two per child: one stays on the child, the tag goes home with the guardian. */
 const PRINT_CSS = `
@@ -48,11 +49,12 @@ export function LabelsPage() {
   useDocumentTitle(t('checkin.labelsTitle'));
   const printed = useRef(false);
   const items = query.data?.items ?? [];
+  const kiosk = canOperate && params.get('kiosk') === '1';
   // Guardians printing at home go back to their children; volunteers to the station.
   const back = !canOperate
     ? `${base}/checkin/me`
     : items[0]
-      ? `${base}/checkin/sessions/${items[0].sessionId}/station`
+      ? `${base}/checkin/sessions/${items[0].sessionId}/station${kiosk ? '?kiosk=true' : ''}`
       : `${base}/checkin`;
 
   // Open the print dialog once the labels are on screen, when asked to (`print=1`).
@@ -64,49 +66,51 @@ export function LabelsPage() {
   }, [query.isSuccess, params]);
 
   return (
-    <Page size="wide" className="print:p-0">
-      <style>{PRINT_CSS}</style>
-      <div data-print="hide" className="flex flex-wrap items-center justify-between gap-3">
-        <Button asChild variant="ghost" size="sm" className="-ml-2.5 text-muted-foreground">
-          <Link to={back}>
-            <ArrowLeft />
-            {canOperate ? t('checkin.backToStation') : t('checkin.backToMine')}
-          </Link>
-        </Button>
-        {items.length > 0 ? <PrintButton label={t('checkin.printLabels')} /> : null}
-      </div>
-      <div data-print="hide">
-        <h1 className="text-2xl font-bold tracking-tight">{t('checkin.labelsTitle')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('checkin.labelsHint')}</p>
-      </div>
+    <KioskFrame active={kiosk}>
+      <Page size="wide" className="print:p-0">
+        <style>{PRINT_CSS}</style>
+        <div data-print="hide" className="flex flex-wrap items-center justify-between gap-3">
+          <Button asChild variant="ghost" size="sm" className="-ml-2.5 text-muted-foreground">
+            <Link to={back}>
+              <ArrowLeft />
+              {canOperate ? t('checkin.backToStation') : t('checkin.backToMine')}
+            </Link>
+          </Button>
+          {items.length > 0 ? <PrintButton label={t('checkin.printLabels')} /> : null}
+        </div>
+        <div data-print="hide">
+          <h1 className="text-2xl font-bold tracking-tight">{t('checkin.labelsTitle')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('checkin.labelsHint')}</p>
+        </div>
 
-      {ids.length === 0 || (query.isError && isGone(query.error)) ? (
-        <EmptyState
-          icon={Tag}
-          tone={CHECKIN_TONE}
-          title={t('checkin.noLabels')}
-          description={t('checkin.noLabelsHint')}
-        />
-      ) : query.isPending ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-      ) : query.isError ? (
-        <ErrorState
-          error={query.error}
-          message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
-          retrying={query.isFetching}
-        />
-      ) : (
-        <div className="checkin-labels grid gap-4 sm:grid-cols-2 print:grid-cols-2">
-          {items.map((label) => (
-            <LabelPair key={label.id} label={label} />
-          ))}
-        </div>
-      )}
-    </Page>
+        {ids.length === 0 || (query.isError && isGone(query.error)) ? (
+          <EmptyState
+            icon={Tag}
+            tone={CHECKIN_TONE}
+            title={t('checkin.noLabels')}
+            description={t('checkin.noLabelsHint')}
+          />
+        ) : query.isPending ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </div>
+        ) : query.isError ? (
+          <ErrorState
+            error={query.error}
+            message={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        ) : (
+          <div className="checkin-labels grid gap-4 sm:grid-cols-2 print:grid-cols-2">
+            {items.map((label) => (
+              <LabelPair key={label.id} label={label} />
+            ))}
+          </div>
+        )}
+      </Page>
+    </KioskFrame>
   );
 }
 

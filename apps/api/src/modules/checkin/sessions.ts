@@ -4,6 +4,7 @@ import {
   canOperateCheckin,
   checkInBodySchema,
   checkinListQuerySchema,
+  checkinServiceListQuerySchema,
   checkinSessionInputSchema,
   checkinSessionListQuerySchema,
   childAge,
@@ -11,10 +12,25 @@ import {
   churchParamsSchema,
   fullName,
   isRatioExceeded,
+  isSelfCheckInDate,
   sessionClassParamsSchema,
   suggestClass,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gte, inArray, like, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  like,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { CheckinSessionRow } from '../../db/schema';
@@ -50,7 +66,9 @@ import {
   syncAttendance,
   todayIn,
   uniqueSecurityCode,
+  zonedIso,
 } from '../../services/checkin';
+import { moduleEnabled } from '../../services/modules';
 import { notify } from '../../services/notifications';
 
 const operate = { module: 'checkin', permission: ['checkin.operate', 'checkin.manage'] } as const;
@@ -115,6 +133,38 @@ export const checkinSessionsRouter = (deps: Deps) => {
         return { items: hydrateSessions(db, rows), total, page: query.page, limit: query.limit };
       },
       { church: operate, params: churchParamsSchema, query: checkinSessionListQuerySchema },
+    )
+    .get(
+      '/services',
+      ({ church, query }) => {
+        // Services come from the worship module's schedule; without it there is nothing to link.
+        if (!moduleEnabled(church, 'worship')) return { items: [] };
+        const next = new Date(`${query.date}T00:00:00Z`);
+        next.setUTCDate(next.getUTCDate() + 1);
+        return {
+          items: db
+            .select({
+              id: worshipServices.id,
+              title: worshipServices.title,
+              startsAt: worshipServices.startsAt,
+            })
+            .from(worshipServices)
+            .where(
+              and(
+                eq(worshipServices.churchId, church.id),
+                gte(worshipServices.startsAt, zonedIso(query.date, '00:00', church.timezone)),
+                lt(
+                  worshipServices.startsAt,
+                  zonedIso(next.toISOString().slice(0, 10), '00:00', church.timezone),
+                ),
+              ),
+            )
+            .orderBy(asc(worshipServices.startsAt))
+            .limit(20)
+            .all(),
+        };
+      },
+      { church: manage, params: churchParamsSchema, query: checkinServiceListQuerySchema },
     )
     .post(
       '/',
@@ -202,7 +252,7 @@ export const checkinSessionsRouter = (deps: Deps) => {
         const row = loadSessionRow(db, church.id, params.id);
         if (row.status === 'closed') throw conflict('This session is already closed');
         const updated = db.transaction((tx) => {
-          const attendanceSessionId = syncAttendance(tx, row, auth.user.id);
+          const attendanceSessionId = syncAttendance(tx, row, church.timezone, auth.user.id);
           const now = nowIso();
           const next = tx
             .update(checkinSessions)
@@ -382,9 +432,11 @@ export const checkinSessionsRouter = (deps: Deps) => {
           throw forbidden('Your account is not linked to a person in this church');
         }
         if (session.status !== 'open') throw conflict('This session is closed');
+        if (self && !isSelfCheckInDate(session.date, todayIn(church.timezone))) {
+          throw conflict('Self check-in is only open on the day of the session');
+        }
         const guardianId = self ? access.personId : body.guardianPersonId;
-        const guardian =
-          guardianId && !self ? loadPerson(db, church.id, guardianId, 'Guardian') : null;
+        const guardian = guardianId ? loadPerson(db, church.id, guardianId, 'Guardian') : null;
 
         const today = todayIn(church.timezone);
         const settings = checkinSettingsOf(church);

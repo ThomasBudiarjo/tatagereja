@@ -20,6 +20,7 @@ import {
   checkinSessionInputSchema,
   checkinSessionListSchema,
   checkinSessionResponseSchema,
+  checkinServiceListSchema,
   checkinSettingsResponseSchema,
   checkinSettingsSchema,
   checkOutBodySchema,
@@ -63,6 +64,8 @@ export const checkinKeys = {
     [...checkinKeys.sessions(churchId), 'list', params] as const,
   session: (churchId: string, id: string) =>
     [...checkinKeys.sessions(churchId), 'detail', id] as const,
+  services: (churchId: string, date: string) =>
+    [...checkinKeys.sessions(churchId), 'services', date] as const,
   sessionCheckins: (churchId: string, id: string, params: Record<string, unknown>) =>
     [...checkinKeys.sessions(churchId), 'checkins', id, params] as const,
   roster: (churchId: string, sessionId: string, classId: string) =>
@@ -147,6 +150,18 @@ export const sessionQuery = (churchId: string, id: string) =>
     queryKey: checkinKeys.session(churchId, id),
     queryFn: () => request(checkinSessionDetailSchema, { url: at(churchId, `/sessions/${id}`) }),
     refetchInterval: LIVE_REFRESH_MS,
+  });
+
+/** Worship services (ibadah) on a date that a new session can belong to. */
+export const servicesQuery = (churchId: string, date: string) =>
+  queryOptions({
+    queryKey: checkinKeys.services(churchId, date),
+    queryFn: () =>
+      request(checkinServiceListSchema, {
+        url: at(churchId, '/sessions/services'),
+        params: { date },
+      }),
+    staleTime: 60_000,
   });
 
 export type SessionCheckinParams = Partial<CheckinListQuery>;
@@ -355,9 +370,12 @@ export const useOverrideCheckOut = (churchId: string, id: string) =>
     }),
   );
 
+/** A removed check-in of a closed session is taken out of attendance too. */
 export const useDeleteCheckin = (churchId: string) =>
-  useCheckinMutation(churchId, (id: string) =>
-    request(okSchema, { method: 'DELETE', url: at(churchId, `/checkins/${id}`) }),
+  useCheckinMutation(
+    churchId,
+    (id: string) => request(okSchema, { method: 'DELETE', url: at(churchId, `/checkins/${id}`) }),
+    (church) => [keys.attendance(church)],
   );
 
 /** A first-time child is a new person in the directory too. */

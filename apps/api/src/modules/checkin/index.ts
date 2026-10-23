@@ -3,8 +3,9 @@ import {
   GUARDIAN_RELATIONSHIPS,
   checkinSettingsSchema,
   churchParamsSchema,
+  dayBefore,
 } from '@tatagereja/shared';
-import { and, asc, count, countDistinct, desc, eq, gte, inArray, or } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, gte, inArray, lte, or } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import {
   checkinChildAlerts,
@@ -156,10 +157,8 @@ const checkinHomeRouter = (deps: Deps) => {
       ({ church, access }) => {
         const settings = checkinSettingsOf(church);
         const today = todayIn(church.timezone);
-        // Sessions left open from earlier weeks are not offered to guardians.
-        const yesterday = addDays(new Date(`${today}T00:00:00Z`), -1)
-          .toISOString()
-          .slice(0, 10);
+        // Sessions left open from earlier weeks, or opened ahead for next week, are not offered.
+        const yesterday = dayBefore(today);
         const openRows = db
           .select()
           .from(checkinSessions)
@@ -168,6 +167,7 @@ const checkinHomeRouter = (deps: Deps) => {
               eq(checkinSessions.churchId, church.id),
               eq(checkinSessions.status, 'open'),
               gte(checkinSessions.date, yesterday),
+              lte(checkinSessions.date, today),
             ),
           )
           .orderBy(desc(checkinSessions.date), asc(checkinSessions.openedAt))

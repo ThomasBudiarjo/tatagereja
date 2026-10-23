@@ -6,7 +6,9 @@ import {
   checkInBodySchema,
   checkinClassInputSchema,
   childAge,
+  dayBefore,
   highestSeverity,
+  isSelfCheckInDate,
   kioskSearchQuerySchema,
   phoneLast4,
   suggestClass,
@@ -74,5 +76,20 @@ describe('kids check-in rules', () => {
     expect(checkinClassInputSchema.safeParse({ name: 'Kelas', minAge: 7, maxAge: 4 }).success).toBe(
       false,
     );
+  });
+});
+
+describe('self check-in dates', () => {
+  it('takes the day before across months and leap days', () => {
+    expect(dayBefore('2026-03-01')).toBe('2026-02-28');
+    expect(dayBefore('2028-03-01')).toBe('2028-02-29');
+    expect(dayBefore('2027-01-01')).toBe('2026-12-31');
+  });
+
+  it('accepts only sessions of today and yesterday', () => {
+    expect(isSelfCheckInDate('2026-10-25', '2026-10-25')).toBe(true);
+    expect(isSelfCheckInDate('2026-10-24', '2026-10-25')).toBe(true);
+    expect(isSelfCheckInDate('2026-10-23', '2026-10-25')).toBe(false);
+    expect(isSelfCheckInDate('2026-10-26', '2026-10-25')).toBe(false);
   });
 });

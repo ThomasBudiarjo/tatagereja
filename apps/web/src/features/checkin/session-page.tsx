@@ -10,6 +10,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarX2,
+  Church,
   ClipboardCheck,
   LockKeyhole,
   LockKeyholeOpen,
@@ -34,6 +35,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { RowActions } from '@/components/ui/row-actions';
 import { SkeletonList, SkeletonStats } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { ErrorState } from '@/components/ui/states';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -218,6 +220,11 @@ export function SessionPage() {
       />
       <div className="-mt-2 flex flex-wrap items-center gap-2">
         <SessionStatusBadge status={session.status} />
+        {session.serviceTitle ? (
+          <StatusBadge tone="violet" icon={Church} size="sm">
+            {session.serviceTitle}
+          </StatusBadge>
+        ) : null}
         {session.closedAt ? (
           <span className="text-xs text-muted-foreground">
             {t('checkin.closedAt', { date: formatDate(session.closedAt, 'dateTime') })}
@@ -248,8 +255,8 @@ export function SessionPage() {
             .map((item) =>
               t('checkin.ratioWarningItem', {
                 name: item.name,
-                children: item.presentCount,
-                teachers: item.teacherCount,
+                children: t('checkin.childrenCount', { count: item.presentCount }),
+                teachers: t('checkin.teachersCount', { count: item.teacherCount }),
               }),
             )
             .join(' · ')}

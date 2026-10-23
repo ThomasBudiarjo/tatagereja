@@ -34,13 +34,21 @@ import { cn } from '@/lib/utils';
 import { checkinQuery, useCheckOut, useOverrideCheckOut } from './api';
 import { AlertCallout, ChildAvatar } from './checkin-ui';
 
-type Pickup = { key: string; personId: string | null; name: string; detail: string | null };
+type Pickup = {
+  key: string;
+  personId: string | null;
+  /** The pick-up list entry, for someone without a person record. */
+  pickupId: string | null;
+  name: string;
+  detail: string | null;
+};
 
 /** Everyone allowed to collect the child: the guardians first, then the pick-up list. */
 function pickupOptions(detail: CheckinDetail, guardianLabel: string): Pickup[] {
   const options: Pickup[] = detail.guardians.map((person) => ({
     key: `person:${person.id}`,
     personId: person.id,
+    pickupId: null,
     name: fullName(person),
     detail: guardianLabel,
   }));
@@ -49,6 +57,7 @@ function pickupOptions(detail: CheckinDetail, guardianLabel: string): Pickup[] {
     options.unshift({
       key: `person:${brought.id}`,
       personId: brought.id,
+      pickupId: null,
       name: fullName(brought),
       detail: guardianLabel,
     });
@@ -62,6 +71,7 @@ function pickupOptions(detail: CheckinDetail, guardianLabel: string): Pickup[] {
     options.push({
       key: pickup.pickupPersonId ? `person:${pickup.pickupPersonId}` : `name:${pickup.id}`,
       personId: pickup.pickupPersonId,
+      pickupId: pickup.pickupPersonId ? null : pickup.id,
       name: pickup.name,
       detail: [pickup.relationship, pickup.phone].filter(Boolean).join(' · ') || null,
     });
@@ -145,10 +155,8 @@ function CheckoutForm({ detail, onDone }: { detail: CheckinDetail; onDone: () =>
   const chosen = options.find((option) => option.key === pickupKey) ?? null;
   const pickup = () =>
     pickupKey === 'other'
-      ? { pickupPersonId: null, pickupName: otherName.trim() || null }
-      : chosen
-        ? { pickupPersonId: chosen.personId, pickupName: chosen.personId ? null : chosen.name }
-        : { pickupPersonId: null, pickupName: null };
+      ? { pickupPersonId: null, pickupId: null, pickupName: otherName.trim() || null }
+      : { pickupPersonId: chosen?.personId ?? null, pickupId: chosen?.pickupId ?? null };
 
   const codeForm = useForm<
     z.input<typeof checkOutBodySchema>,
@@ -156,7 +164,7 @@ function CheckoutForm({ detail, onDone }: { detail: CheckinDetail; onDone: () =>
     z.output<typeof checkOutBodySchema>
   >({
     resolver: zodResolver(checkOutBodySchema),
-    defaultValues: { securityCode: '', pickupPersonId: null, pickupName: null },
+    defaultValues: { securityCode: '' },
   });
   const overrideForm = useForm<
     z.input<typeof overrideCheckOutBodySchema>,
@@ -164,7 +172,7 @@ function CheckoutForm({ detail, onDone }: { detail: CheckinDetail; onDone: () =>
     z.output<typeof overrideCheckOutBodySchema>
   >({
     resolver: zodResolver(overrideCheckOutBodySchema),
-    defaultValues: { reason: '', pickupPersonId: null, pickupName: null },
+    defaultValues: { reason: '' },
   });
   const success = (result: { checkin: { pickupName: string | null } }) =>
     result.checkin.pickupName

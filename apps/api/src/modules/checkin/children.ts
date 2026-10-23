@@ -4,6 +4,7 @@ import {
   canEditChildCare,
   canOperateCheckin,
   checkinChildListQuerySchema,
+  childAge,
   childAlertInputSchema,
   childAlertParamsSchema,
   childAttendanceQuerySchema,
@@ -59,6 +60,7 @@ import {
   checkinSettingsOf,
   classRowsOf,
   guardiansOf,
+  householdLinkOf,
   isGuardianOf,
   loadClassRow,
   loadPerson,
@@ -87,11 +89,44 @@ const childName = (person: Pick<PersonRow, 'firstName' | 'lastName'>) => fullNam
 export const checkinChildrenRouter = (deps: Deps) => {
   const { db } = deps;
 
-  /** Loads a child the caller may see: volunteers see every child, guardians their own. */
+  /**
+   * Whether a person counts as a child for check-in, the rule the children list uses: young
+   * enough, a child of a household without a birth date, or with a check-in profile or history.
+   */
+  const isCheckinChild = (church: ChurchRow, person: PersonRow) => {
+    const age = childAge(person.birthDate, todayIn(church.timezone));
+    if (age !== null && age <= checkinSettingsOf(church).childMaxAge) return true;
+    if (age === null && householdLinkOf(db, church.id, person.id)?.relationship === 'child') {
+      return true;
+    }
+    const profile = db
+      .select({ id: checkinChildProfiles.personId })
+      .from(checkinChildProfiles)
+      .where(
+        and(
+          eq(checkinChildProfiles.churchId, church.id),
+          eq(checkinChildProfiles.personId, person.id),
+        ),
+      )
+      .get();
+    if (profile) return true;
+    return !!db
+      .select({ id: checkins.id })
+      .from(checkins)
+      .where(and(eq(checkins.churchId, church.id), eq(checkins.childPersonId, person.id)))
+      .get();
+  };
+
+  /**
+   * Loads a child the caller may see: volunteers see the children of the church (not adults,
+   * whose records belong to the directory), guardians their own.
+   */
   const loadChild = (church: ChurchRow, access: AccessLike, personId: string) => {
     const person = loadPerson(db, church.id, personId, 'Child');
     const isGuardian = isGuardianOf(db, church.id, access.personId, person.id);
-    if (!isGuardian && !canOperateCheckin(access)) throw notFound('Child');
+    if (!isGuardian && !(canOperateCheckin(access) && isCheckinChild(church, person))) {
+      throw notFound('Child');
+    }
     return { person, isGuardian };
   };
 
@@ -202,7 +237,10 @@ export const checkinChildrenRouter = (deps: Deps) => {
     return row;
   };
 
-  /** The stored values of a pick-up entry; a chosen person lends their name and phone. */
+  /**
+   * The stored values of a pick-up entry; a chosen person lends their name. Their phone is not
+   * copied, so a guardian cannot read a number the person keeps private in the directory.
+   */
   const pickupValues = (churchId: string, childId: string, body: AuthorizedPickupInput) => {
     if (body.pickupPersonId === childId) {
       throw conflict('A child cannot be their own pick-up person');
@@ -212,7 +250,7 @@ export const checkinChildrenRouter = (deps: Deps) => {
       pickupPersonId: person?.id ?? null,
       name: body.name ?? (person ? fullName(person) : ''),
       relationship: body.relationship,
-      phone: body.phone ?? person?.phone ?? null,
+      phone: body.phone,
       notes: body.notes,
     };
   };

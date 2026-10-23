@@ -27,6 +27,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page } from '@/components/layout/page';
+import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -51,7 +52,7 @@ import {
   useCheckIn,
 } from './api';
 import { CHECKIN_TONE, useCheckinAccess } from './checkin-lib';
-import { AlertBadges, CheckinListRow, ChildAvatar, SecurityCode } from './checkin-ui';
+import { AlertBadges, CheckinListRow, ChildAvatar, KioskFrame, SecurityCode } from './checkin-ui';
 import { CheckoutDialog } from './checkout-dialog';
 import { NewChildDialog } from './child-dialogs';
 
@@ -78,6 +79,7 @@ export function StationPage() {
   const session = useQuery(sessionQuery(churchId, sessionId));
   const classes = useQuery(classesQuery(churchId, false));
   const fullscreen = useFullscreen();
+  const [exiting, setExiting] = useState(false);
   useDocumentTitle(
     session.data ? `${t('checkin.stationTitle')} · ${session.data.session.name}` : null,
   );
@@ -106,94 +108,111 @@ export function StationPage() {
   const open = current.status === 'open';
 
   return (
-    <Page size="wide" className="gap-4 sm:gap-5">
-      <header className="flex animate-page-in flex-col gap-3">
-        <div className="flex items-center gap-2">
+    <KioskFrame active={state.kiosk}>
+      <Page size="wide" className="gap-4 sm:gap-5">
+        <header className="flex animate-page-in flex-col gap-3">
+          <div className="flex items-center gap-2">
+            {state.kiosk ? null : (
+              <Button asChild variant="ghost" size="icon-lg" className="-ml-2.5 shrink-0">
+                <Link to={sessionPath} aria-label={t('checkin.backToSession')}>
+                  <ArrowLeft />
+                </Link>
+              </Button>
+            )}
+            <div className="min-w-0 flex-1">
+              <p data-tone={CHECKIN_TONE} className="text-overline text-tone-ink">
+                {state.kiosk ? t('checkin.kioskEyebrow') : t('checkin.stationTitle')}
+              </p>
+              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
+                {current.name} · {formatDate(current.date, 'dayMonth')}
+              </h1>
+            </div>
+            {fullscreen.supported ? (
+              <Button
+                variant="outline"
+                size="icon-lg"
+                onClick={fullscreen.toggle}
+                aria-label={
+                  fullscreen.active ? t('checkin.exitFullscreen') : t('checkin.fullscreen')
+                }
+              >
+                {fullscreen.active ? <Shrink /> : <Expand />}
+              </Button>
+            ) : null}
+          </div>
           {state.kiosk ? null : (
-            <Button asChild variant="ghost" size="icon-lg" className="-ml-2.5 shrink-0">
-              <Link to={sessionPath} aria-label={t('checkin.backToSession')}>
-                <ArrowLeft />
-              </Link>
-            </Button>
-          )}
-          <div className="min-w-0 flex-1">
-            <p data-tone={CHECKIN_TONE} className="text-overline text-tone-ink">
-              {state.kiosk ? t('checkin.kioskEyebrow') : t('checkin.stationTitle')}
-            </p>
-            <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
-              {current.name} · {formatDate(current.date, 'dayMonth')}
-            </h1>
-          </div>
-          {fullscreen.supported ? (
-            <Button
-              variant="outline"
-              size="icon-lg"
-              onClick={fullscreen.toggle}
-              aria-label={fullscreen.active ? t('checkin.exitFullscreen') : t('checkin.fullscreen')}
-            >
-              {fullscreen.active ? <Shrink /> : <Expand />}
-            </Button>
-          ) : null}
-        </div>
-        {state.kiosk ? null : (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Segmented<Mode>
-              aria-label={t('checkin.stationMode')}
-              value={mode}
-              onChange={(value) => setState({ mode: value })}
-              className="h-12 sm:max-w-sm"
-              options={[
-                { value: 'in', label: t('checkin.checkIn'), icon: LogIn },
-                { value: 'out', label: t('checkin.checkOut'), icon: LogOut },
-              ]}
-            />
-            <label className="flex min-h-11 items-center gap-3 text-sm sm:ml-auto">
-              <Switch
-                checked={state.kiosk}
-                onCheckedChange={(kiosk) => {
-                  setState({ kiosk, mode: 'in' });
-                  if (kiosk && !fullscreen.active) fullscreen.toggle();
-                }}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Segmented<Mode>
+                aria-label={t('checkin.stationMode')}
+                value={mode}
+                onChange={(value) => setState({ mode: value })}
+                className="h-12 sm:max-w-sm"
+                options={[
+                  { value: 'in', label: t('checkin.checkIn'), icon: LogIn },
+                  { value: 'out', label: t('checkin.checkOut'), icon: LogOut },
+                ]}
               />
-              <span>
-                <span className="font-medium">{t('checkin.kioskMode')}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {t('checkin.kioskModeHint')}
+              <label className="flex min-h-11 items-center gap-3 text-sm sm:ml-auto">
+                <Switch
+                  checked={state.kiosk}
+                  onCheckedChange={(kiosk) => {
+                    setState({ kiosk, mode: 'in' });
+                    if (kiosk && !fullscreen.active) fullscreen.toggle();
+                  }}
+                />
+                <span>
+                  <span className="font-medium">{t('checkin.kioskMode')}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t('checkin.kioskModeHint')}
+                  </span>
                 </span>
-              </span>
-            </label>
-          </div>
+              </label>
+            </div>
+          )}
+        </header>
+
+        {!open ? (
+          <Alert variant="warning" title={t('checkin.sessionClosedBanner')}>
+            {t('checkin.stationClosedBody')}
+          </Alert>
+        ) : mode === 'in' ? (
+          <CheckInPanel
+            sessionId={sessionId}
+            classes={classes.data?.items ?? []}
+            kiosk={state.kiosk}
+            canRegister={canOperate && !state.kiosk}
+          />
+        ) : (
+          <CheckOutPanel sessionId={sessionId} />
         )}
-      </header>
 
-      {!open ? (
-        <Alert variant="warning" title={t('checkin.sessionClosedBanner')}>
-          {t('checkin.stationClosedBody')}
-        </Alert>
-      ) : mode === 'in' ? (
-        <CheckInPanel
-          sessionId={sessionId}
-          classes={classes.data?.items ?? []}
-          kiosk={state.kiosk}
-          canRegister={canOperate && !state.kiosk}
-        />
-      ) : (
-        <CheckOutPanel sessionId={sessionId} />
-      )}
-
-      {state.kiosk ? (
-        <div className="flex justify-center pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => setState({ kiosk: false })}
-          >
-            {t('checkin.exitKiosk')}
-          </Button>
-        </div>
-      ) : null}
-    </Page>
+        {state.kiosk ? (
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setExiting(true)}
+            >
+              {t('checkin.exitKiosk')}
+            </Button>
+            <ConfirmDialog
+              open={exiting}
+              onOpenChange={setExiting}
+              title={t('checkin.exitKioskTitle')}
+              description={t('checkin.exitKioskBody')}
+              confirmLabel={t('checkin.exitKiosk')}
+              variant="default"
+              onConfirm={() => {
+                setExiting(false);
+                setState({ kiosk: false });
+                if (fullscreen.active) fullscreen.toggle();
+              }}
+            />
+          </div>
+        ) : null}
+      </Page>
+    </KioskFrame>
   );
 }
 
@@ -231,7 +250,7 @@ function CheckInPanel({
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
-  if (done) return <CheckInDone items={done} onNext={restart} />;
+  if (done) return <CheckInDone items={done} kiosk={kiosk} onNext={restart} />;
 
   if (family) {
     return (
@@ -618,7 +637,15 @@ function FamilyCheckIn({
 }
 
 /** The codes after a check-in, and the way to the labels. */
-function CheckInDone({ items, onNext }: { items: Checkin[]; onNext: () => void }) {
+function CheckInDone({
+  items,
+  kiosk,
+  onNext,
+}: {
+  items: Checkin[];
+  kiosk: boolean;
+  onNext: () => void;
+}) {
   const { base } = useChurch();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -658,7 +685,10 @@ function CheckInDone({ items, onNext }: { items: Checkin[]; onNext: () => void }
           size="lg"
           variant="outline"
           className="h-14"
-          onClick={() => void navigate(`${base}/checkin/labels?ids=${ids}`)}
+          // From the kiosk the labels open inside kiosk mode and print right away.
+          onClick={() =>
+            void navigate(`${base}/checkin/labels?ids=${ids}${kiosk ? '&kiosk=1&print=1' : ''}`)
+          }
         >
           <Printer />
           {t('checkin.printLabels')}

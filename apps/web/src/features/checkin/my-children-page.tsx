@@ -156,9 +156,11 @@ function CurrentCard({ me }: { me: CheckinMe }) {
             <ChildAvatar child={item.child} alerts={item.alerts} />
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold">{item.child.firstName}</p>
-              <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                <Clock className="size-3" aria-hidden />
-                {item.className} · {t('checkin.inSince', { time: formatTime(item.checkedInAt) })}
+              <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">
+                  {item.className} · {t('checkin.inSince', { time: formatTime(item.checkedInAt) })}
+                </span>
               </p>
             </div>
             {item.securityCode ? <SecurityCode code={item.securityCode} size="sm" /> : null}

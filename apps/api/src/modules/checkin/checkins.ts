@@ -31,6 +31,7 @@ import {
   loadCheckinRow,
   loadPerson,
   loadSessionRow,
+  removeFromAttendance,
   toPickup,
 } from '../../services/checkin';
 import { notify } from '../../services/notifications';
@@ -74,28 +75,42 @@ export const checkinCheckinsRouter = (deps: Deps) => {
 
   /**
    * Who collects the child. A chosen person must be a guardian, the person who brought the
-   * child, or on the authorized pick-up list, unless a coordinator overrides.
+   * child, or on the authorized pick-up list, and a typed name is only taken for a child with
+   * nobody on record (a first-time visitor), unless a coordinator overrides.
    */
   const resolvePickup = (
     churchId: string,
     row: CheckinRow,
-    input: { pickupPersonId: string | null; pickupName: string | null },
+    input: { pickupPersonId: string | null; pickupId: string | null; pickupName: string | null },
     enforceList: boolean,
   ) => {
+    const list = pickupsOf(db, churchId, row.childPersonId);
     if (input.pickupPersonId) {
       const person = loadPerson(db, churchId, input.pickupPersonId);
       const allowed =
         row.guardianPersonId === person.id ||
         isGuardianOf(db, churchId, person.id, row.childPersonId) ||
-        pickupsOf(db, churchId, row.childPersonId).some(
-          (item) => item.pickupPersonId === person.id,
-        );
+        list.some((item) => item.pickupPersonId === person.id);
       if (enforceList && !allowed) {
         throw forbidden(`${fullName(person)} is not on the pick-up list for this child`);
       }
       return { pickupPersonId: person.id, pickupName: fullName(person) };
     }
-    if (input.pickupName) return { pickupPersonId: null, pickupName: input.pickupName };
+    if (input.pickupId) {
+      const entry = list.find((item) => item.id === input.pickupId);
+      if (!entry) throw notFound('Pick-up person');
+      return { pickupPersonId: entry.pickupPersonId, pickupName: entry.name };
+    }
+    if (input.pickupName) {
+      const onRecord =
+        !!row.guardianPersonId ||
+        list.length > 0 ||
+        guardiansOf(db, churchId, row.childPersonId).length > 0;
+      if (enforceList && onRecord) {
+        throw forbidden('Choose someone from the pick-up list for this child');
+      }
+      return { pickupPersonId: null, pickupName: input.pickupName };
+    }
     if (row.guardianPersonId) {
       const guardian = db
         .select({ firstName: people.firstName, lastName: people.lastName })
@@ -272,10 +287,16 @@ export const checkinCheckinsRouter = (deps: Deps) => {
         if (row.status === 'checked_out') {
           throw conflict(`${childName(church.id, row.childPersonId)} was already picked up`);
         }
-        // Every attempt on one check-in counts, so a code cannot be guessed by trying them all.
+        // Every attempt on one check-in counts, so a code cannot be guessed by trying them all,
+        // and one volunteer cannot spread guesses over every child in class either.
+        const windowMs = CHECKIN_LIMITS.checkoutWindowMinutes * 60_000;
         enforceRateLimit(deps.limiters, 'checkin.checkout', `${church.id}:${row.id}`, {
-          windowMs: CHECKIN_LIMITS.checkoutWindowMinutes * 60_000,
+          windowMs,
           max: CHECKIN_LIMITS.checkoutAttemptsMax,
+        });
+        enforceRateLimit(deps.limiters, 'checkin.checkout.user', `${church.id}:${access.userId}`, {
+          windowMs,
+          max: CHECKIN_LIMITS.checkoutUserAttemptsMax,
         });
         if (!safeEqual(body.securityCode, row.securityCode)) {
           recordAudit(db, audit, {
@@ -312,9 +333,12 @@ export const checkinCheckinsRouter = (deps: Deps) => {
       '/:id',
       ({ church, audit, params }) => {
         const row = loadCheckinRow(db, church.id, params.id);
+        const session = loadSessionRow(db, church.id, row.sessionId);
         const name = childName(church.id, row.childPersonId);
         db.transaction((tx) => {
           tx.delete(checkins).where(eq(checkins.id, row.id)).run();
+          // A closed session already copied the child into attendance; take that back too.
+          removeFromAttendance(tx, session, row.childPersonId);
           recordAudit(tx, audit, {
             module: 'checkin',
             action: 'checkin.delete',

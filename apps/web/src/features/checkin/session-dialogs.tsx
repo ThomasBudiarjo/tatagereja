@@ -1,11 +1,12 @@
 import {
   checkinSessionInputSchema,
   checkinSettingsSchema,
+  isModuleEnabled,
   type CheckinSession,
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
@@ -22,14 +23,15 @@ import {
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
 import { Switch } from '@/components/ui/switch';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
-import { settingsQuery, useSaveSession, useSaveSettings } from './api';
-import { todayIn } from './checkin-lib';
+import { servicesQuery, settingsQuery, useSaveSession, useSaveSettings } from './api';
+import { todayIn, useCheckinAccess } from './checkin-lib';
 
 type SessionForm = z.input<typeof checkinSessionInputSchema>;
 
@@ -44,7 +46,8 @@ export function SessionDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { churchId, base, church } = useChurch();
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, formatTime } = useI18n();
+  const { canManage } = useCheckinAccess();
   const navigate = useNavigate();
   const today = todayIn(church.timezone);
   const form = useForm<SessionForm, unknown, z.output<typeof checkinSessionInputSchema>>({
@@ -56,6 +59,21 @@ export function SessionDialog({
     },
   });
   const errors = form.formState.errors;
+  const withWorship = isModuleEnabled(church.enabledModules, 'worship') && canManage;
+  const date = useWatch({ control: form.control, name: 'date' });
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date ?? '');
+  const services = useQuery({
+    ...servicesQuery(churchId, date ?? ''),
+    enabled: open && withWorship && validDate,
+  });
+  const linked = session?.worshipServiceId ?? null;
+  const options = [
+    ...(services.data?.items ?? []),
+    // Keep the linked service selectable after the date is changed.
+    ...(linked && session?.serviceTitle && !services.data?.items.some((item) => item.id === linked)
+      ? [{ id: linked, title: session.serviceTitle, startsAt: null }]
+      : []),
+  ];
   const save = useMutationToast(useSaveSession(churchId, session?.id), {
     success: (result) =>
       session
@@ -120,6 +138,53 @@ export function SessionDialog({
                 {...form.register('date')}
               />
             </Field>
+            {withWorship ? (
+              <Controller
+                control={form.control}
+                name="worshipServiceId"
+                render={({ field }) => (
+                  <Field
+                    label={t('checkin.sessionService')}
+                    htmlFor="session-service"
+                    description={
+                      services.isSuccess && options.length === 0
+                        ? t('checkin.sessionNoService')
+                        : t('checkin.sessionServiceHint')
+                    }
+                    error={errors.worshipServiceId?.message}
+                  >
+                    <Select
+                      id="session-service"
+                      value={field.value ?? ''}
+                      disabled={services.isPending && validDate}
+                      onChange={(event) => {
+                        const id = event.target.value || null;
+                        field.onChange(id);
+                        const service = options.find((item) => item.id === id);
+                        // A fresh session takes the service's name; a typed name stays.
+                        if (service && !form.getFieldState('name').isDirty) {
+                          form.setValue(
+                            'name',
+                            t('checkin.sessionNameForService', {
+                              service: service.title,
+                            }),
+                          );
+                        }
+                      }}
+                    >
+                      <option value="">{t('checkin.sessionNoServiceOption')}</option>
+                      {options.map((service) => (
+                        <option key={service.id} value={service.id}>
+                          {service.startsAt
+                            ? `${service.title} · ${formatTime(service.startsAt)}`
+                            : service.title}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+              />
+            ) : null}
           </DialogBody>
           <DialogFooter>
             <Button

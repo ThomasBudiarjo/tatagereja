@@ -29,6 +29,8 @@ export const CHECKIN_LIMITS = {
   alertDescriptionMax: 500,
   /** Check-out attempts allowed per check-in before a cool-down. */
   checkoutAttemptsMax: 10,
+  /** Check-out attempts one volunteer may make across all check-ins in the same window. */
+  checkoutUserAttemptsMax: 100,
   checkoutWindowMinutes: 15,
   kioskQueryMin: 2,
   kioskResultsMax: 10,
@@ -180,6 +182,20 @@ export const suggestClass = <T extends ClassForAge>(
   );
 };
 
+/** The day before `date` (YYYY-MM-DD). */
+export const dayBefore = (date: string): string => {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() - 1);
+  return value.toISOString().slice(0, 10);
+};
+
+/**
+ * Guardians check in from their phones only to today's sessions (yesterday's too, for a church
+ * whose evening service runs past midnight), never to old or future ones.
+ */
+export const isSelfCheckInDate = (sessionDate: string, today: string): boolean =>
+  sessionDate <= today && sessionDate >= dayBefore(today);
+
 /** The last four digits of a phone number, for the kiosk search and the masked display. */
 export const phoneLast4 = (phone: string | null | undefined): string | null => {
   const digits = (phone ?? '').replace(/\D/g, '');
@@ -274,6 +290,8 @@ export const checkinSessionSchema = z.object({
   name: z.string(),
   date: isoDateSchema,
   worshipServiceId: idSchema.nullable(),
+  /** Title of the linked worship service (ibadah), when there is one. */
+  serviceTitle: z.string().nullable(),
   attendanceSessionId: idSchema.nullable(),
   status: z.enum(CHECKIN_SESSION_STATUSES),
   openedAt: isoDateTimeSchema,
@@ -291,6 +309,17 @@ export const checkinSessionInputSchema = z.object({
   worshipServiceId: idSchema.nullable().default(null),
 });
 export type CheckinSessionInput = z.infer<typeof checkinSessionInputSchema>;
+
+/** A worship service (ibadah) a session can belong to, from the worship module's schedule. */
+export const checkinServiceOptionSchema = z.object({
+  id: idSchema,
+  title: z.string(),
+  startsAt: isoDateTimeSchema,
+});
+export type CheckinServiceOption = z.infer<typeof checkinServiceOptionSchema>;
+
+export const checkinServiceListQuerySchema = z.object({ date: isoDateSchema });
+export const checkinServiceListSchema = z.object({ items: z.array(checkinServiceOptionSchema) });
 
 export const checkinSessionListQuerySchema = paginationQuerySchema.extend({
   status: z.enum(CHECKIN_SESSION_STATUSES).optional(),
@@ -528,17 +557,26 @@ export const checkinDetailSchema = z.object({
 });
 export type CheckinDetail = z.infer<typeof checkinDetailSchema>;
 
+/**
+ * Who collects the child: a person (a guardian or someone on the pick-up list), an entry of the
+ * pick-up list by id (for people without a person record), or, only for a child with nobody on
+ * record and for overrides, a typed name.
+ */
+const pickupChoiceShape = {
+  pickupPersonId: idSchema.nullable().default(null),
+  pickupId: idSchema.nullable().default(null),
+  pickupName: optionalText(LIMITS.nameMax),
+};
+
 export const checkOutBodySchema = z.object({
   securityCode: securityCodeSchema,
-  pickupPersonId: idSchema.nullable().default(null),
-  pickupName: optionalText(LIMITS.nameMax),
+  ...pickupChoiceShape,
 });
 export type CheckOutBody = z.infer<typeof checkOutBodySchema>;
 
 export const overrideCheckOutBodySchema = z.object({
   reason: requiredText(5, LIMITS.shortTextMax),
-  pickupPersonId: idSchema.nullable().default(null),
-  pickupName: optionalText(LIMITS.nameMax),
+  ...pickupChoiceShape,
 });
 export type OverrideCheckOutBody = z.infer<typeof overrideCheckOutBodySchema>;
 

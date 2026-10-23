@@ -17,6 +17,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, LogOut, TriangleAlert, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, NavLink } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
@@ -268,8 +269,8 @@ export function ClassStatTile({ stat, to }: { stat: SessionClassStat; to: string
           aria-hidden
         />
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <p className="text-3xl leading-none font-bold tracking-tight tabular">
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1.5">
+        <p className="text-3xl leading-none font-bold tracking-tight whitespace-nowrap tabular">
           {formatNumber(stat.presentCount)}
           {stat.capacity !== null ? (
             <span className="text-base font-medium text-muted-foreground">
@@ -278,8 +279,8 @@ export function ClassStatTile({ stat, to }: { stat: SessionClassStat; to: string
             </span>
           ) : null}
         </p>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="size-3.5" aria-hidden />
+        <span className="flex items-center gap-1 text-xs whitespace-nowrap text-muted-foreground">
+          <Users className="size-3.5 shrink-0" aria-hidden />
           {t('checkin.teachersCount', { count: stat.teacherCount })}
         </span>
       </div>
@@ -392,7 +393,7 @@ export function SessionRow({ session }: { session: CheckinSession }) {
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold tracking-tight">{session.name}</p>
         <p className="truncate text-sm text-muted-foreground">
-          {formatDate(session.date, 'dateLong')}
+          {[formatDate(session.date, 'dateLong'), session.serviceTitle].filter(Boolean).join(' · ')}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <SessionStatusBadge status={session.status} />
@@ -439,21 +440,23 @@ export function CheckinListRow({
           <p className={cn('truncate font-medium', !inClass && 'text-muted-foreground')}>
             {fullName(checkin.child)}
           </p>
-          <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
             {checkin.securityCode ? (
               <span className="shrink-0 rounded bg-muted px-1.5 font-mono font-semibold tracking-widest text-foreground">
                 {checkin.securityCode}
               </span>
             ) : null}
-            <span className="truncate">
+            <span className="min-w-0 break-words">
               {[
                 showClass ? checkin.className : null,
                 inClass
                   ? t('checkin.inSince', { time: formatTime(checkin.checkedInAt) })
-                  : t('checkin.outAt', {
-                      time: formatTime(checkin.checkedOutAt),
-                      name: checkin.pickupName ?? '—',
-                    }),
+                  : checkin.pickupName
+                    ? t('checkin.outAt', {
+                        time: formatTime(checkin.checkedOutAt),
+                        name: checkin.pickupName,
+                      })
+                    : t('checkin.outAtTime', { time: formatTime(checkin.checkedOutAt) }),
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -482,5 +485,24 @@ export function CheckinListRow({
       </div>
       {alertsInFull ? <AlertCallout alerts={checkin.alerts} className="sm:pl-13" /> : null}
     </li>
+  );
+}
+
+/**
+ * Kiosk mode covers the app shell (menu, search, tabs), so a family at the kiosk tablet only
+ * reaches check-in and its labels. Without `active` the children render in place.
+ */
+export function KioskFrame({ active, children }: { active: boolean; children: ReactNode }) {
+  const { t } = useI18n();
+  if (!active) return children;
+  return createPortal(
+    <div
+      role="region"
+      aria-label={t('checkin.kioskMode')}
+      className="fixed inset-0 z-40 overflow-y-auto overscroll-contain bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] print:static print:overflow-visible"
+    >
+      {children}
+    </div>,
+    document.body,
   );
 }
