@@ -50,7 +50,8 @@ export const churchTables = (): TableInfo[] =>
  * Keys that are credentials and never leave the server, in exports or backups. Check-in
  * security codes release children at pickup, so they count as credentials too.
  */
-const CREDENTIAL_KEY = /^(token|tokenHash|passwordHash|secretEncrypted|codeHash|securityCode)$/;
+const CREDENTIAL_KEY =
+  /^(token|secret|securityCode|recoveryCode|password)$|(Hash|Encrypted|Secret|Token)$/;
 
 /** A copy of a row without credential fields. */
 export const withoutCredentials = (row: Record<string, unknown>): Record<string, unknown> =>
