@@ -1,4 +1,5 @@
 import {
+  type AccessLike,
   GUARDIAN_RELATIONSHIPS,
   checkinSettingsSchema,
   childAge,
@@ -45,6 +46,7 @@ import { nowIso } from '../lib/time';
 import { generateCode, newId } from '../lib/tokens';
 import { syncRecordTimes } from './attendance';
 import { moduleSettings } from './modules';
+import { withPrivacy } from './people';
 
 /*
  * Kids check-in helpers shared by the checkin routers: settings, guardianship from the people
@@ -470,6 +472,7 @@ export const guardianUserIds = (db: Queryable, churchId: string, childPersonId: 
 export const buildHouseholds = (
   db: Queryable,
   church: ChurchRow,
+  access: AccessLike,
   householdIds: readonly string[],
   sessionId: string | null,
 ): CheckinHousehold[] => {
@@ -522,6 +525,14 @@ export const buildHouseholds = (
           .all()
           .map((row) => [row.personId, row.defaultClassId]),
   );
+  // A guardian who hides their phone in the directory is not shown by its last digits either.
+  const phones = new Map(
+    withPrivacy(
+      db,
+      access,
+      members.map(({ person }) => ({ id: person.id, phone: person.phone })),
+    ).map((person) => [person.id, person.phone]),
+  );
   const open = openCheckinsByChild(db, church.id, sessionId, childIds);
   const classes = classRowsOf(db, church.id, false);
   return homes
@@ -530,7 +541,7 @@ export const buildHouseholds = (
       const guardians = own.filter((member) => isGuardianRelationship(member.relationship));
       const phone =
         phoneLast4(home.phone) ??
-        guardians.map((member) => phoneLast4(member.person.phone)).find(Boolean) ??
+        guardians.map((member) => phoneLast4(phones.get(member.person.id) ?? null)).find(Boolean) ??
         null;
       return {
         householdId: home.id,

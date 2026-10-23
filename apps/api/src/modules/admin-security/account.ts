@@ -9,10 +9,11 @@ import {
   type PersonalDataExport,
   type LocalizedText,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import {
+  auditLogs,
   churches,
   churchMemberships,
   loginEvents,
@@ -490,7 +491,20 @@ export const accountSecurityRouter = (deps: Deps) => {
               },
             );
           }
-          accountAudit(tx, audit, 'account.delete', user.id, `${user.name} deleted their account`);
+          accountAudit(tx, audit, 'account.delete', user.id, 'An account was deleted');
+          // Account-level entries are about the account alone: they keep what happened and
+          // when, not who, nor from where. Church entries stay with the church's records.
+          tx.update(auditLogs)
+            .set({
+              summary: sql`replace(${auditLogs.summary}, ${user.name}, 'A deleted account')`,
+              params: {},
+              before: null,
+              after: null,
+              ip: null,
+              userAgent: null,
+            })
+            .where(and(isNull(auditLogs.churchId), eq(auditLogs.entityId, user.id)))
+            .run();
           // Sessions, memberships, role assignments, 2FA and sign-in history cascade; person
           // records stay in the directory, unlinked.
           tx.delete(users).where(eq(users.id, user.id)).run();

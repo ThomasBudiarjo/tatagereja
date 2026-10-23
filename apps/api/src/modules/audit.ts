@@ -2,12 +2,27 @@ import {
   LIMITS,
   auditLogExportQuerySchema,
   auditLogFilterSchema,
+  auditRedactedModules,
   churchIdParamsSchema,
   churchParamsSchema,
   isModuleId,
+  type AccessLike,
   type AuditLogExportQuery,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gte, like, lt, lte, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  like,
+  lt,
+  lte,
+  notInArray,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { ChurchRow } from '../db/schema';
 import { auditLogs, users } from '../db/schema';
@@ -29,8 +44,15 @@ const viewGuard = { permission: 'audit.view', message: 'You cannot view the audi
 export const auditModule = (deps: Deps) => {
   const { db } = deps;
 
-  /** Conditions for the viewer's filters; calendar days follow the church time zone. */
-  const conditionsFor = (church: ChurchRow, query: AuditLogExportQuery): SQL[] => {
+  /**
+   * Conditions for the viewer's filters; calendar days follow the church time zone. A search
+   * never matches the hidden text of entries the viewer sees redacted.
+   */
+  const conditionsFor = (
+    church: ChurchRow,
+    access: AccessLike,
+    query: AuditLogExportQuery,
+  ): SQL[] => {
     const conditions: SQL[] = [eq(auditLogs.churchId, church.id)];
     if (query.actorUserId) conditions.push(eq(auditLogs.actorUserId, query.actorUserId));
     if (query.module) conditions.push(eq(auditLogs.module, query.module));
@@ -46,8 +68,10 @@ export const auditModule = (deps: Deps) => {
       conditions.push(lt(auditLogs.createdAt, zonedDayStart(query.toDate, church.timezone, true)));
     }
     if (query.q) {
+      const hidden = auditRedactedModules(access);
+      const summary = like(auditLogs.summary, likePattern(query.q));
       const search = or(
-        like(auditLogs.summary, likePattern(query.q)),
+        hidden.length > 0 ? and(summary, notInArray(auditLogs.module, hidden)) : summary,
         like(auditLogs.action, likePattern(query.q)),
         like(users.name, likePattern(query.q)),
       );
@@ -60,8 +84,8 @@ export const auditModule = (deps: Deps) => {
     .use(authPlugin(deps))
     .get(
       '/',
-      ({ church, query }) => {
-        const where = and(...conditionsFor(church, query));
+      ({ church, access, query }) => {
+        const where = and(...conditionsFor(church, access, query));
         // Actors are joined for the count only when the search reads their names.
         const counted = db.select({ value: count() }).from(auditLogs).$dynamic();
         const total =
@@ -87,7 +111,7 @@ export const auditModule = (deps: Deps) => {
           row.log.id,
         ]);
         return {
-          items: rows.map((row) => toAuditLog(row.log, row.actorName ?? null)),
+          items: rows.map((row) => toAuditLog(row.log, row.actorName ?? null, access)),
           total,
           page: query.page,
           limit: query.limit,
@@ -139,7 +163,7 @@ export const auditModule = (deps: Deps) => {
           .select({ log: auditLogs, actorName: users.name })
           .from(auditLogs)
           .leftJoin(users, eq(users.id, auditLogs.actorUserId))
-          .where(and(...conditionsFor(church, query)))
+          .where(and(...conditionsFor(church, access, query)))
           .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
           .limit(LIMITS.csvRowsMax)
           .all();
@@ -157,21 +181,23 @@ export const auditModule = (deps: Deps) => {
             'ip',
             'userAgent',
           ]),
-          ...rows.map(({ log, actorName }) =>
-            csvRow([
-              log.createdAt,
-              actorName ?? '',
-              log.module,
-              log.action,
-              log.entityType,
-              log.entityId,
-              log.summary,
-              log.before ?? null,
-              log.after ?? null,
-              log.ip,
-              log.userAgent,
-            ]),
-          ),
+          ...rows.map(({ log, actorName }) => {
+            // The export follows the same redaction as the viewer.
+            const entry = toAuditLog(log, actorName ?? null, access);
+            return csvRow([
+              entry.createdAt,
+              entry.actorName ?? '',
+              entry.module,
+              entry.action,
+              entry.entityType,
+              entry.entityId,
+              entry.summary,
+              entry.before,
+              entry.after,
+              entry.ip,
+              entry.userAgent,
+            ]);
+          }),
         ];
         // The export itself is recorded, so downloads of the log are visible in the log.
         recordAudit(db, audit, {
@@ -198,7 +224,7 @@ export const auditModule = (deps: Deps) => {
     )
     .get(
       '/:id',
-      ({ church, params }) => {
+      ({ church, access, params }) => {
         const row = db
           .select({ log: auditLogs, actorName: users.name })
           .from(auditLogs)
@@ -206,7 +232,7 @@ export const auditModule = (deps: Deps) => {
           .where(and(eq(auditLogs.id, params.id), eq(auditLogs.churchId, church.id)))
           .get();
         if (!row) throw notFound('Audit entry');
-        return { entry: toAuditLog(row.log, row.actorName ?? null) };
+        return { entry: toAuditLog(row.log, row.actorName ?? null, access) };
       },
       { church: viewGuard, params: churchIdParamsSchema },
     );

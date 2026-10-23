@@ -339,8 +339,10 @@ The API is the only security boundary; the interface is a convenience on top of 
   in constant time and codes are generated with a CSPRNG. See
   [docs/SECURITY.md](./docs/SECURITY.md).
 - **Abuse limits.** Rate limits on registration, sign-in, two-step codes, invitation tokens,
-  check-out codes, prayer requests, join requests and data exports, progressive account lockout, Turnstile on registration, a request body limit
-  (`MAX_BODY_KB`), and `TRUST_PROXY` so a client cannot spoof its address.
+  check-out codes, prayer requests, join requests and data exports, per-account limits on every
+  write, export and search, progressive account lockout, Turnstile on registration, body limits
+  per kind of route under `MAX_BODY_KB`, repeated notifications collapsed, and `TRUST_PROXY` so a
+  client cannot spoof its address.
 - **Headers.** A strict Content Security Policy (no inline script, no `eval`), `nosniff`,
   `X-Frame-Options`, `Referrer-Policy`, COOP, CORP, a restrictive `Permissions-Policy` and
   preload-ready HSTS behind HTTPS on every response.
@@ -352,7 +354,15 @@ The API is the only security boundary; the interface is a convenience on top of 
 - **Tests.** Every module has integration tests for its permission matrix, cross-church access,
   module switches, validation, audit and notifications. A generated test walks every write route of
   the router as an anonymous caller, as a member without permissions, and as another church's owner,
-  so a new route that forgets a check fails the suite.
+  so a new route that forgets a check fails the suite; the permission and data-scope matrix calls
+  every route as every kind of caller (each suggested role, a leader, a suspended member, a custom
+  role with exactly the route's permission) and searches every answer for planted canaries.
+- **Scope and redaction.** Leaders read attendance only for the groups they lead; care flows add
+  people or change their status only with the directory permissions (otherwise a suggestion);
+  audit viewers see finance and pastoral care entries redacted without that access; directory
+  privacy holds in search, birthday lists, the calendar, the Warta Jemaat, exports, rosters,
+  check-in and care. See [docs/SECURITY.md](./docs/SECURITY.md) for the threat model, the
+  permission model and the data classification.
 
 ## Interface
 
@@ -405,6 +415,9 @@ management actions appear next to the data they affect for the people allowed to
     reuse detection, idle and absolute timeouts, field encryption with key rotation, hashed
     invitation links shown once, administrator reset links and recovery-code reset, common-password
     checks and a strict CSP
+29. An authorization pass over every module: the generated permission and data-scope matrix,
+    leader scope, directory permissions in care, redacted audit entries with structured params,
+    privacy on every surface, anonymised account deletion, and per-account abuse limits
 
 New modules follow the contract in [docs/ARCHITECTURE-MODULES.md](./docs/ARCHITECTURE-MODULES.md).
 

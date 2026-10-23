@@ -29,6 +29,9 @@ import { toCustomRole, toUserSummary } from '../serializers';
 import { recordAudit, type AuditContext } from '../services/audit';
 import { notify } from '../services/notifications';
 
+/** Members named in one role entry; the rest are counted. */
+const AUDIT_NAMES_MAX = 10;
+
 const memberRoleParamsSchema = churchIdParamsSchema.extend({ roleId: idSchema });
 
 const escalationDenied = () =>
@@ -252,6 +255,11 @@ export const rolesModule = (deps: Deps) => {
         ]
           .filter(Boolean)
           .join('; '),
+        params: {
+          member: target.user.name,
+          added: added.length > 0 ? describe(added) : null,
+          removed: removed.length > 0 ? describe(removed) : null,
+        },
         before: { roleIds: currentIds },
         after: { roleIds: nextIds },
       });
@@ -434,12 +442,29 @@ export const rolesModule = (deps: Deps) => {
             .returning()
             .get();
           if (!row) throw notFound('Role');
+          // Everyone holding the role gains or loses its permissions: the entry names them.
+          const holders = tx
+            .select({ name: users.name })
+            .from(membershipRoles)
+            .innerJoin(churchMemberships, eq(churchMemberships.id, membershipRoles.membershipId))
+            .innerJoin(users, eq(users.id, churchMemberships.userId))
+            .where(eq(membershipRoles.roleId, role.id))
+            .orderBy(asc(users.name))
+            .all()
+            .map((holder) => holder.name);
+          const shown = holders.slice(0, AUDIT_NAMES_MAX).join(', ');
+          const more =
+            holders.length > AUDIT_NAMES_MAX ? ` and ${holders.length - AUDIT_NAMES_MAX} more` : '';
           recordAudit(tx, audit, {
             module: 'core',
             action: 'role.update',
             entityType: 'role',
             entityId: role.id,
-            summary: `Updated the role ${row.name}`,
+            summary:
+              holders.length > 0
+                ? `Updated the role ${row.name}, held by ${shown}${more}`
+                : `Updated the role ${row.name}`,
+            params: { name: row.name, members: shown || null, memberCount: holders.length },
             before: { name: role.name, description: role.description, permissions: before },
             after: { name: row.name, description: row.description, permissions: after },
           });

@@ -1,6 +1,7 @@
 import {
   OWN_RECORD_ROLES,
   can,
+  personAttendanceScope,
   canEditPersonPrivacy,
   canEditPersonProfile,
   canSeeGroup,
@@ -42,6 +43,7 @@ import { conflict, forbidden, notFound } from '../lib/errors';
 import { offsetOf } from '../lib/query';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
+import { attendanceScopeCondition } from '../services/attendance';
 import { authPlugin } from '../plugins/auth';
 import { toPrivateDetails } from '../serializers';
 import { customRolesOf } from '../services/access';
@@ -585,7 +587,12 @@ export const peopleModule = (deps: Deps) => {
           .from(attendanceRecords)
           .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
           .leftJoin(groups, eq(groups.id, attendanceSessions.groupId))
-          .where(eq(attendanceRecords.personId, person.id))
+          .where(
+            and(
+              eq(attendanceRecords.personId, person.id),
+              attendanceScopeCondition(personAttendanceScope(access, person)),
+            ),
+          )
           .orderBy(desc(attendanceSessions.sessionAt))
           .limit(100)
           .all();

@@ -1,4 +1,6 @@
 import {
+  canApplyStatusSuggestion,
+  followUpStatusSuggestion,
   canAdministerCareCase,
   canChangeCareConfidentiality,
   canCompleteCareTask,
@@ -48,6 +50,7 @@ import {
 } from '../../db/schema';
 import { toPersonSummary } from '../../serializers';
 import { caregiverIdsByCase, caregiverSummaries } from '../../services/care';
+import { withPrivacy } from '../../services/people';
 
 const unique = (ids: readonly (string | null | undefined)[]): string[] => [
   ...new Set(ids.filter((id): id is string => !!id)),
@@ -365,6 +368,22 @@ export function hydrateFollowUps(
     db,
     rows.map((row) => row.assignedUserId),
   );
+  // Contact details follow each person's directory privacy choices.
+  const contacts = new Map<string, { phone: string | null; email: string | null }>(
+    withPrivacy(
+      db,
+      access,
+      [...persons.values()].map((person) => ({
+        id: person.id,
+        userId: person.userId,
+        phone: person.phone,
+        email: person.email,
+      })),
+    ).map((contact): [string, { phone: string | null; email: string | null }] => [
+      contact.id,
+      contact,
+    ]),
+  );
   const openTasks = new Map<string, { count: number; next: string | null; overdue: boolean }>();
   for (const task of db
     .select({ followUpId: careTasks.followUpId, dueDate: careTasks.dueDate })
@@ -394,8 +413,8 @@ export function hydrateFollowUps(
       {
         id: row.id,
         person: toPersonSummary(person),
-        phone: person.phone,
-        email: person.email,
+        phone: contacts.get(person.id)?.phone ?? null,
+        email: contacts.get(person.id)?.email ?? null,
         stage: row.stage,
         source: row.source,
         firstVisitDate: row.firstVisitDate,
@@ -407,6 +426,8 @@ export function hydrateFollowUps(
         nextDueDate: tasks?.next ?? null,
         hasOverdueTask: tasks?.overdue ?? false,
         canManage: canManageFollowUp(access, row),
+        statusSuggestion: followUpStatusSuggestion(row.stage, person.membershipStatus),
+        canChangeStatus: canApplyStatusSuggestion(access),
         createdAt: row.createdAt,
       },
     ];

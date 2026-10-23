@@ -1,6 +1,7 @@
 import {
   FOLLOW_UP_STAGES,
   FOLLOW_UP_STAGE_LABELS,
+  canAddVisitorPerson,
   has,
   localize,
   visitorFollowUpInputSchema,
@@ -135,12 +136,17 @@ export function NewFollowUpSheet({
   onCreated?: (followUp: VisitorFollowUp) => void;
 }) {
   const { t } = useI18n();
+  const { access } = useChurch();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t('care.newFollowUp')}</SheetTitle>
-          <SheetDescription>{t('care.newFollowUpDescription')}</SheetDescription>
+          <SheetDescription>
+            {canAddVisitorPerson(access)
+              ? t('care.newFollowUpDescription')
+              : t('care.newFollowUpExistingDescription')}
+          </SheetDescription>
         </SheetHeader>
         {open ? (
           <NewFollowUpForm
@@ -157,9 +163,11 @@ export function NewFollowUpSheet({
 
 function NewFollowUpForm({ onDone }: { onDone: (created?: VisitorFollowUp) => void }) {
   const { t } = useI18n();
-  const { churchId } = useChurch();
+  const { churchId, access } = useChurch();
   const today = useToday();
-  const [mode, setMode] = useState<'new' | 'existing'>('new');
+  // A new guest is a new person in the directory: only for those who may add people.
+  const canAddPerson = canAddVisitorPerson(access);
+  const [mode, setMode] = useState<'new' | 'existing'>(canAddPerson ? 'new' : 'existing');
   const form = useForm<CreateValues, unknown, VisitorFollowUpInput>({
     resolver: zodResolver(visitorFollowUpInputSchema),
     defaultValues: {
@@ -193,18 +201,22 @@ function NewFollowUpForm({ onDone }: { onDone: (created?: VisitorFollowUp) => vo
       className="flex min-h-0 flex-1 flex-col gap-4"
     >
       <SheetBody className="flex flex-col gap-4">
-        <Segmented
-          aria-label={t('care.visitorKind')}
-          value={mode}
-          onChange={(value) => {
-            setMode(value);
-            form.clearErrors();
-          }}
-          options={[
-            { value: 'new', label: t('care.newGuest') },
-            { value: 'existing', label: t('care.inDirectory') },
-          ]}
-        />
+        {canAddPerson ? (
+          <Segmented
+            aria-label={t('care.visitorKind')}
+            value={mode}
+            onChange={(value) => {
+              setMode(value);
+              form.clearErrors();
+            }}
+            options={[
+              { value: 'new', label: t('care.newGuest') },
+              { value: 'existing', label: t('care.inDirectory') },
+            ]}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('care.newGuestNeedsPermission')}</p>
+        )}
         {mode === 'existing' ? (
           <Controller
             control={form.control}

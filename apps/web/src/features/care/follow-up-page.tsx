@@ -1,5 +1,6 @@
 import {
   FOLLOW_UP_STAGE_LABELS,
+  PERSON_STATUS_TEXT,
   fullName,
   has,
   localize,
@@ -7,7 +8,16 @@ import {
   type FollowUpStage,
 } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, ListTodo, Mail, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  ListTodo,
+  Mail,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
@@ -24,7 +34,7 @@ import { Stepper } from '@/components/ui/stepper';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
-import { followUpQuery, tasksQuery, useDeleteFollowUp } from './api';
+import { followUpQuery, tasksQuery, useApplyFollowUpStatus, useDeleteFollowUp } from './api';
 import { StageBadge } from './components';
 import { ContactButtons, EditFollowUpSheet, StageMenu } from './follow-up-components';
 import { useStageMover } from './use-stage-mover';
@@ -46,6 +56,9 @@ export function FollowUpPage() {
   const [editingTask, setEditingTask] = useState<CareTask | null>(null);
   const remove = useMutationToast(useDeleteFollowUp(churchId), {
     success: t('care.followUpDeleted'),
+  });
+  const applyStatus = useMutationToast(useApplyFollowUpStatus(churchId), {
+    success: (data) => t('care.statusApplied', { name: fullName(data.followUp.person) }),
   });
   const crumbs = [
     { label: t('care.nav'), to: `${base}/care` },
@@ -155,6 +168,30 @@ export function FollowUpPage() {
               current={Math.max(0, pathIndex)}
             />
           )}
+          {followUp.statusSuggestion ? (
+            <Alert
+              variant={followUp.canChangeStatus ? 'success' : 'info'}
+              title={t('care.statusSuggestionTitle', {
+                status: localize(PERSON_STATUS_TEXT[followUp.statusSuggestion], locale),
+              })}
+              action={
+                followUp.canChangeStatus ? (
+                  <Button
+                    size="sm"
+                    loading={applyStatus.isPending}
+                    onClick={() => void applyStatus.run(followUp.id)}
+                  >
+                    <BadgeCheck />
+                    {t('care.applyStatus')}
+                  </Button>
+                ) : null
+              }
+            >
+              {followUp.canChangeStatus
+                ? t('care.statusSuggestionCan', { name })
+                : t('care.statusSuggestionCannot', { name })}
+            </Alert>
+          ) : null}
           {followUp.canManage ? (
             <div className="flex flex-wrap items-center gap-2">
               {next ? (

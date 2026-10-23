@@ -53,6 +53,7 @@ import { likePattern, offsetOf } from '../../lib/query';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
+import { onVisibleContact } from '../../services/people';
 import { changes, recordAudit, redact } from '../../services/audit';
 import {
   activeAlertsByChild,
@@ -275,7 +276,7 @@ export const checkinChildrenRouter = (deps: Deps) => {
     .use(authPlugin(deps))
     .get(
       '/households',
-      ({ church, query }) => {
+      ({ church, access, query }) => {
         if (query.sessionId) loadSessionRow(db, church.id, query.sessionId);
         let match: SQL | undefined;
         if (query.phoneLast4) {
@@ -290,7 +291,7 @@ export const checkinChildrenRouter = (deps: Deps) => {
                 .where(
                   and(
                     eq(householdMembers.householdId, households.id),
-                    like(digitsOf(people.phone), suffix),
+                    onVisibleContact(access, 'show_phone', like(digitsOf(people.phone), suffix)),
                   ),
                 ),
             ),
@@ -328,7 +329,7 @@ export const checkinChildrenRouter = (deps: Deps) => {
           .all()
           .map((row) => row.id);
         return {
-          items: buildHouseholds(db, church, ids, query.sessionId ?? null).slice(
+          items: buildHouseholds(db, church, access, ids, query.sessionId ?? null).slice(
             0,
             CHECKIN_LIMITS.kioskResultsMax,
           ),

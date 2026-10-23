@@ -534,7 +534,19 @@ describe('insights attendance', () => {
         `${base}/absences?threshold=3&includeResolved=true`,
         { token: s.leader.token },
       );
-      expect(leaderView.json.items[0].careTaskId).toBe(taskId);
+      // The leader sees that the alert was followed up, not the pastoral care task itself.
+      expect(leaderView.json.items[0].status).toBe('followed_up');
+      expect(leaderView.json.items[0].careTaskId).toBeNull();
+      const carerView = await t.request(
+        'GET',
+        `${base}/absences?threshold=3&includeResolved=true`,
+        { token: carer.token },
+      );
+      expect(
+        carerView.json.items.find(
+          (item: { person: { id: string } }) => item.person.id === s.alice.id,
+        )?.careTaskId,
+      ).toBe(taskId);
     });
 
     it('keeps alerts inside the church', async () => {
@@ -572,14 +584,20 @@ describe('insights attendance', () => {
       const unlinked = await t.request('GET', `${base}/me`, { token: s.leader.token });
       expect(unlinked.json.history).toBeNull();
 
+      // A leader reads only the sessions of the group they lead: Alice's church-wide service
+      // is not theirs to see.
       const alice = await t.request('GET', `${base}/people/${s.alice.id}`, {
         token: s.leader.token,
       });
       expect(alice.status).toBe(200);
       expect(alice.json.history.streak.currentAbsentStreak).toBe(3);
-      expect(alice.json.history.streak.longestPresentStreak).toBe(2);
-      expect(alice.json.history.counts).toEqual({ present: 2, absent: 3, excused: 0 });
-      expect(alice.json.history.streak.presentRate).toBe(0.4);
+      expect(alice.json.history.streak.longestPresentStreak).toBe(1);
+      expect(alice.json.history.counts).toEqual({ present: 1, absent: 3, excused: 0 });
+      expect(alice.json.history.streak.presentRate).toBe(0.25);
+      const everything = await t.request('GET', `${base}/people/${s.alice.id}`, {
+        token: viewer.token,
+      });
+      expect(everything.json.history.counts).toEqual({ present: 2, absent: 3, excused: 0 });
 
       const bob = await t.request('GET', `${base}/people/${s.bob.id}`, { token: viewer.token });
       expect(bob.status).toBe(200);
@@ -598,7 +616,7 @@ describe('insights attendance', () => {
       expect(badId.status).toBe(422);
     });
 
-    it('shows recorder notes only to the person and to those who may open the session', async () => {
+    it('shows a session and its recorder note only to the person and those who may open it', async () => {
       const churchWide = await createSession(s.admin.token, {
         title: 'Ibadah Pengucapan Syukur',
         sessionAt: weeksAgo(0, 3),
@@ -619,12 +637,16 @@ describe('insights attendance', () => {
           (item: { sessionId: string }) => item.sessionId === sessionId,
         )?.note;
 
-      // The leader sees Alice's history through their group, but not notes from other sessions.
+      // The leader sees Alice's history through their group, but not the church-wide session.
       const leader = await t.request('GET', `${base}/people/${s.alice.id}`, {
         token: s.leader.token,
       });
       expect(leader.status).toBe(200);
-      expect(noteOf(leader)).toBeNull();
+      expect(
+        leader.json.history.items.some(
+          (item: { sessionId: string }) => item.sessionId === sessionId,
+        ),
+      ).toBe(false);
       const viewed = await t.request('GET', `${base}/people/${s.alice.id}`, {
         token: viewer.token,
       });

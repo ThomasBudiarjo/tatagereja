@@ -8,7 +8,7 @@ import {
   type ModuleId,
 } from '@tatagereja/shared';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Braces, Download, FileClock, Globe, Hash, Monitor } from 'lucide-react';
+import { Braces, Download, FileClock, Globe, Hash, Lock, Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { FilterBar, type FilterDefinition } from '@/components/ui/filter-bar';
-import { EmptyState, ErrorState } from '@/components/ui/misc';
+import { Alert, EmptyState, ErrorState } from '@/components/ui/misc';
 import { InfiniteListFooter } from '@/components/ui/pagination';
 import {
   Sheet,
@@ -120,7 +120,15 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
                 <ModuleBadge module={data.module} />
               </div>
 
-              {locale !== 'en' ? (
+              {data.redacted ? (
+                <Alert variant="info" title={t('admin-security.auditHiddenTitle')}>
+                  {data.redacted === 'finance'
+                    ? t('admin-security.auditHiddenFinance')
+                    : t('admin-security.auditHiddenCare')}
+                </Alert>
+              ) : null}
+
+              {locale !== 'en' && !data.redacted ? (
                 <section className="flex flex-col gap-1">
                   <h3 className="text-sm font-semibold">
                     {t('admin-security.auditStoredSummary')}
@@ -131,7 +139,7 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
                 </section>
               ) : null}
 
-              <section className="flex flex-col gap-2">
+              <section className={cn('flex flex-col gap-2', data.redacted && 'hidden')}>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">{t('admin-security.auditChanges')}</h3>
                   <Button
@@ -413,6 +421,12 @@ export function AuditLogPage() {
                             {entry.actorName ?? t('admin-security.auditSystem')}
                           </span>
                           <ModuleBadge module={entry.module} />
+                          {entry.redacted ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Lock className="size-3" aria-hidden />
+                              {t('admin-security.auditHidden')}
+                            </span>
+                          ) : null}
                           <span className="hidden font-mono sm:inline">{entry.action}</span>
                         </span>
                       </span>

@@ -57,6 +57,13 @@
       "when": 1792779045911,
       "tag": "0007_sec_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792785194845,
+      "tag": "0008_sec_authz",
+      "breakpoints": true
     }
   ]
 }

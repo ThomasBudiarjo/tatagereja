@@ -168,6 +168,18 @@ describe('groups: schedule, visibility, join requests and leader tools', () => {
     );
     expect(approve.status).toBe(200);
     expect(approve.json.request.status).toBe('approved');
+    // The approval adds a member, so it is on the audit log with who it was.
+    const approvals = await t.request(
+      'GET',
+      `${s.base}/audit-logs?action=group.join_request_approve`,
+      { token: s.owner.token },
+    );
+    expect(approvals.json.items).toHaveLength(1);
+    expect(approvals.json.items[0].params).toMatchObject({
+      name: 'Paduan Suara Efrata',
+      person: 'Lukas',
+      asLeader: false,
+    });
     const again = await t.request(
       'POST',
       `${s.base}/groups/${choir.id}/join-requests/${request.json.request.id}/decision`,

@@ -23,6 +23,7 @@ import type { Deps } from '../../deps';
 import { notFound, validationError } from '../../lib/errors';
 import { likePattern } from '../../lib/query';
 import { authPlugin } from '../../plugins/auth';
+import { withPrivacy } from '../../services/people';
 import { changes, recordAudit } from '../../services/audit';
 import { moduleStatus, saveModuleSettings } from '../../services/modules';
 import {
@@ -188,7 +189,7 @@ const recordsHomeRouter = (deps: Deps) => {
     )
     .get(
       '/people',
-      ({ church, query }) => {
+      ({ church, access, query }) => {
         const conditions: SQL[] = [eq(people.churchId, church.id)];
         if (query.q) {
           const pattern = likePattern(query.q);
@@ -199,21 +200,26 @@ const recordsHomeRouter = (deps: Deps) => {
           );
           if (text) conditions.push(text);
         }
+        // A hidden birthday stays hidden here too; the register keeps its own dates.
         return {
-          items: db
-            .select({
-              id: people.id,
-              firstName: people.firstName,
-              lastName: people.lastName,
-              photoUrl: people.photoUrl,
-              membershipStatus: people.membershipStatus,
-              birthDate: people.birthDate,
-            })
-            .from(people)
-            .where(and(...conditions))
-            .orderBy(asc(people.firstName), asc(people.lastName))
-            .limit(query.limit)
-            .all(),
+          items: withPrivacy(
+            db,
+            access,
+            db
+              .select({
+                id: people.id,
+                firstName: people.firstName,
+                lastName: people.lastName,
+                photoUrl: people.photoUrl,
+                membershipStatus: people.membershipStatus,
+                birthDate: people.birthDate,
+              })
+              .from(people)
+              .where(and(...conditions))
+              .orderBy(asc(people.firstName), asc(people.lastName))
+              .limit(query.limit)
+              .all(),
+          ),
         };
       },
       {

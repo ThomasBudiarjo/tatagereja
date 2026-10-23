@@ -547,6 +547,25 @@ export function useMoveFollowUp(churchId: string) {
   });
 }
 
+/** Applies the directory status a follow-up suggests (needs `people.edit`). */
+export function useApplyFollowUpStatus(churchId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request(visitorFollowUpResponseSchema, {
+        url: path(churchId, `/follow-ups/${id}/apply-status`),
+        method: 'POST',
+      }),
+    onSuccess: async (data) => {
+      client.setQueryData(careKeys.detail(churchId, 'follow-ups', data.followUp.id), data);
+      await Promise.all([
+        invalidateCare(client, churchId),
+        client.invalidateQueries({ queryKey: keys.people(churchId) }),
+      ]);
+    },
+  });
+}
+
 export function useDeleteFollowUp(churchId: string) {
   const client = useQueryClient();
   return useMutation({

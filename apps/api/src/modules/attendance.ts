@@ -6,6 +6,7 @@ import {
   attendanceSessionUpdateSchema,
   bulkMarkAttendanceBodySchema,
   can,
+  personAttendanceScope,
   canFollowUpAbsence,
   canSeeAbsenceOf,
   canViewAbsences,
@@ -488,7 +489,7 @@ export const attendanceModule = (deps: Deps) => {
             person,
             INSIGHTS_LIMITS.historyMax,
             todayIn(church),
-            () => true,
+            null,
           ),
         };
       },
@@ -501,7 +502,6 @@ export const attendanceModule = (deps: Deps) => {
         if (!can.viewPersonAttendance(access, person, groupIdsOfPerson(db, person.id))) {
           throw forbidden("You cannot view this person's attendance");
         }
-        const self = access.personId === person.id;
         return {
           history: attendanceHistory(
             db,
@@ -509,7 +509,7 @@ export const attendanceModule = (deps: Deps) => {
             person,
             INSIGHTS_LIMITS.historyMax,
             todayIn(church),
-            (groupId) => self || can.viewAttendanceSession(access, { groupId }),
+            personAttendanceScope(access, person),
           ),
         };
       },
@@ -586,7 +586,7 @@ export const attendanceModule = (deps: Deps) => {
             });
             return updated;
           });
-          return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
+          return { alert: toAbsenceAlert(person, streak, row, lastPresentAt, access) };
         }
 
         if (!streak || streak.streak < INSIGHTS_LIMITS.absentStreakMin) {
@@ -702,7 +702,7 @@ export const attendanceModule = (deps: Deps) => {
           }
           return saved;
         });
-        return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
+        return { alert: toAbsenceAlert(person, streak, row, lastPresentAt, access) };
       },
       {
         church: true,

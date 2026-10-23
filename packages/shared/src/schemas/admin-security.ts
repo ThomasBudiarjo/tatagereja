@@ -24,7 +24,7 @@ import {
   passwordSchema,
   userSummarySchema,
 } from './auth';
-import { membershipSchema } from './church';
+import { membershipSchema, permissionListSchema } from './church';
 import { idSchema, isoDateSchema, isoDateTimeSchema, paginatedSchema } from './common';
 import { memberPermissionsSchema } from './role';
 
@@ -542,6 +542,11 @@ export const memberListItemSchema = membershipSchema.extend({
   /** Leads at least one group. */
   isLeader: z.boolean(),
   personId: idSchema.nullable(),
+  /**
+   * Effective permissions, so row actions match the anti-escalation rules the API applies
+   * (`MembershipTarget.permissions`).
+   */
+  permissions: permissionListSchema,
 });
 export type MemberListItem = z.infer<typeof memberListItemSchema>;
 

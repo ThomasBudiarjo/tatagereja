@@ -35,6 +35,14 @@ export const CARE_NOTIFICATION_TYPES = defineNotificationTypes('care', [
     },
   },
   {
+    type: 'care.status_suggested',
+    label: { en: 'Membership status suggestions', id: 'Saran status keanggotaan' },
+    description: {
+      en: 'When a visitor joined and their status in the directory should change.',
+      id: 'Saat seorang tamu bergabung dan statusnya di data jemaat perlu diubah.',
+    },
+  },
+  {
     type: 'prayer.submitted',
     label: { en: 'New prayer requests', id: 'Pokok doa baru' },
     description: {

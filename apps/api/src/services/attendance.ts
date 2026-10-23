@@ -1,4 +1,5 @@
 import {
+  isCareTeam,
   INSIGHTS_LIMITS,
   attendanceStreakOf,
   dateTimeFormat,
@@ -323,6 +324,7 @@ export const toAbsenceAlert = (
   streak: AbsenceStreak,
   row: AbsenceAlertRow | undefined,
   lastPresentAt: string | null,
+  access: Pick<AccessLike, 'permissions'>,
 ): AbsenceAlert => {
   const resolved = stillResolved(row, lastPresentAt);
   return {
@@ -331,7 +333,8 @@ export const toAbsenceAlert = (
     lastPresentAt: streak.lastPresentAt,
     lastAbsentAt: streak.lastAbsentAt,
     status: resolved && row ? row.status : 'open',
-    careTaskId: resolved ? (row?.careTaskId ?? null) : null,
+    // Pastoral care that followed the alert is the care team's to see.
+    careTaskId: resolved && isCareTeam(access) ? (row?.careTaskId ?? null) : null,
     resolvedAt: resolved ? (row?.resolvedAt ?? null) : null,
   };
 };
@@ -387,7 +390,13 @@ export function listAbsences(
       const person = persons.get(streak.personId);
       if (!person) return [];
       return [
-        toAbsenceAlert(person, streak, stored.get(person.id), lastPresent.get(person.id) ?? null),
+        toAbsenceAlert(
+          person,
+          streak,
+          stored.get(person.id),
+          lastPresent.get(person.id) ?? null,
+          access,
+        ),
       ];
     })
     .filter((alert) => query.includeResolved || alert.status === 'open')
@@ -414,6 +423,7 @@ export function cachedAbsences(
   const scope = absenceScope(access, query.groupId);
   const key = `absences:${JSON.stringify([
     scope ? [...scope].sort() : null,
+    isCareTeam(access),
     query.threshold,
     query.includeResolved,
     query.q ?? null,
@@ -421,10 +431,14 @@ export function cachedAbsences(
   return cache.remember(churchId, key, () => listAbsences(db, churchId, access, query));
 }
 
+/** SQL for `personAttendanceScope`: every session, or only those of the given groups. */
+export const attendanceScopeCondition = (scope: readonly string[] | null): SQL | undefined =>
+  scope === null ? undefined : inArray(attendanceSessions.groupId, [...scope]);
+
 /**
- * A person's attendance history: streaks, counts, the last twelve months and recent sessions.
- * The recorder's note on a mark is shown only where `showNote` allows it (the person themselves,
- * or someone who may open that session), so a leader does not read notes from other groups.
+ * A person's attendance history: streaks, counts, the last twelve months and recent sessions,
+ * of the sessions in `scope` only (see `personAttendanceScope`): a leader reads the sessions of
+ * the groups they lead, not the person's whole history.
  */
 export function attendanceHistory(
   db: Queryable,
@@ -432,7 +446,8 @@ export function attendanceHistory(
   person: Pick<PersonRow, 'id' | 'firstName' | 'lastName' | 'photoUrl' | 'membershipStatus'>,
   limit: number,
   today: string,
-  showNote: (groupId: string | null) => boolean,
+  /** Sessions the caller may read (see `personAttendanceScope`); `null` for all. */
+  scope: readonly string[] | null,
 ): AttendanceHistory {
   const rows = db
     .select({
@@ -448,7 +463,11 @@ export function attendanceHistory(
     .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
     .leftJoin(groups, eq(groups.id, attendanceSessions.groupId))
     .where(
-      and(eq(attendanceRecords.churchId, church.id), eq(attendanceRecords.personId, person.id)),
+      and(
+        eq(attendanceRecords.churchId, church.id),
+        eq(attendanceRecords.personId, person.id),
+        attendanceScopeCondition(scope),
+      ),
     )
     .orderBy(desc(attendanceSessions.sessionAt))
     .all();
@@ -479,7 +498,6 @@ export function attendanceHistory(
     items: rows.slice(0, limit).map((row) => ({
       ...row,
       groupName: row.groupName ?? null,
-      note: showNote(row.groupId) ? row.note : null,
     })),
   };
 }

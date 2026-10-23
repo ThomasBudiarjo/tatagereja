@@ -102,6 +102,17 @@ const showsSql = (column: 'show_phone' | 'show_email' | 'show_birthday'): SQL =>
 };
 
 /**
+ * `condition` on a contact field of `people`, matching only people who show the field unless
+ * the caller may see hidden ones: searching by a hidden phone number must not find its owner.
+ */
+export const onVisibleContact = (
+  access: AccessLike,
+  column: 'show_phone' | 'show_email' | 'show_birthday',
+  condition: SQL,
+): SQL =>
+  has(access, 'people.private.view') ? condition : (and(condition, showsSql(column)) ?? condition);
+
+/**
  * Refuses filters that would reveal what the caller may not see: who belongs to a private group,
  * or who holds a value in a private custom field. Both answer 404 like an unknown id.
  */
@@ -149,9 +160,8 @@ export function directoryConditions(
   query: Omit<DirectoryQuery, 'page' | 'limit'>,
   today: string,
 ): SQL[] {
-  const seesHidden = has(access, 'people.private.view');
   const visible = (column: 'show_phone' | 'show_email' | 'show_birthday', condition: SQL) =>
-    seesHidden ? condition : (and(condition, showsSql(column)) ?? condition);
+    onVisibleContact(access, column, condition);
   const conditions: SQL[] = [eq(people.churchId, churchId)];
   if (query.status) conditions.push(eq(people.membershipStatus, query.status));
   if (query.gender) conditions.push(eq(people.gender, query.gender));
@@ -278,6 +288,40 @@ const FIELD_FLAG: Record<PersonPrivacyField, keyof PersonPrivacy> = {
   address: 'showAddress',
   birthday: 'showBirthday',
 };
+
+type ContactFields = {
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  birthDate?: string | null;
+};
+
+/**
+ * Strips the contact fields each person hid from rows that carry some of them (pickers,
+ * rosters, birthday lists, exports), unless the caller may see them (`canSeeHiddenContact`).
+ * Rows without `userId` count as the caller's own only through `access.personId`.
+ */
+export function withPrivacy<T extends { id: string; userId?: string | null } & ContactFields>(
+  db: Queryable,
+  access: AccessLike,
+  rows: readonly T[],
+): T[] {
+  if (has(access, 'people.private.view') || rows.length === 0) return [...rows];
+  const privacy = privacyByPerson(
+    db,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => {
+    if (canSeeHiddenContact(access, { id: row.id, userId: row.userId ?? null })) return row;
+    const choices = privacyOf(privacy, row.id);
+    const next = { ...row };
+    if ('phone' in row && !choices.showPhone) next.phone = null;
+    if ('email' in row && !choices.showEmail) next.email = null;
+    if ('address' in row && !choices.showAddress) next.address = null;
+    if ('birthDate' in row && !choices.showBirthday) next.birthDate = null;
+    return next;
+  });
+}
 
 /** Contact fields the caller does not see because the person hid them. */
 export const hiddenFieldsFor = (

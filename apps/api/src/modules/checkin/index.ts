@@ -177,7 +177,13 @@ const checkinHomeRouter = (deps: Deps) => {
           !!link && (GUARDIAN_RELATIONSHIPS as readonly string[]).includes(link.relationship);
         const household =
           link && isGuardian
-            ? (buildHouseholds(db, church, [link.householdId], openRows[0]?.id ?? null)[0] ?? null)
+            ? (buildHouseholds(
+                db,
+                church,
+                access,
+                [link.householdId],
+                openRows[0]?.id ?? null,
+              )[0] ?? null)
             : null;
         const childIds = household?.children.map((child) => child.id) ?? [];
         // Children in class right now: the household's, and any the caller brought.

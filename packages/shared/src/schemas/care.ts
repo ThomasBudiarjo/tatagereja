@@ -1,7 +1,7 @@
 // Zod schemas, enums and labels owned by the care module. Only that module edits this file;
 // it is already exported from the package index. See docs/ARCHITECTURE-MODULES.md.
 import { z } from 'zod';
-import { LIMITS } from '../constants';
+import { LIMITS, PERSON_MEMBERSHIP_STATUSES, type PersonMembershipStatus } from '../constants';
 import type { LocalizedText } from '../localized';
 import { has, hasAny, type AccessLike } from '../permissions';
 import {
@@ -301,6 +301,25 @@ export const isPrayerRequestPublic = (request: {
   visibility: PrayerVisibility;
   moderationStatus: PrayerModerationStatus;
 }): boolean => request.visibility === 'church' && request.moderationStatus === 'approved';
+
+/**
+ * Care flows touch the directory only with its own permissions: a new visitor is a new person
+ * (`people.create`), and a membership status change is an edit (`people.edit`). Without them
+ * the care team picks someone already in the directory, and the status change stays a
+ * suggestion for someone who holds the permission.
+ */
+export const canAddVisitorPerson = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  has(access, 'people.create');
+
+export const canApplyStatusSuggestion = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  has(access, 'people.edit');
+
+/** The status a follow-up suggests for its person, or null when there is nothing to change. */
+export const followUpStatusSuggestion = (
+  stage: FollowUpStage,
+  membershipStatus: PersonMembershipStatus,
+): PersonMembershipStatus | null =>
+  stage === 'joined' && membershipStatus === 'visitor' ? 'regular' : null;
 
 /** Who may move a visitor through the pipeline: care managers and the assigned person. */
 export const canManageFollowUp = (
@@ -638,6 +657,13 @@ export const visitorFollowUpSchema = z.object({
   nextDueDate: isoDateSchema.nullable(),
   hasOverdueTask: z.boolean(),
   canManage: z.boolean(),
+  /**
+   * The directory status the follow-up suggests (a visitor who joined becomes a regular
+   * attendee), while the person still has the old one. Applied by `people.edit` holders.
+   */
+  statusSuggestion: z.enum(PERSON_MEMBERSHIP_STATUSES).nullable(),
+  /** Whether the caller may apply the suggestion (`people.edit`). */
+  canChangeStatus: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type VisitorFollowUp = z.infer<typeof visitorFollowUpSchema>;

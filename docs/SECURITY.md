@@ -1,9 +1,169 @@
-# Security: sessions, credentials and secrets
+# Security
 
-This document describes how TataGereja authenticates people, keeps sessions, stores secrets and
-resists guessing. The permission model (who may do what in a church) is in
-[PLAN.md](../PLAN.md#security-model) and [ARCHITECTURE-MODULES.md](./ARCHITECTURE-MODULES.md).
-The API is the only security boundary; everything below is enforced on the server.
+This document describes how TataGereja protects a church's data: who may see and change what
+(threat model, permission model, data classification, abuse limits), what to do when something
+goes wrong (incident response), how to run a server safely (self-hosting checklist), and how it
+authenticates people, keeps sessions, stores secrets and resists guessing. The API is the only
+security boundary; everything below is enforced on the server. The permission catalog and the
+module contract are in [PLAN.md](../PLAN.md#security-model) and
+[ARCHITECTURE-MODULES.md](./ARCHITECTURE-MODULES.md).
+
+## Threat model
+
+**What is protected.** Personal data of the jemaat (contact details, birthdays, national ID
+numbers, medical notes, family links), pastoral care (counselling notes, visits, prayer
+requests shared with pastors only), giving and church finance, the church register, children's
+check-in (custody alerts, authorised pick-ups, security codes), and the accounts themselves
+(passwords, sessions, two-step secrets).
+
+**Who might attack.** Someone on the internet without an account; a person with an account in
+another church on the same server; a member of the church reading more than their role allows
+(curiosity is the most likely case: a member looking up a neighbour's giving or a pastoral
+note); a group leader or volunteer reaching beyond their scope; an administrator trying to
+raise their own permissions or remove a pastor; a stolen session or password; a buggy or
+abusive script flooding the server; and someone with a copy of the database or a backup.
+
+| Threat                                              | Defence                                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reading another church's rows by id (IDOR)          | Every church row carries `church_id`; ids in a request are loaded inside the church and answer `404` otherwise                               |
+| A member calling routes the interface hides         | Guards on every route, row rules in the handler; the generated matrix test calls every route as every kind of caller                         |
+| Learning a route's schema or a row's existence      | Session, membership and route permission are checked before the body, query and parameters are validated (`401`/`403`, never `422` first)    |
+| Over-broad answers (a field the caller may not see) | Field rules on the server: privacy choices, private details, confidential care, giving, check-in codes, audit redaction                      |
+| Oracles (searching by a hidden phone number)        | Searches and filters on a hidden field match only people who show it, for callers who could not see it                                       |
+| Leaders reaching beyond their groups                | Leader scope is per group: attendance, rosters and members only of the groups they lead                                                      |
+| Privilege escalation                                | `canGrant` anti-escalation on roles, base roles, suspensions, removals and reset links; owner untouchable                                    |
+| Stolen sessions, CSRF, XSS, guessing                | See [Sessions](#sessions) to [Headers](#headers): httpOnly cookies, CSRF tokens, rotating refresh tokens, lockout, strict CSP, Trusted Types |
+| Floods and notification loops                       | Body limits per kind of route, per-account limits on writes, exports and searches, repeated notices collapsed                                |
+| A copied database or backup                         | Confidential columns encrypted (AES-256-GCM); tokens stored as hashes; backups and exports leave credentials out                             |
+
+Out of scope: a compromised server or operating system (an attacker with the process and the key
+reads everything), and a church owner who abuses their own church's data (the audit log records
+what they do).
+
+## Permission model
+
+A request passes these layers, in this order:
+
+1. **Session** (`auth` and `church` macros, `transform` hook): a valid cookie (with CSRF token
+   for writes) or bearer token, else `401`.
+2. **Admission**, still before validation: the caller is an active member of `:churchId`
+   (`404` unknown church, `403` non-member, `403 MEMBERSHIP_SUSPENDED`), the church's 2FA policy
+   holds, the module is on (`403 MODULE_DISABLED`), and the route's guard permission is held
+   (`403 FORBIDDEN`). The guard is recorded on the route (`detail['x-church-guard']`), so the
+   tests read it.
+3. **Validation** of body, query and parameters (`422`).
+4. **Row rules** in the handler, with the shared `can.*` and module rules: leader scope, own
+   data, confidentiality, caregivers, segregation of duties, anti-escalation.
+5. **Field rules** when serialising: directory privacy (`applyPersonPrivacy`, `withPrivacy`),
+   private details, confidential care, giving, check-in codes, audit redaction.
+
+Rules decided in this pass:
+
+- **Group leaders** see a person's attendance history (lists, totals, timeline) only for sessions
+  of the groups they lead (`personAttendanceScope`); church-wide services and other groups stay
+  hidden, and adding someone to their group does not widen it. Leaders add members who asked to
+  join or who are already in the directory (`canAddGroupMember`); every add and removal is on the
+  audit log, marked when made as a leader.
+- **Care and the directory.** A new visitor from the follow-up board is a new person and needs
+  `people.create`; changing their membership status when they join needs `people.edit`. Without
+  them the care team picks someone already in the directory, and the status change becomes a
+  suggestion: the follow-up shows it, holders of `people.edit` are notified
+  (`care.status_suggested`) and apply it (`POST /care/follow-ups/:id/apply-status`).
+- **Audit viewers.** `audit.view` shows who did what and when. Finance entries also need
+  `finance.view` (or `finance.manage`), pastoral care entries the care team (`care.view`,
+  `care.manage` or `care.confidential`); otherwise the entry's summary, params and values are
+  replaced (`redacted: 'finance' | 'care'`), in the list, the detail, the CSV export and the
+  security overview, and a search never matches their hidden text.
+- **Member actions.** The member list sends each member's effective permissions, so the row
+  actions apply the same anti-escalation rule as the API (an administrator is not offered to
+  suspend or remove a Pendeta holding `care.confidential`).
+
+Audit entries carry an action key (`member.roles_update`), params (`{ member, added, removed }`,
+`{ name }`, `{ person, status }`) and the English summary; the viewer builds the headline in the
+reader's language from the key and params. Role changes name the members they affect.
+
+## Data classification
+
+| Class        | Data                                                                                                                             | At rest                                           | Who sees it                                                                                                               | Audit log                                                   | Exports and backups                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| Secret       | Password hashes, session, refresh, reset, invitation and feed token hashes, TOTP secrets, recovery codes                         | Hashed (argon2id, SHA-256); TOTP secret encrypted | Nobody; never serialised                                                                                                  | Always `[redacted]`                                         | Never included                                                       |
+| Credential   | Check-in security codes                                                                                                          | Plain (short, read aloud)                         | The guardian and `checkin.manage`                                                                                         | Redacted                                                    | Left out                                                             |
+| Confidential | Pastoral care descriptions, notes and visit summaries; check-in alerts and pick-up notes; national ID, medical and private notes | AES-256-GCM (`encryptedText`)                     | Care: caregivers, the care team (confidential: `care.confidential`). Private details: `people.private.view` or the person | Values redacted; care entries redacted for non-care viewers | Backup (owner) in plain text; personal export only own non-care rows |
+| Financial    | Gifts, donors, offerings, expenses, budgets, ledger                                                                              | Plain, integer minor units                        | Finance permissions; each person their own giving                                                                         | Redacted without `finance.view`                             | Backup; personal export of own giving                                |
+| Personal     | Phone, email, address, birthday                                                                                                  | Plain (searchable)                                | Everyone in the directory unless the person hides it; hidden: `people.private.view` or the person                         | Plain                                                       | Directory export follows privacy; backup in full                     |
+| Scoped       | Attendance history, absence alerts, rosters, group join requests                                                                 | Plain                                             | `attendance.view`, the person, leaders for their groups                                                                   | Plain                                                       | Backup                                                               |
+| Directory    | Names, households, areas, groups, membership status                                                                              | Plain                                             | Members with `people.view` (every member by default)                                                                      | Plain                                                       | Backup, directory export                                             |
+
+When an account is deleted, its sessions, memberships, roles, 2FA, sign-in history,
+notifications and preferences go with it; content others rely on (events, announcements, rows
+that cannot be orphaned) passes to the church owner; the person record stays in the directory,
+unlinked. Account-level audit entries keep what happened and when, not the name, email,
+address or browser. Church audit entries stay with the church's records.
+
+## Abuse limits
+
+- **Body size by kind of route** (`lib/abuse.ts`): 32 KB for sign-in, registration and codes;
+  1 MB for long documents (Warta Jemaat, liturgies, songs, registry entries, pastoral notes);
+  256 KB for everything else; imports up to `MAX_BODY_KB`. Larger bodies answer
+  `413 PAYLOAD_TOO_LARGE`; a chunked body without `Content-Length` answers
+  `411 LENGTH_REQUIRED` outside imports, so the limits cannot be stepped around.
+- **Per account** (`account.*` limiters), on top of the route-specific limits: 1,200 writes per
+  10 minutes (a demo church is seeded with about 800), 120 exports and reports per 15 minutes
+  (CSV exports, rosters, giving statements, reports, backups), 900 searches per 5 minutes.
+  `429 RATE_LIMITED` says how many seconds to wait.
+- **Route-specific** limits stay stricter: sign-in, two-step codes, reset links, invitations,
+  check-out codes, prayer requests, join requests, audit export, backups.
+- **Notifications** are not repeated: an identical unread notice (type, item, title and body)
+  sent in the last 10 minutes is skipped, so toggling something back and forth cannot flood an
+  inbox. Mandatory security notices are always sent.
+
+## Incident response
+
+1. **Contain.** Suspend the member involved (`Settings → Members`), or have the person use
+   _Sign out everywhere_; an owner or administrator can make a password reset link for a member
+   who lost access. Turn off a module that is being misused. If the `ENCRYPTION_KEY` or a backup
+   leaked, rotate the key (see [Rotating the key](#rotating-the-key)). Session tokens do not
+   depend on that key: if tokens may have leaked, end the sessions (each person can sign out
+   everywhere; an operator can delete the rows of the `sessions` table, and everyone signs in
+   again).
+2. **Investigate.** The audit log (filter by person, module, action, item or dates; export CSV),
+   each account's sign-in history, the security overview (members without two-step
+   verification, recent entries) and the server log (`LOG_REQUESTS=true`; paths are logged
+   without tokens). Look for bursts of `401`, `403` and `429`.
+3. **Recover.** Restore the database from a backup together with the key that encrypted it;
+   correct or void registry and finance entries rather than deleting them.
+4. **Notify.** Tell the church leadership and the people affected. Indonesia's Personal Data
+   Protection Law (UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi) requires written
+   notice to the people affected and to the authority within 3 × 24 hours of a failure to
+   protect personal data; check the rules that apply to your church.
+5. **Learn.** Add a test for what went wrong (the generated matrix makes most access bugs a
+   one-line canary), and report vulnerabilities in TataGereja itself privately to the
+   maintainers rather than in a public issue.
+
+## Self-hosting checklist
+
+- [ ] **HTTPS only.** Put the container behind a reverse proxy that terminates TLS, redirect
+      HTTP, and set `APP_URL` to the `https://` address (cookies get the `__Host-` prefix and HSTS
+      is sent only over HTTPS).
+- [ ] **`TRUST_PROXY`** set to the number of proxies in front of the API (usually `1`), so rate
+      limits and sign-in history use the real client address; `0` when nothing is in front.
+- [ ] **`ENCRYPTION_KEY`** set from `openssl rand -base64 32` and kept in a secret store, not in
+      the repository; or keep the generated `.tatagereja.key` with mode 0600.
+- [ ] **Backups**: the SQLite file (with `-wal`) taken with the server stopped or with
+      `sqlite3 .backup`, copied off the machine, encrypted, kept with (but stored apart from) the
+      encryption key, and a restore tested. The owner's church backup download is an extra copy,
+      not a replacement.
+- [ ] **`REGISTRATION_MODE=invite_only`** unless the server is meant for public sign-up; enable
+      Turnstile for public registration.
+- [ ] **`CORS_ORIGINS`** set to the origins that may call the API from a browser when the app
+      is not served by the same server.
+- [ ] **`MAX_BODY_KB`** left at 2048 or lower; the per-route limits apply below it.
+- [ ] **Accounts**: the owner turns on two-step verification and sets the church's 2FA policy
+      for managers; give roles the fewest permissions that do the job and review the members
+      list and the audit log regularly.
+- [ ] **Updates**: rebuild the image when TataGereja releases a fix; migrations run on start.
+- [ ] **Logs and monitoring**: keep request logs (no tokens are logged) and watch for spikes of
+      `401`, `403`, `413` and `429`.
 
 ## Sessions
 
@@ -232,6 +392,20 @@ sign in, invitations, reset links, two-step setup, sessions, sign-out) reports n
 Trusted Types violations.
 
 ## Tests
+
+`apps/api/tests/security-matrix.test.ts` is the permission and data-scope matrix: generated from
+the router, it calls every route as nobody, another church's owner, a suspended member, a plain
+member, a group leader, each suggested role, the administrator, the owner and a custom role
+holding exactly the route's guard permission, checks the status codes, and searches every answer
+for canaries planted in the church (a hidden phone, email, address and birthday, private
+details, confidential and normal care text, a large gift, attendance in a group the leader does
+not lead, a check-in security code, secret field names), including searches, filters and
+downloads that could act as oracles. `security-routes.test.ts` walks every write as anonymous,
+member and another church's owner on real rows. `security-scope.test.ts` (leader scope, leader
+adds, audit redaction, member row actions, role-change params), `security-privacy.test.ts`
+(privacy on every surface, exports and backups, account deletion) and
+`security-abuse.test.ts` (body limits, account limits, notification repeats) cover the
+authorization pass.
 
 `apps/api/tests/sec-auth-sessions.test.ts` (cookie sessions and CSRF, bearer refresh rotation and
 reuse detection, idle and absolute expiry, sign out everywhere, uniform sign-in answers and

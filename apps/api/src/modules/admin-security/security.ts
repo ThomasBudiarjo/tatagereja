@@ -148,7 +148,7 @@ export const churchSecurityRouter = (deps: Deps) => {
               .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
               .limit(5)
               .all()
-              .map((row) => toAuditLog(row.log, row.actorName ?? null)),
+              .map((row) => toAuditLog(row.log, row.actorName ?? null, access)),
           };
         }
         return {
