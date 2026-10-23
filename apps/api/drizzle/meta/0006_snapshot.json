@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c4f8048c-ff11-4be6-ac35-2acb5ce78240",
+  "id": "8036c70b-32d3-4cdf-a3e0-55b28a5a8fbe",
   "prevId": "19de926a-c835-4acd-9511-af0a19b54d1e",
   "tables": {
     "announcements": {
@@ -10057,6 +10057,8 @@
           "columns": [
             "church_id",
             "entry_date",
+            "created_at",
+            "id",
             "voided_at",
             "source_type",
             "amount",
@@ -10080,8 +10082,13 @@
         "finance_entries_account_date_idx": {
           "name": "finance_entries_account_date_idx",
           "columns": [
+            "church_id",
             "account_id",
-            "entry_date"
+            "entry_date",
+            "created_at",
+            "id",
+            "voided_at",
+            "amount"
           ],
           "isUnique": false
         },

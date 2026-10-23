@@ -16,7 +16,21 @@ import {
   type FinancePending,
   type FinanceSummary,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gt, gte, like, lt, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  like,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { ChurchRow, FinanceEntryRow } from '../../db/schema';
@@ -103,12 +117,26 @@ export function pendingFor(db: Queryable, churchId: string, access: AccessLike):
   return { batches, expenses, total: batches + expenses };
 }
 
-/** Running balance after each live entry of one account, in posting order. */
-function runningBalances(db: Queryable, churchId: string, accountId: string, opening: number) {
-  const balances = new Map<string, number>();
-  let balance = opening;
-  for (const row of db
-    .select({ id: financeEntries.id, amount: financeEntries.amount })
+/**
+ * Running balance after each live entry of one account, in posting order. The sums run in SQL
+ * (a window over the account's entries); only the rows asked for (`ids`, a page) come back.
+ */
+function runningBalances(
+  db: Queryable,
+  churchId: string,
+  accountId: string,
+  opening: number,
+  ids?: readonly string[],
+) {
+  if (ids && ids.length === 0) return new Map<string, number>();
+  const ordered = db
+    .select({
+      id: financeEntries.id,
+      running:
+        sql<number>`sum(${financeEntries.amount}) over (order by ${financeEntries.entryDate}, ${financeEntries.createdAt}, ${financeEntries.id} rows between unbounded preceding and current row)`
+          .mapWith(Number)
+          .as('running'),
+    })
     .from(financeEntries)
     .where(
       and(
@@ -117,12 +145,15 @@ function runningBalances(db: Queryable, churchId: string, accountId: string, ope
         liveEntry,
       ),
     )
-    .orderBy(asc(financeEntries.entryDate), asc(financeEntries.createdAt), asc(financeEntries.id))
-    .all()) {
-    balance += row.amount;
-    balances.set(row.id, balance);
-  }
-  return balances;
+    .as('ordered');
+  return new Map(
+    db
+      .select({ id: ordered.id, running: ordered.running })
+      .from(ordered)
+      .where(ids ? inArray(ordered.id, [...ids]) : undefined)
+      .all()
+      .map((row) => [row.id, opening + row.running]),
+  );
 }
 
 export function financeSummary(
@@ -241,17 +272,27 @@ export const ledgerRouter = (deps: Deps) => {
             );
 
           const account = query.accountId ? loadAccount(db, church.id, query.accountId) : null;
-          const running = account
-            ? runningBalances(db, church.id, account.id, account.openingBalance)
-            : undefined;
+          const runningFor = (rows: readonly FinanceEntryRow[]) =>
+            account
+              ? runningBalances(
+                  db,
+                  church.id,
+                  account.id,
+                  account.openingBalance,
+                  rows.map((row) => row.id),
+                )
+              : undefined;
 
           if (query.format === 'csv') {
             enforceExportLimit(deps.limiters, church.id, auth.user.id);
+            const exported = ordered.limit(LIMITS.csvRowsMax).all();
             const items = hydrateEntries(
               db,
               church.id,
-              ordered.limit(LIMITS.csvRowsMax).all(),
-              running,
+              exported,
+              account
+                ? runningBalances(db, church.id, account.id, account.openingBalance)
+                : undefined,
             );
             Object.assign(
               set.headers,
@@ -315,7 +356,7 @@ export const ledgerRouter = (deps: Deps) => {
             (row) => [row.entryDate, row.createdAt, row.id],
           );
           return {
-            items: hydrateEntries(db, church.id, rows, running),
+            items: hydrateEntries(db, church.id, rows, runningFor(rows)),
             total,
             page: query.page,
             limit: query.limit,

@@ -39,6 +39,11 @@ function backfillCopiedColumns(sqlite: Database): void {
   `);
 }
 
+const hasMigrationsTable = (sqlite: Database): boolean =>
+  !!sqlite
+    .query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'")
+    .get();
+
 /** How often a long-running server refreshes planner statistics (`PRAGMA optimize`). */
 export const OPTIMIZE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
@@ -68,8 +73,14 @@ export function openDatabase(path: string): DatabaseHandle {
     sqlite.exec('PRAGMA mmap_size = 268435456;');
   }
   const db = createDrizzle(sqlite);
+  const applied = () =>
+    (sqlite.query('SELECT count(*) AS n FROM __drizzle_migrations').get() as { n: number }).n;
+  const before = hasMigrationsTable(sqlite) ? applied() : 0;
   migrate(db, { migrationsFolder });
   backfillCopiedColumns(sqlite);
+  // New indexes have no planner statistics until analyzed, and without them SQLite may pick a
+  // worse index for years-old tables. A migration is rare, so it pays for a full ANALYZE.
+  if (applied() > before && before > 0) sqlite.exec('ANALYZE;');
   // 0x10002: also analyze tables that never had statistics (new or migrated databases).
   sqlite.exec('PRAGMA optimize = 0x10002;');
   const optimize = () => sqlite.exec('PRAGMA optimize;');
