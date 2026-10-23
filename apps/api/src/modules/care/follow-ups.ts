@@ -1,6 +1,5 @@
 import {
   FOLLOW_UP_ACTIVE_STAGES,
-  FOLLOW_UP_ENDED_VISIBLE_DAYS,
   FOLLOW_UP_STAGES,
   canManageFollowUp,
   churchIdParamsSchema,
@@ -15,7 +14,7 @@ import {
   type AccessLike,
   type FollowUpStage,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, gte, inArray, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { ChurchRow, PersonRow, VisitorFollowUpRow } from '../../db/schema';
@@ -23,12 +22,13 @@ import { people, visitorFollowUps } from '../../db/schema';
 import type { Deps } from '../../deps';
 import { conflict, forbidden, notFound } from '../../lib/errors';
 import { likePattern } from '../../lib/query';
-import { addDays, nowIso } from '../../lib/time';
+import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { recordAudit, redact } from '../../services/audit';
 import {
   assertActiveMembers,
+  followUpOnBoardCondition,
   loadPersonInChurch,
   redactedChanges,
   todayIn,
@@ -146,11 +146,7 @@ export const followUpsRouter = (deps: Deps) => {
           if (match) base.push(match);
         }
         // Joined and closed follow-ups leave the board after a while unless asked for.
-        const endedSince = addDays(new Date(), -FOLLOW_UP_ENDED_VISIBLE_DAYS).toISOString();
-        const recent = or(
-          inArray(visitorFollowUps.stage, [...FOLLOW_UP_ACTIVE_STAGES]),
-          gte(visitorFollowUps.stageChangedAt, endedSince),
-        );
+        const recent = followUpOnBoardCondition();
         const counted = and(...base, ...(recent ? [recent] : []));
         const counts = Object.fromEntries(FOLLOW_UP_STAGES.map((stage) => [stage, 0])) as Record<
           FollowUpStage,

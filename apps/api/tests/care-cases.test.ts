@@ -219,9 +219,12 @@ describe('care cases', () => {
         token: viewer.token,
       });
       expect(hiddenVisit.status).toBe(404);
-      // The elder raised it without care.confidential and is not a caregiver: it is gone for them.
-      const gone = await t.request('GET', `${base}/cases/${normalId}`, { token: elder.token });
-      expect(gone.status).toBe(404);
+      // The elder raised it without care.confidential, so they stay on it as a caregiver.
+      const kept = await t.request('GET', `${base}/cases/${normalId}`, { token: elder.token });
+      expect(kept.status).toBe(200);
+      expect(kept.json.case.caregivers.map((c: { userId: string }) => c.userId)).toContain(
+        elder.user.id,
+      );
       const lower = await t.request('PATCH', `${base}/cases/${normalId}`, {
         token: pastor.token,
         body: { category: 'grief', title: 'Pendampingan duka', confidentiality: 'normal' },

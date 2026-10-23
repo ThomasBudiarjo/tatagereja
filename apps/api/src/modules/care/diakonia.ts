@@ -80,10 +80,16 @@ export const diakoniaRouter = (deps: Deps) => {
   };
 
   /** Checks the recipient and the case; a case the caller may not read does not exist for them. */
-  const resolve = (churchId: string, access: AccessLike, body: DiakoniaAidInput) => {
+  const resolve = (
+    churchId: string,
+    access: AccessLike,
+    body: DiakoniaAidInput,
+    existing?: DiakoniaAidRow,
+  ) => {
     const person = body.personId ? loadPersonInChurch(db, churchId, body.personId) : null;
     if (body.householdId) loadHouseholdInChurch(db, churchId, body.householdId);
-    if (body.caseId) {
+    // Keeping the case a record already names needs no access to it (corrections by treasurers).
+    if (body.caseId && body.caseId !== existing?.caseId) {
       const linked = db
         .select()
         .from(careCases)
@@ -233,7 +239,7 @@ export const diakoniaRouter = (deps: Deps) => {
       ({ church, access, audit, params, body }) => {
         const row = loadAid(church.id, params.id);
         if (row.voidedAt) throw conflict('A voided aid record cannot be changed');
-        const { label, ...values } = resolve(church.id, access, body);
+        const { label, ...values } = resolve(church.id, access, body, row);
         const updated = db.transaction((tx) => {
           const next = tx
             .update(diakoniaAid)

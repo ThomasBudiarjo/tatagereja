@@ -1,11 +1,13 @@
 import {
+  FOLLOW_UP_ACTIVE_STAGES,
+  FOLLOW_UP_ENDED_VISIBLE_DAYS,
   has,
   isCareTeam,
   type AccessLike,
   type CareConfidentiality,
   type Caregiver,
 } from '@tatagereja/shared';
-import { and, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, PersonRow } from '../db/schema';
 import {
@@ -18,9 +20,10 @@ import {
   households,
   people,
   users,
+  visitorFollowUps,
 } from '../db/schema';
 import { notFound } from '../lib/errors';
-import { nowIso } from '../lib/time';
+import { addDays, nowIso } from '../lib/time';
 import { changes, redact } from './audit';
 import { notify } from './notifications';
 
@@ -47,6 +50,16 @@ export const addDaysToDate = (date: string, days: number): string => {
 
 /** The first day of the month of a `YYYY-MM-DD` date. */
 export const monthStart = (date: string): string => `${date.slice(0, 7)}-01`;
+
+/**
+ * Follow-ups on the board: every active one, and joined or closed ones for a while after they
+ * ended. The board and the overview count the same set.
+ */
+export const followUpOnBoardCondition = (now = new Date()) =>
+  or(
+    inArray(visitorFollowUps.stage, [...FOLLOW_UP_ACTIVE_STAGES]),
+    gte(visitorFollowUps.stageChangedAt, addDays(now, -FOLLOW_UP_ENDED_VISIBLE_DAYS).toISOString()),
+  );
 
 /** Generic wording for anything about a confidential case: no titles, names or notes. */
 export const CONFIDENTIAL_LABEL = 'Pendampingan rahasia';

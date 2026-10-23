@@ -40,9 +40,9 @@ import {
 import { notify } from '../../services/notifications';
 import { hydrateTasks } from './serializers';
 
-/** Titles of tasks on confidential cases are as private as the case. */
+/** Titles and subjects of tasks on confidential cases are as private as the case. */
 const secretFields = (confidential: boolean) =>
-  confidential ? ['description', 'title'] : ['description'];
+  confidential ? ['description', 'title', 'personId'] : ['description'];
 
 const auditable = (row: CareTaskRow) => ({
   title: row.title,

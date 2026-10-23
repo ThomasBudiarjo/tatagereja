@@ -35,6 +35,11 @@ import {
 import { hydrateVisits, visitorIdsByVisit } from './serializers';
 
 const SECRET_FIELDS = ['summary', 'followUpNote'];
+/** Who was visited and where stay out of the audit log for confidential visits. */
+const CONFIDENTIAL_FIELDS = [...SECRET_FIELDS, 'personId', 'householdId', 'location'];
+
+const secretFields = (row: Pick<CareVisitRow, 'confidentiality'>) =>
+  row.confidentiality === 'confidential' ? CONFIDENTIAL_FIELDS : SECRET_FIELDS;
 
 const auditable = (row: CareVisitRow, visitorPersonIds: readonly string[]) => ({
   caseId: row.caseId,
@@ -262,7 +267,7 @@ export const careVisitsRouter = (deps: Deps) => {
             entityType: 'care_visit',
             entityId: row.id,
             summary: `Recorded ${subjectName(row)}`,
-            after: redact(auditable(row, resolved.visitorPersonIds), SECRET_FIELDS),
+            after: redact(auditable(row, resolved.visitorPersonIds), secretFields(row)),
           });
           return row;
         });
@@ -325,7 +330,7 @@ export const careVisitsRouter = (deps: Deps) => {
             ...redactedChanges(
               auditable(row, visitorPersonIds),
               auditable(next, resolved.visitorPersonIds),
-              SECRET_FIELDS,
+              secretFields(next.confidentiality === 'confidential' ? next : row),
             ),
           });
           return next;
@@ -353,7 +358,7 @@ export const careVisitsRouter = (deps: Deps) => {
             entityType: 'care_visit',
             entityId: row.id,
             summary: `Deleted ${subjectName(row)}`,
-            before: redact(auditable(row, visitorPersonIds), SECRET_FIELDS),
+            before: redact(auditable(row, visitorPersonIds), secretFields(row)),
           });
         });
         return { ok: true as const };

@@ -25,7 +25,7 @@ import type { Queryable } from '../../db/client';
 import type { CareCaseRow, ChurchRow } from '../../db/schema';
 import { careCaseCaregivers, careCases, careNotes, careVisits, people } from '../../db/schema';
 import type { Deps } from '../../deps';
-import { forbidden, notFound } from '../../lib/errors';
+import { conflict, forbidden, notFound } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
@@ -45,8 +45,12 @@ import {
 import { notify } from '../../services/notifications';
 import { hydrateCases, hydrateNotes, toCareCaseDetail } from './serializers';
 
-/** Free-text fields never reach the audit log; titles of confidential cases neither. */
+/**
+ * Free-text fields never reach the audit log; neither do the title and the subject (who the
+ * case is about) of confidential cases.
+ */
 const TEXT_FIELDS = ['description', 'nextActionNote', 'closedReason'];
+const CONFIDENTIAL_FIELDS = [...TEXT_FIELDS, 'title', 'personId', 'householdId'];
 
 const auditable = (row: CareCaseRow) => ({
   personId: row.personId,
@@ -63,7 +67,7 @@ const auditable = (row: CareCaseRow) => ({
 });
 
 const secretFields = (confidentiality: CareConfidentiality) =>
-  confidentiality === 'confidential' ? [...TEXT_FIELDS, 'title'] : TEXT_FIELDS;
+  confidentiality === 'confidential' ? CONFIDENTIAL_FIELDS : TEXT_FIELDS;
 
 const PRIORITY_ORDER = sql`case ${careCases.priority} when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end`;
 
@@ -320,14 +324,40 @@ export const careCasesRouter = (deps: Deps) => {
     .patch(
       '/:id',
       ({ church, access, auth, audit, params, body }) => {
-        const { row } = loadManageable(church.id, access, params.id);
+        const { row, caregiverIds } = loadManageable(church.id, access, params.id);
         if (!canChangeCareConfidentiality(access, row.confidentiality, body.confidentiality)) {
           throw forbidden('Only holders of confidential care access can lower confidentiality');
         }
         const { person, household } = resolveSubject(church.id, body);
         const now = nowIso();
         const statusChanged = body.status !== row.status;
+        // Like opening one, making a case confidential keeps its editor on it as a caregiver.
+        const keepEditor = !canReadCareCase(
+          access,
+          { confidentiality: body.confidentiality },
+          caregiverIds,
+        );
         const updated = db.transaction((tx) => {
+          if (keepEditor) {
+            tx.insert(careCaseCaregivers)
+              .values({
+                caseId: row.id,
+                userId: auth.user.id,
+                churchId: church.id,
+                assignedBy: auth.user.id,
+                assignedAt: now,
+              })
+              .run();
+            recordAudit(tx, audit, {
+              module: 'care',
+              action: 'care_case.assign',
+              entityType: 'care_case',
+              entityId: row.id,
+              summary: `Changed the caregivers of ${subjectName({ ...row, confidentiality: 'confidential' })}`,
+              before: { caregiverUserIds: caregiverIds },
+              after: { caregiverUserIds: [...caregiverIds, auth.user.id] },
+            });
+          }
           const next = tx
             .update(careCases)
             .set({
@@ -410,6 +440,11 @@ export const careCasesRouter = (deps: Deps) => {
         }
         const next = [...new Set(body.userIds)];
         assertActiveMembers(db, church.id, next);
+        if (!canReadCareCase(access, row, next)) {
+          throw conflict(
+            'You would lose access to this confidential case. Ask a pastor to remove you.',
+          );
+        }
         const added = next.filter((userId) => !caregiverIds.includes(userId));
         const removed = caregiverIds.filter((userId) => !next.includes(userId));
         const now = nowIso();

@@ -175,6 +175,13 @@ describe('prayer requests', () => {
       expect(answered.status).toBe(200);
       expect(answered.json.request.answeredAt).not.toBeNull();
       expect(answered.json.request.testimony).toBe('Puji Tuhan, ibu sudah sembuh dan pulang.');
+      // The testimony is new public text, so it is reviewed first.
+      expect(answered.json.request.moderationStatus).toBe('pending');
+      const approved = await t.request('POST', `${base}/prayer-requests/${requestId}/moderate`, {
+        token: moderator.token,
+        body: { decision: 'approved' },
+      });
+      expect(approved.status).toBe(200);
       expect((await wall(other.token)).map((item) => item.id)).not.toContain(requestId);
       const answeredList = await t.request('GET', `${base}/prayer-requests?scope=answered`, {
         token: other.token,

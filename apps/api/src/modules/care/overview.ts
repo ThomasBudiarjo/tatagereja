@@ -52,6 +52,7 @@ import { authPlugin } from '../../plugins/auth';
 import { permissionsByUser } from '../../services/access';
 import {
   addDaysToDate,
+  followUpOnBoardCondition,
   monthStart,
   readableCaseCondition,
   readableVisitCondition,
@@ -141,7 +142,8 @@ export const careOverviewRouter = (deps: Deps) => {
           for (const row of db
             .select({ stage: visitorFollowUps.stage, value: count() })
             .from(visitorFollowUps)
-            .where(eq(visitorFollowUps.churchId, church.id))
+            .innerJoin(people, eq(people.id, visitorFollowUps.personId))
+            .where(and(eq(visitorFollowUps.churchId, church.id), followUpOnBoardCondition()))
             .groupBy(visitorFollowUps.stage)
             .all()) {
             stages[row.stage] = row.value;

@@ -451,10 +451,21 @@ export const prayerRouter = (deps: Deps) => {
           throw forbidden('You cannot mark this prayer request answered');
         }
         const now = nowIso();
+        // A new testimony is new text for the whole church, so it is reviewed like an edit.
+        const review =
+          row.visibility === 'church' &&
+          !!body.testimony &&
+          body.testimony !== row.testimony &&
+          !canModeratePrayer(access);
         const updated = db.transaction((tx) => {
           const next = tx
             .update(prayerRequests)
-            .set({ answeredAt: row.answeredAt ?? now, testimony: body.testimony, updatedAt: now })
+            .set({
+              answeredAt: row.answeredAt ?? now,
+              testimony: body.testimony,
+              ...(review ? { moderationStatus: 'pending' as const, moderationNote: null } : {}),
+              updatedAt: now,
+            })
             .where(eq(prayerRequests.id, row.id))
             .returning()
             .get();
@@ -467,7 +478,9 @@ export const prayerRouter = (deps: Deps) => {
             summary: 'Marked a prayer request answered',
             ...redactedChanges(auditable(row), auditable(next), SECRET_FIELDS),
           });
-          if (!row.answeredAt && next.moderationStatus === 'approved') {
+          if (review) notifyReviewers(tx, church, next);
+          // Only shared requests were prayed for, and their title is already public.
+          if (!row.answeredAt && row.moderationStatus === 'approved') {
             const prayed = tx
               .select({ userId: prayerRequestPrayers.userId })
               .from(prayerRequestPrayers)
