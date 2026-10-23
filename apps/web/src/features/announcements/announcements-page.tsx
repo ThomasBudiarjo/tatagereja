@@ -1,148 +1,173 @@
-import { can } from '@tatagereja/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Megaphone, Plus } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { can, has, type AnnouncementState } from '@tatagereja/shared';
+import { useQuery } from '@tanstack/react-query';
+import { Megaphone, SquarePen } from 'lucide-react';
+import { Link } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ListGroup, ListRow } from '@/components/ui/list';
-import { EmptyState, ErrorState, SearchInput, Skeleton } from '@/components/ui/misc';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar, type FilterDefinition } from '@/components/ui/filter-bar';
+import { Pagination } from '@/components/ui/pagination';
+import { SkeletonCards } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { groupsQuery } from '@/features/groups/api';
 import { getErrorMessage } from '@/lib/api';
-import { formatRelative } from '@/lib/format';
-import { useDebounced } from '@/lib/use-debounced';
+import { useI18n, type MessageKey } from '@/lib/i18n';
+import { useUrlState } from '@/lib/use-url-state';
 import { announcementsQuery } from './api';
+import { ANNOUNCEMENT_TONE } from './announcement-lib';
+import { AnnouncementCard } from './announcement-ui';
+
+const PAGE_SIZE = 20;
+const TABS = ['all', 'published', 'scheduled', 'draft', 'expired'] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, MessageKey> = {
+  all: 'announcements.tabAll',
+  published: 'announcements.tabPublished',
+  scheduled: 'announcements.tabScheduled',
+  draft: 'announcements.tabDrafts',
+  expired: 'announcements.tabExpired',
+};
 
 export function AnnouncementsPage() {
   const { churchId, base, access } = useChurch();
-  const [params, setParams] = useSearchParams();
-  const [search, setSearch] = useState(params.get('q') ?? '');
-  const page = Number(params.get('page') ?? '1');
-  const debounced = useDebounced(search);
-  const canPost = can.createAnyAnnouncement(access);
-
-  const query = useQuery({
-    ...announcementsQuery(churchId, {
-      q: debounced || undefined,
-      page: Number.isFinite(page) && page > 0 ? page : 1,
-      limit: 50,
+  const { t } = useI18n();
+  const [state, setState, reset] = useUrlState({ tab: 'all', q: '', groupId: '', page: 1 });
+  // Managers and leaders see drafts and schedules (leaders for their groups); members only news.
+  const writer = can.createAnyAnnouncement(access);
+  const tab: Tab =
+    writer && (TABS as readonly string[]).includes(state.tab) ? (state.tab as Tab) : 'all';
+  const query = useQuery(
+    announcementsQuery(churchId, {
+      q: state.q || undefined,
+      groupId: state.groupId || undefined,
+      state: tab === 'all' ? undefined : (tab as AnnouncementState),
+      page: state.page,
+      limit: PAGE_SIZE,
     }),
-    placeholderData: keepPreviousData,
+  );
+  const groups = useQuery({
+    ...groupsQuery(churchId),
+    enabled: has(access, 'groups.view'),
   });
+  const filtered = !!(state.q || state.groupId);
 
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    if (key !== 'page') next.delete('page');
-    setParams(next, { replace: true });
-  };
+  const filters: FilterDefinition[] =
+    (groups.data?.items.length ?? 0) > 0
+      ? [
+          {
+            id: 'groupId',
+            label: t('announcements.filterGroup'),
+            value: state.groupId,
+            onChange: (groupId) => setState({ groupId }),
+            options: (groups.data?.items ?? []).map((group) => ({
+              value: group.id,
+              label: group.name,
+            })),
+          },
+        ]
+      : [];
 
-  const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / query.data.limit)) : 1;
+  const newButton = writer ? (
+    <Button asChild size="sm">
+      <Link
+        to={`${base}/announcements/new${state.groupId ? `?groupId=${state.groupId}` : ''}`}
+        aria-label={t('announcements.new')}
+      >
+        <SquarePen />
+        <span className="hidden sm:inline">{t('announcements.new')}</span>
+      </Link>
+    </Button>
+  ) : null;
 
   return (
     <Page>
       <PageHeader
-        backTo={`${base}/more`}
-        title="Announcements"
-        description="News for the whole church and for your groups."
-        actions={
-          canPost ? (
-            <Button asChild size="sm">
-              <Link to={`${base}/announcements/new`}>
-                <Plus /> New
-              </Link>
-            </Button>
-          ) : null
-        }
+        title={t('announcements.title')}
+        description={t('announcements.description')}
+        icon={Megaphone}
+        tone={ANNOUNCEMENT_TONE}
+        actions={newButton}
       />
-      <SearchInput
-        value={search}
-        onChange={(value) => {
-          setSearch(value);
-          setParam('q', value);
+      {writer ? (
+        <Tabs value={tab} onValueChange={(value) => setState({ tab: value }, { push: true })}>
+          <TabsList variant="underline">
+            {TABS.map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {t(TAB_LABELS[value])}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      ) : null}
+      <FilterBar
+        search={{
+          value: state.q,
+          onChange: (q) => setState({ q }),
+          placeholder: t('announcements.search'),
         }}
-        placeholder="Search announcements"
+        filters={filters}
+        onReset={() => reset(['tab'])}
       />
 
       {query.isPending ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-16" />
-          ))}
-        </div>
+        <SkeletonCards count={4} />
       ) : query.isError ? (
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
+        <ErrorState
+          error={query.error}
+          message={getErrorMessage(query.error)}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
       ) : query.data.items.length === 0 ? (
         <EmptyState
           icon={Megaphone}
-          title={debounced ? 'No matching announcements' : 'No announcements yet'}
+          tone={ANNOUNCEMENT_TONE}
+          title={filtered ? t('announcements.noneFound') : t('announcements.empty')}
           description={
-            canPost
-              ? 'Share news, schedules or prayer requests with your church.'
-              : 'Check back later.'
+            filtered
+              ? t('common.noResultsHint')
+              : writer
+                ? t('announcements.emptyWriter')
+                : t('announcements.emptyMember')
           }
           action={
-            canPost && !debounced ? (
+            filtered ? (
+              <Button variant="outline" onClick={() => reset(['tab'])}>
+                {t('common.clearAll')}
+              </Button>
+            ) : writer ? (
               <Button asChild>
                 <Link to={`${base}/announcements/new`}>
-                  <Plus /> Write one
+                  <SquarePen />
+                  {t('announcements.new')}
                 </Link>
               </Button>
             ) : null
           }
         />
       ) : (
-        <>
-          <ListGroup>
-            {query.data.items.map((announcement) => (
-              <ListRow
-                key={announcement.id}
-                to={`${base}/announcements/${announcement.id}`}
-                title={
-                  <span className="flex items-center gap-2">
-                    {announcement.title}
-                    {announcement.status === 'draft' ? (
-                      <Badge variant="warning">Draft</Badge>
-                    ) : null}
-                  </span>
-                }
-                subtitle={`${announcement.authorName} · ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
-                trailing={
-                  announcement.groupName ? (
-                    <Badge variant="secondary">{announcement.groupName}</Badge>
-                  ) : (
-                    <Badge variant="muted">Church</Badge>
-                  )
-                }
-              />
-            ))}
-          </ListGroup>
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={query.data.page <= 1}
-                onClick={() => setParam('page', String(query.data.page - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground tabular">
-                Page {query.data.page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={query.data.page >= totalPages}
-                onClick={() => setParam('page', String(query.data.page + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          ) : null}
-        </>
+        <div className="flex flex-col gap-3" aria-busy={query.isFetching || undefined}>
+          {query.data.items.map((announcement) => (
+            <AnnouncementCard
+              key={announcement.id}
+              announcement={announcement}
+              to={`${base}/announcements/${announcement.id}`}
+              showState={announcement.seenCount !== null}
+            />
+          ))}
+          <Pagination
+            page={query.data.page}
+            pageSize={query.data.limit}
+            total={query.data.total}
+            onPageChange={(page) => {
+              setState({ page });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="pt-2"
+          />
+        </div>
       )}
     </Page>
   );

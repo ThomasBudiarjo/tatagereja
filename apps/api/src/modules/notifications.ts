@@ -16,6 +16,7 @@ import { offsetOf } from '../lib/query';
 import { nowIso } from '../lib/time';
 import { authPlugin } from '../plugins/auth';
 import { toNotification } from '../serializers';
+import { releaseDueAnnouncements } from '../services/announcements';
 
 /**
  * The caller's own notifications across churches. Notifications of a church the caller is
@@ -35,6 +36,23 @@ export const notificationsModule = (deps: Deps) => {
     return and(eq(notifications.userId, userId), scope) as SQL;
   };
 
+  /** Scheduled announcements of the caller's churches whose time has come are released first. */
+  const releaseFor = (userId: string, churchId?: string) => {
+    const churchIds = db
+      .select({ id: churchMemberships.churchId })
+      .from(churchMemberships)
+      .where(
+        and(
+          eq(churchMemberships.userId, userId),
+          eq(churchMemberships.status, 'active'),
+          churchId ? eq(churchMemberships.churchId, churchId) : undefined,
+        ),
+      )
+      .all()
+      .map((row) => row.id);
+    releaseDueAnnouncements(db, churchIds);
+  };
+
   const unreadCount = (userId: string, churchId?: string): number =>
     db
       .select({ value: count() })
@@ -47,6 +65,7 @@ export const notificationsModule = (deps: Deps) => {
     .get(
       '/',
       ({ auth, query }) => {
+        releaseFor(auth.user.id, query.churchId);
         const conditions: SQL[] = [visibleTo(auth.user.id, query.churchId)];
         if (query.unread) conditions.push(isNull(notifications.readAt));
         const where = and(...conditions);
@@ -72,7 +91,10 @@ export const notificationsModule = (deps: Deps) => {
     )
     .get(
       '/unread-count',
-      ({ auth, query }) => ({ count: unreadCount(auth.user.id, query.churchId) }),
+      ({ auth, query }) => {
+        releaseFor(auth.user.id, query.churchId);
+        return { count: unreadCount(auth.user.id, query.churchId) };
+      },
       { auth: true, query: unreadCountQuerySchema },
     )
     .patch(

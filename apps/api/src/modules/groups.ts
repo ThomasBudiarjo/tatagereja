@@ -50,6 +50,7 @@ import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toPersonSummary } from '../serializers';
+import { announcementVisibility } from '../services/announcements';
 import { changes, recordAudit } from '../services/audit';
 import { notify } from '../services/notifications';
 import { groupIdsOfPerson, privacyByPerson, privacyOf, sendCsv, toCsv } from '../services/people';
@@ -453,7 +454,12 @@ export const groupsModule = (deps: Deps) => {
             publishedAt: announcements.publishedAt,
           })
           .from(announcements)
-          .where(and(eq(announcements.groupId, group.id), eq(announcements.status, 'published')))
+          .where(
+            and(
+              eq(announcements.groupId, group.id),
+              announcementVisibility(db, group.churchId, access, now),
+            ),
+          )
           .orderBy(desc(announcements.publishedAt))
           .limit(3)
           .all()

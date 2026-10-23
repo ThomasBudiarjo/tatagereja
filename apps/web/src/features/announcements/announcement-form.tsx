@@ -1,163 +1,478 @@
 import {
-  announcementInputSchema,
-  has,
-  type Announcement,
-  type AnnouncementInput,
-  type Group,
+  announcementDetailsInputSchema,
+  canTargetChurchWide,
+  type AnnouncementAudience,
+  type AnnouncementDetails,
+  type AnnouncementDetailsInput,
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Controller, useForm } from 'react-hook-form';
-import type { z } from 'zod';
+import { CalendarClock, ImageIcon, Pin, Send, Timer } from 'lucide-react';
+import { useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useChurch } from '@/components/layout/church-provider';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FormActions } from '@/components/ui/field';
-import { Input, Textarea } from '@/components/ui/input';
-import { Alert, ErrorState, PageLoader } from '@/components/ui/misc';
+import { Input } from '@/components/ui/input';
+import { Alert, Segmented } from '@/components/ui/misc';
 import { Select } from '@/components/ui/select';
-import { groupsQuery } from '@/features/groups/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
+import { Switch } from '@/components/ui/switch';
+import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
+import { ChurchDateTimeInput } from '@/features/comms/church-time-input';
+import { useCommsResolver, useServerErrors } from '@/features/comms/forms';
+import { MarkdownEditor } from '@/features/comms/markdown';
 import { getErrorMessage } from '@/lib/api';
-import { applyServerErrors } from '@/lib/forms';
+import { useI18n } from '@/lib/i18n';
+import { useMutationToast } from '@/lib/use-mutation-toast';
+import { cn } from '@/lib/utils';
+import { audienceOptionsQuery, useSaveAnnouncement, type AnnouncementFormInput } from './api';
+import { AUDIENCE_ICONS } from './announcement-lib';
 
-type FormInput = z.input<typeof announcementInputSchema>;
-const FIELDS = ['title', 'body', 'groupId', 'status'] as const;
+type Timing = 'now' | 'schedule';
 
-type AnnouncementFormProps = {
-  announcement?: Announcement;
+type Props = {
+  announcement?: AnnouncementDetails;
   defaultGroupId?: string | null;
-  onSubmit: (values: AnnouncementInput) => Promise<unknown>;
-  onCancel?: () => void;
+  onSaved: (id: string) => void;
+  onCancel: () => void;
 };
 
-/** Groups load first so the audience select and the form state always agree. */
-export function AnnouncementForm(props: AnnouncementFormProps) {
+/**
+ * The announcement form: audience (church, group or roles), markdown-lite body, cover image,
+ * pinning, and publishing now or at a set time with an optional expiry. Options load first, so
+ * the audience choice and the form state always agree.
+ */
+export function AnnouncementForm(props: Props) {
   const { churchId } = useChurch();
-  const groups = useQuery(groupsQuery(churchId, { includeInactive: true }));
-  if (groups.isPending) return <PageLoader />;
-  if (groups.isError) {
+  const options = useQuery(audienceOptionsQuery(churchId));
+  if (options.isPending) {
     return (
-      <ErrorState message={getErrorMessage(groups.error)} onRetry={() => void groups.refetch()} />
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <Skeleton className="h-11" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-11 w-1/2" />
+        </CardContent>
+      </Card>
     );
   }
-  return <AnnouncementFormFields groups={groups.data.items} {...props} />;
+  if (options.isError) {
+    return (
+      <ErrorState
+        error={options.error}
+        message={getErrorMessage(options.error)}
+        onRetry={() => void options.refetch()}
+        retrying={options.isFetching}
+      />
+    );
+  }
+  return <AnnouncementFormFields options={options.data} {...props} />;
 }
 
 function AnnouncementFormFields({
-  groups,
+  options,
   announcement,
   defaultGroupId,
-  onSubmit,
+  onSaved,
   onCancel,
-}: AnnouncementFormProps & { groups: Group[] }) {
-  const { access } = useChurch();
-  const admin = has(access, 'announcements.manage');
-  const selectable = admin
-    ? groups
-    : groups.filter((group) => access.leaderGroupIds.includes(group.id));
+}: Props & {
+  options: {
+    churchWide: boolean;
+    groups: { id: string; name: string }[];
+    roles: { id: string; name: string }[];
+  };
+}) {
+  const { t } = useI18n();
+  const { access, churchId } = useChurch();
+  const churchWide = options.churchWide && canTargetChurchWide(access);
+  const audiences: AnnouncementAudience[] = churchWide ? ['church', 'group', 'roles'] : ['group'];
+  const initialGroup =
+    announcement?.groupId ??
+    (defaultGroupId && options.groups.some((group) => group.id === defaultGroupId)
+      ? defaultGroupId
+      : churchWide
+        ? null
+        : (options.groups[0]?.id ?? null));
 
-  const form = useForm<FormInput, unknown, AnnouncementInput>({
-    resolver: zodResolver(announcementInputSchema),
+  const form = useForm<AnnouncementFormInput, unknown, AnnouncementDetailsInput>({
+    resolver: useCommsResolver(zodResolver(announcementDetailsInputSchema)),
     defaultValues: {
       title: announcement?.title ?? '',
       body: announcement?.body ?? '',
-      groupId:
-        announcement?.groupId ?? defaultGroupId ?? (admin ? null : (selectable[0]?.id ?? null)),
-      status: announcement?.status ?? 'draft',
+      audience: announcement?.audience ?? (churchWide && !initialGroup ? 'church' : 'group'),
+      groupId: initialGroup,
+      roleIds: announcement?.roleIds ?? [],
+      status: announcement?.status ?? 'published',
+      publishAt: announcement?.publishAt ?? '',
+      expiresAt: announcement?.expiresAt ?? '',
+      pinned: announcement?.pinned ?? false,
+      coverImageUrl: announcement?.coverImageUrl ?? '',
     },
   });
-  const errors = form.formState.errors;
+  const serverErrors = useServerErrors(form);
+  const { errors, isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
+  const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
+  const [audience, coverImageUrl, publishAt] = useWatch({
+    control: form.control,
+    name: ['audience', 'coverImageUrl', 'publishAt'],
+  });
+  const [timing, setTiming] = useState<Timing>(announcement?.publishAt ? 'schedule' : 'now');
+  const [coverFailed, setCoverFailed] = useState(false);
 
-  const submitWith = (status: 'draft' | 'published') =>
+  const save = useMutationToast(useSaveAnnouncement(churchId, announcement?.id), {
+    success: (result) =>
+      result.announcement.state === 'draft'
+        ? t('announcements.savedDraft')
+        : result.announcement.state === 'scheduled'
+          ? t('announcements.savedScheduled')
+          : t('announcements.savedPublished'),
+    form: serverErrors,
+  });
+
+  const submit = (status: 'draft' | 'published') =>
     form.handleSubmit(async (values) => {
-      if (!admin && !values.groupId) {
-        form.setError('groupId', { message: 'Choose one of the groups you lead' });
+      if (status === 'published' && timing === 'schedule' && !values.publishAt) {
+        form.setError(
+          'publishAt',
+          { message: t('announcements.schedulePick') },
+          { shouldFocus: true },
+        );
         return;
       }
-      try {
-        await onSubmit({ ...values, status });
-      } catch (error) {
-        if (!applyServerErrors(error, form.setError, FIELDS)) {
-          form.setError('root', { message: getErrorMessage(error) });
-        }
-      }
+      const result = await save.run({
+        ...values,
+        status,
+        publishAt: timing === 'schedule' ? values.publishAt : null,
+      });
+      if (result) onSaved(result.announcement.id);
     });
 
-  if (!admin && selectable.length === 0) {
+  if (!churchWide && options.groups.length === 0) {
     return (
-      <Alert variant="warning" title="No audience to publish to">
-        You can publish announcements to groups you lead. Ask an administrator to assign you to a
-        group.
+      <Alert variant="warning" title={t('announcements.noScopeTitle')}>
+        {t('announcements.noScopeBody')}
       </Alert>
     );
   }
 
+  const publishLabel =
+    timing === 'schedule'
+      ? t('announcements.schedule')
+      : announcement?.status === 'published'
+        ? t('announcements.saveAndPublish')
+        : t('announcements.publish');
+
   return (
     <form
-      className="flex flex-col gap-4"
       noValidate
-      onSubmit={(event) => void submitWith('published')(event)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit('published')(event);
+      }}
+      className="flex flex-col gap-5"
     >
-      {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
-      <Field label="Title" htmlFor="announcement-title" error={errors.title?.message} required>
-        <Input id="announcement-title" {...form.register('title')} aria-invalid={!!errors.title} />
-      </Field>
-      <Controller
-        control={form.control}
-        name="groupId"
-        render={({ field }) => (
+      <Card>
+        <CardContent className="flex flex-col gap-4">
           <Field
-            label="Audience"
-            htmlFor="announcement-group"
-            error={errors.groupId?.message}
-            description={
-              admin
-                ? 'Church-wide announcements reach everyone.'
-                : 'You can publish to groups you lead.'
-            }
+            label={t('announcements.fieldTitle')}
+            htmlFor="announcement-title"
+            error={errors.title?.message}
+            required
           >
-            <Select
-              id="announcement-group"
-              value={field.value ?? ''}
-              onChange={(event) => field.onChange(event.target.value || null)}
-              aria-invalid={!!errors.groupId}
-            >
-              {admin ? <option value="">Whole church</option> : null}
-              {!admin && !field.value ? <option value="">Select a group…</option> : null}
-              {selectable.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </Select>
+            <Input
+              id="announcement-title"
+              autoFocus
+              placeholder={t('announcements.titlePlaceholder')}
+              aria-invalid={!!errors.title}
+              {...form.register('title')}
+            />
           </Field>
-        )}
-      />
-      <Field label="Message" htmlFor="announcement-body" error={errors.body?.message} required>
-        <Textarea
-          id="announcement-body"
-          rows={8}
-          {...form.register('body')}
-          aria-invalid={!!errors.body}
-        />
-      </Field>
+          <Controller
+            control={form.control}
+            name="body"
+            render={({ field }) => (
+              <Field
+                label={t('announcements.fieldBody')}
+                htmlFor="announcement-body"
+                error={errors.body?.message}
+                required
+              >
+                <MarkdownEditor
+                  id="announcement-body"
+                  ref={field.ref}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  rows={9}
+                  placeholder={t('announcements.bodyPlaceholder')}
+                  aria-invalid={!!errors.body}
+                />
+              </Field>
+            )}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div>
+            <h2 className="font-semibold">{t('announcements.audienceTitle')}</h2>
+            <p className="text-sm text-muted-foreground">{t('announcements.audienceHint')}</p>
+          </div>
+          {audiences.length > 1 ? (
+            <Controller
+              control={form.control}
+              name="audience"
+              render={({ field }) => (
+                <div
+                  role="radiogroup"
+                  aria-label={t('announcements.audienceTitle')}
+                  className="grid gap-2 sm:grid-cols-3"
+                >
+                  {audiences.map((value) => {
+                    const Icon = AUDIENCE_ICONS[value];
+                    const selected = (field.value ?? 'church') === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => field.onChange(value)}
+                        className={cn(
+                          'flex min-h-12 items-center gap-2.5 rounded-lg border px-3.5 text-left text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+                          selected
+                            ? 'border-primary/40 bg-accent text-accent-foreground'
+                            : 'hover:bg-muted',
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" aria-hidden />
+                        {value === 'church'
+                          ? t('announcements.audienceChurch')
+                          : value === 'group'
+                            ? t('announcements.audienceGroup')
+                            : t('announcements.audienceRoles')}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            />
+          ) : null}
+          {audience === 'group' ? (
+            <Controller
+              control={form.control}
+              name="groupId"
+              render={({ field }) => (
+                <Field
+                  label={t('announcements.fieldGroup')}
+                  htmlFor="announcement-group"
+                  error={errors.groupId?.message}
+                  required
+                >
+                  <Select
+                    id="announcement-group"
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value || null)}
+                    aria-invalid={!!errors.groupId}
+                  >
+                    <option value="">{t('announcements.chooseGroup')}</option>
+                    {options.groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            />
+          ) : null}
+          {audience === 'roles' ? (
+            <Controller
+              control={form.control}
+              name="roleIds"
+              render={({ field }) => {
+                const value = field.value ?? [];
+                return (
+                  <Field
+                    label={t('announcements.fieldRoles')}
+                    error={errors.roleIds?.message}
+                    required
+                  >
+                    <div
+                      role="group"
+                      aria-label={t('announcements.fieldRoles')}
+                      className="grid gap-1.5 sm:grid-cols-2"
+                    >
+                      {options.roles.map((role) => {
+                        const checked = value.includes(role.id);
+                        return (
+                          <label
+                            key={role.id}
+                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-primary/40 has-[:checked]:bg-accent/50"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(next) =>
+                                field.onChange(
+                                  next ? [...value, role.id] : value.filter((id) => id !== role.id),
+                                )
+                              }
+                            />
+                            {role.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                );
+              }}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <h2 className="font-semibold">{t('announcements.optionsTitle')}</h2>
+          <Field
+            label={t('announcements.fieldCover')}
+            htmlFor="announcement-cover"
+            error={errors.coverImageUrl?.message}
+            description={t('announcements.coverHint')}
+          >
+            <Input
+              id="announcement-cover"
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              aria-invalid={!!errors.coverImageUrl}
+              {...form.register('coverImageUrl', { onChange: () => setCoverFailed(false) })}
+            />
+          </Field>
+          {coverImageUrl && /^https?:\/\//.test(coverImageUrl) ? (
+            coverFailed ? (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ImageIcon className="size-4" aria-hidden />
+                {t('announcements.coverBroken')}
+              </p>
+            ) : (
+              <img
+                src={coverImageUrl}
+                alt=""
+                onError={() => setCoverFailed(true)}
+                className="aspect-[16/7] w-full rounded-lg border object-cover"
+              />
+            )
+          ) : null}
+          {churchWide || announcement?.pinned ? (
+            <Controller
+              control={form.control}
+              name="pinned"
+              render={({ field }) => (
+                <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-2.5">
+                  <Pin className="size-4 text-muted-foreground" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {t('announcements.fieldPinned')}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t('announcements.pinnedHint')}
+                    </span>
+                  </span>
+                  <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                </label>
+              )}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <h2 className="font-semibold">{t('announcements.timingTitle')}</h2>
+          <Segmented
+            aria-label={t('announcements.timingTitle')}
+            value={timing}
+            onChange={setTiming}
+            options={[
+              { value: 'now', label: t('announcements.timingNow'), icon: Send },
+              { value: 'schedule', label: t('announcements.timingSchedule'), icon: CalendarClock },
+            ]}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {timing === 'schedule' ? (
+              <Controller
+                control={form.control}
+                name="publishAt"
+                render={({ field }) => (
+                  <Field
+                    label={t('announcements.fieldPublishAt')}
+                    htmlFor="announcement-publish"
+                    error={errors.publishAt?.message}
+                    required
+                  >
+                    <ChurchDateTimeInput
+                      id="announcement-publish"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      aria-invalid={!!errors.publishAt}
+                    />
+                  </Field>
+                )}
+              />
+            ) : null}
+            <Controller
+              control={form.control}
+              name="expiresAt"
+              render={({ field }) => (
+                <Field
+                  label={t('announcements.fieldExpiresAt')}
+                  htmlFor="announcement-expires"
+                  error={errors.expiresAt?.message}
+                  description={t('announcements.expiresHint')}
+                >
+                  <ChurchDateTimeInput
+                    id="announcement-expires"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    aria-invalid={!!errors.expiresAt}
+                  />
+                </Field>
+              )}
+            />
+          </div>
+          {timing === 'schedule' && !publishAt ? (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Timer className="size-4" aria-hidden />
+              {t('announcements.scheduleHint')}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <FormActions>
-        {onCancel ? (
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        ) : null}
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
         <Button
           type="button"
           variant="outline"
-          loading={form.formState.isSubmitting}
-          onClick={(event) => void submitWith('draft')(event)}
+          disabled={save.isPending}
+          onClick={(event) => void submit('draft')(event)}
         >
-          Save draft
+          {t('announcements.saveDraft')}
         </Button>
-        <Button type="submit" loading={form.formState.isSubmitting}>
-          Publish
+        <Button type="submit" loading={save.isPending}>
+          {timing === 'schedule' ? <CalendarClock /> : <Send />}
+          {publishLabel}
         </Button>
       </FormActions>
+      {guard}
     </form>
   );
 }
