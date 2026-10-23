@@ -959,6 +959,14 @@ put(schema.offeringBatchLines, lineRows);
 const contributionRows: Record<string, unknown>[] = [];
 const givers = personIds.filter((_, index) => index % 3 !== 2);
 const contributionCount = n(46_000);
+const receiptCounters = new Map<string, number>();
+/** `KW-2026-00042`, the app's own receipt format (numbered per year in insertion order). */
+const receiptNumber = (date: string) => {
+  const year = date.slice(0, 4);
+  const next = (receiptCounters.get(year) ?? 0) + 1;
+  receiptCounters.set(year, next);
+  return `KW-${year}-${String(next).padStart(5, '0')}`;
+};
 for (let index = 0; index < contributionCount; index += 1) {
   const id = uuid();
   const offset = -int(0, 729);
@@ -982,7 +990,7 @@ for (let index = 0; index < contributionCount; index += 1) {
     amount,
     receivedAt: date,
     reference: null,
-    receiptNumber: `KW/${date.slice(0, 4)}/${String(index + 1).padStart(6, '0')}`,
+    receiptNumber: receiptNumber(date),
     note: null,
     voidedAt: null,
     voidedBy: null,

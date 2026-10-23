@@ -43,6 +43,7 @@ import {
 import { conflict, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
 import { generateCode, newId } from '../lib/tokens';
+import { syncRecordTimes } from './attendance';
 import { moduleSettings } from './modules';
 
 /*
@@ -738,6 +739,7 @@ export const syncAttendance = (
       .set({ title, sessionAt, headcountChildren: childIds.length, updatedAt: now })
       .where(eq(attendanceSessions.id, existing.id))
       .run();
+    syncRecordTimes(db, existing.id, sessionAt);
   } else {
     attendanceId = newId();
     db.insert(attendanceSessions)
@@ -765,6 +767,7 @@ export const syncAttendance = (
           personId,
           churchId: session.churchId,
           status: 'present' as const,
+          sessionAt,
           note: null,
           recordedBy: userId,
           recordedAt: now,

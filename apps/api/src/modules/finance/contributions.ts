@@ -263,13 +263,20 @@ export const contributionsRouter = (deps: Deps) => {
             if (match) conditions.push(match);
           }
           const where = and(...conditions);
-          const base = () =>
-            db
+          // People are joined only to search their names; without a search the count and
+          // total come from the covering index alone.
+          const base = () => {
+            const select = db
               .select({ row: financeContributions })
               .from(financeContributions)
-              .leftJoin(people, eq(people.id, financeContributions.personId))
-              .where(where);
-          const totals = db
+              .$dynamic();
+            return (
+              query.q
+                ? select.leftJoin(people, eq(people.id, financeContributions.personId))
+                : select
+            ).where(where);
+          };
+          const totalsQuery = db
             .select({
               value: count(),
               amount: sumOf(
@@ -277,7 +284,12 @@ export const contributionsRouter = (deps: Deps) => {
               ),
             })
             .from(financeContributions)
-            .leftJoin(people, eq(people.id, financeContributions.personId))
+            .$dynamic();
+          const totals = (
+            query.q
+              ? totalsQuery.leftJoin(people, eq(people.id, financeContributions.personId))
+              : totalsQuery
+          )
             .where(where)
             .get();
           const order = {

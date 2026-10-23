@@ -254,6 +254,7 @@ export const eventsModule = (deps: Deps) => {
             personId,
             churchId: event.churchId,
             status: 'present',
+            sessionAt: session.sessionAt,
             note: null,
             recordedBy: userId,
             recordedAt: now,

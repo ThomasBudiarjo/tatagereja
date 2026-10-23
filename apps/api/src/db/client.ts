@@ -24,6 +24,21 @@ export type DatabaseHandle = {
   close: () => void;
 };
 
+/**
+ * Fills columns that copy a value from another table for fast reads, on rows written before the
+ * column existed (a migration cannot run this backfill reliably once migrations are squashed or
+ * regenerated). Idempotent and quick when there is nothing to fill.
+ */
+function backfillCopiedColumns(sqlite: Database): void {
+  sqlite.exec(`
+    UPDATE attendance_records
+    SET session_at = (
+      SELECT session_at FROM attendance_sessions WHERE attendance_sessions.id = attendance_records.session_id
+    )
+    WHERE session_at = ''
+  `);
+}
+
 /** How often a long-running server refreshes planner statistics (`PRAGMA optimize`). */
 export const OPTIMIZE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
@@ -54,6 +69,7 @@ export function openDatabase(path: string): DatabaseHandle {
   }
   const db = createDrizzle(sqlite);
   migrate(db, { migrationsFolder });
+  backfillCopiedColumns(sqlite);
   // 0x10002: also analyze tables that never had statistics (new or migrated databases).
   sqlite.exec('PRAGMA optimize = 0x10002;');
   const optimize = () => sqlite.exec('PRAGMA optimize;');

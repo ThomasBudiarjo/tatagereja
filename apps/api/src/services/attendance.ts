@@ -12,7 +12,8 @@ import {
   type AttendanceStatus,
   type Headcount,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, inArray, like, max, ne, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, like, max, ne, or, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db, Queryable } from '../db/client';
 import type { AbsenceAlertRow, AttendanceSessionRow, PersonRow } from '../db/schema';
 import {
@@ -180,35 +181,76 @@ export type AbsenceStreak = {
 };
 
 /**
- * Current absent streaks per person from their marks (newest first). Excused marks are skipped
- * and a present mark ends the streak. Only people currently on a streak are returned.
+ * Current absent streaks: per person, the absent marks after their last present mark (excused
+ * marks neither count nor break a streak). Only roster sessions carry marks. `groupIds` limits
+ * the sessions considered, `personIds` the people; only streaks of at least `threshold` come
+ * back. Answered in SQL from the copy of each session's time on its marks, so a church with
+ * years of weekly attendance is one index scan, not every mark loaded into memory. Two
+ * sessions at the same instant are one point in time: a present mark at it ends the streak.
  */
-export function absenceStreaks(marks: readonly PersonMark[]): Map<string, AbsenceStreak> {
-  const byPerson = new Map<string, PersonMark[]>();
-  for (const mark of marks) {
-    const list = byPerson.get(mark.personId) ?? [];
-    list.push(mark);
-    byPerson.set(mark.personId, list);
-  }
-  const result = new Map<string, AbsenceStreak>();
-  for (const [personId, list] of byPerson) {
-    let streak = 0;
-    let lastAbsentAt: string | null = null;
-    let lastPresentAt: string | null = null;
-    for (const mark of list) {
-      if (mark.status === 'excused') continue;
-      if (mark.status === 'present') {
-        lastPresentAt = mark.sessionAt;
-        break;
-      }
-      streak += 1;
-      lastAbsentAt ??= mark.sessionAt;
-    }
-    if (streak > 0 && lastAbsentAt) {
-      result.set(personId, { personId, streak, lastPresentAt, lastAbsentAt });
-    }
-  }
-  return result;
+export function absenceStreaksOf(
+  db: Queryable,
+  churchId: string,
+  scope: { groupIds?: readonly string[]; personIds?: readonly string[] } = {},
+  threshold = 1,
+): AbsenceStreak[] {
+  if (scope.groupIds && scope.groupIds.length === 0) return [];
+  if (scope.personIds && scope.personIds.length === 0) return [];
+  const present = alias(attendanceRecords, 'present');
+  const scopedSessions = scope.groupIds
+    ? db
+        .select({ id: attendanceSessions.id })
+        .from(attendanceSessions)
+        .where(
+          and(
+            eq(attendanceSessions.churchId, churchId),
+            inArray(attendanceSessions.groupId, [...scope.groupIds]),
+          ),
+        )
+    : null;
+  const lastPresent = db
+    .select({ at: max(present.sessionAt) })
+    .from(present)
+    .where(
+      and(
+        eq(present.churchId, churchId),
+        eq(present.status, 'present'),
+        eq(present.personId, attendanceRecords.personId),
+        scopedSessions ? inArray(present.sessionId, scopedSessions) : undefined,
+      ),
+    );
+  const lastPresentAt = sql<string | null>`(${lastPresent})`;
+  return db
+    .select({
+      personId: attendanceRecords.personId,
+      streak: count(),
+      lastPresentAt,
+      lastAbsentAt: sql<string>`max(${attendanceRecords.sessionAt})`,
+    })
+    .from(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.churchId, churchId),
+        eq(attendanceRecords.status, 'absent'),
+        scopedSessions ? inArray(attendanceRecords.sessionId, scopedSessions) : undefined,
+        scope.personIds ? inArray(attendanceRecords.personId, [...scope.personIds]) : undefined,
+        sql`${attendanceRecords.sessionAt} > coalesce(${lastPresentAt}, '')`,
+      ),
+    )
+    .groupBy(attendanceRecords.personId)
+    .having(gte(count(), Math.max(1, threshold)))
+    .all();
+}
+
+/**
+ * Keeps the copy of a session's time on its marks in step after the session moved. Every
+ * write of `attendance_sessions.session_at` for a session with marks calls this.
+ */
+export function syncRecordTimes(db: Queryable, sessionId: string, sessionAt: string): void {
+  db.update(attendanceRecords)
+    .set({ sessionAt })
+    .where(eq(attendanceRecords.sessionId, sessionId))
+    .run();
 }
 
 /** The groups whose sessions the caller's absence view covers; undefined means every session. */
@@ -226,9 +268,8 @@ export function lastPresentByPerson(
   if (personIds.length === 0) return new Map();
   return new Map(
     db
-      .select({ personId: attendanceRecords.personId, at: max(attendanceSessions.sessionAt) })
+      .select({ personId: attendanceRecords.personId, at: max(attendanceRecords.sessionAt) })
       .from(attendanceRecords)
-      .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
       .where(
         and(
           eq(attendanceRecords.churchId, churchId),
@@ -281,11 +322,12 @@ export function listAbsences(
   access: AccessLike,
   query: Pick<AbsenceQuery, 'threshold' | 'groupId' | 'includeResolved' | 'q'>,
 ): AbsenceAlert[] {
-  const streaks = [
-    ...absenceStreaks(
-      marksOf(db, churchId, { groupIds: absenceScope(access, query.groupId) }),
-    ).values(),
-  ].filter((streak) => streak.streak >= query.threshold);
+  const streaks = absenceStreaksOf(
+    db,
+    churchId,
+    { groupIds: absenceScope(access, query.groupId) },
+    query.threshold,
+  );
   if (streaks.length === 0) return [];
   const ids = streaks.map((streak) => streak.personId);
   const conditions: SQL[] = [
