@@ -1,3 +1,4 @@
+import { churchQuery } from '@/features/churches/api';
 import { loadDictionaries } from './i18n';
 import { queryClient } from './query-client';
 
@@ -52,11 +53,7 @@ const quietly = (promise: Promise<unknown>) => void promise.catch(() => undefine
  * page, the home screen code and the dashboard, all while the registry downloads.
  */
 export function prefetchFirstChurchScreen(churchId: string, path: string): void {
-  quietly(
-    import('@/features/churches/api').then(({ churchQuery }) =>
-      queryClient.prefetchQuery(churchQuery(churchId)),
-    ),
-  );
+  quietly(queryClient.prefetchQuery(churchQuery(churchId)));
   if (path.replace(/\/+$/, '') !== `/c/${churchId}`) return;
   quietly(loadHomeScreen());
   quietly(
