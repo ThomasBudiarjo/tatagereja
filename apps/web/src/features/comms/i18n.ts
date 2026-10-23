@@ -105,6 +105,11 @@ export const commsDictionary = defineDictionary('comms', {
       'Only bulletin editors can see it. Publish it to share it with the congregation.',
     bulletinPublish: 'Publish',
     bulletinPublished: 'Bulletin published',
+    bulletinPublishTitle: 'Publish “{title}”?',
+    bulletinPublishBody:
+      'Every member can read it, and everyone who follows Warta Jemaat is notified.',
+    bulletinRepublishBody:
+      'It becomes readable again. Members were already notified the first time, so nobody is notified again.',
     bulletinWithdraw: 'Withdraw',
     bulletinWithdrawn: 'Bulletin withdrawn to draft',
     bulletinDuplicate: 'Copy to next week',
@@ -115,6 +120,7 @@ export const commsDictionary = defineDictionary('comms', {
     bulletinLinkCopied: 'Link copied, ready to share',
     bulletinGoneTitle: 'Bulletin not available',
     bulletinGoneBody: 'It may have been withdrawn or removed.',
+    bulletinBackToList: 'All bulletins',
     bulletinDefaultTitle: 'Warta Jemaat',
     bulletinFieldTitle: 'Title',
     bulletinFieldDate: 'For Sunday',
@@ -152,6 +158,7 @@ export const commsDictionary = defineDictionary('comms', {
     mdEmptyPreview: 'Nothing to preview yet.',
     mdHint: '**bold**, _italic_, "- " for lists, ## for a heading, [text](https://…) for links',
     // Form rules from the shared schemas
+    ruleRequired: 'Fill this in',
     ruleGroup: 'Choose the group',
     ruleRoles: 'Choose at least one role',
     ruleExpiry: 'Must be after the publish time',
@@ -260,6 +267,11 @@ export const commsDictionary = defineDictionary('comms', {
       'Hanya redaksi warta yang dapat melihatnya. Terbitkan untuk membagikannya kepada jemaat.',
     bulletinPublish: 'Terbitkan',
     bulletinPublished: 'Warta diterbitkan',
+    bulletinPublishTitle: 'Terbitkan “{title}”?',
+    bulletinPublishBody:
+      'Seluruh jemaat dapat membacanya, dan yang mengikuti Warta Jemaat akan menerima pemberitahuan.',
+    bulletinRepublishBody:
+      'Warta dapat dibaca lagi. Jemaat sudah diberi tahu saat pertama terbit, jadi tidak ada pemberitahuan baru.',
     bulletinWithdraw: 'Tarik kembali',
     bulletinWithdrawn: 'Warta ditarik menjadi draf',
     bulletinDuplicate: 'Salin ke minggu depan',
@@ -270,6 +282,7 @@ export const commsDictionary = defineDictionary('comms', {
     bulletinLinkCopied: 'Tautan disalin, siap dibagikan',
     bulletinGoneTitle: 'Warta tidak tersedia',
     bulletinGoneBody: 'Warta ini mungkin sudah ditarik atau dihapus.',
+    bulletinBackToList: 'Semua Warta Jemaat',
     bulletinDefaultTitle: 'Warta Jemaat',
     bulletinFieldTitle: 'Judul',
     bulletinFieldDate: 'Untuk hari Minggu',
@@ -307,6 +320,7 @@ export const commsDictionary = defineDictionary('comms', {
     mdEmptyPreview: 'Belum ada yang dapat ditampilkan.',
     mdHint:
       '**tebal**, _miring_, "- " untuk daftar, ## untuk judul, [teks](https://…) untuk tautan',
+    ruleRequired: 'Wajib diisi',
     ruleGroup: 'Pilih kelompok',
     ruleRoles: 'Pilih setidaknya satu peran',
     ruleExpiry: 'Harus setelah waktu terbit',

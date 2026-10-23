@@ -35,7 +35,7 @@ import { ToneIcon } from '@/components/ui/status-badge';
 import { ErrorState, NoAccessState } from '@/components/ui/states';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { churchToday } from '@/features/comms/church-time';
-import { useServerErrors } from '@/features/comms/forms';
+import { useCommsResolver, useServerErrors } from '@/features/comms/forms';
 import { MarkdownEditor } from '@/features/comms/markdown';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -89,7 +89,7 @@ function BulletinEditor({ bulletin }: { bulletin?: Bulletin }) {
   const { t, locale, timeZone, formatDate } = useI18n();
   const navigate = useNavigate();
   const form = useForm<FormInput, unknown, BulletinInput>({
-    resolver: zodResolver(bulletinInputSchema),
+    resolver: useCommsResolver(zodResolver(bulletinInputSchema)),
     defaultValues: {
       title: bulletin?.title ?? t('comms.bulletinDefaultTitle'),
       issueDate: bulletin?.issueDate ?? nextSunday(churchToday(timeZone)),

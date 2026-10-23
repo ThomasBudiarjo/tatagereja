@@ -18,10 +18,9 @@ import {
 import { Alert } from '@/components/ui/misc';
 import { PrintButton, PrintSheet } from '@/components/ui/print';
 import { SkeletonPage } from '@/components/ui/skeleton';
-import { ErrorState } from '@/components/ui/states';
-import { getErrorMessage } from '@/lib/api';
+import { DetailLoadError } from '@/features/comms/load-error';
 import { useI18n } from '@/lib/i18n';
-import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
+import { useMutationToast } from '@/lib/use-mutation-toast';
 import { bulletinQuery, useDeleteBulletin, useDuplicateBulletin, usePublishBulletin } from './api';
 import { BULLETIN_TONE, hasContent } from './bulletin-lib';
 import { BulletinSectionView } from './bulletin-sections';
@@ -37,6 +36,7 @@ export function BulletinPage() {
   const navigate = useNavigate();
   const query = useQuery(bulletinQuery(churchId, id));
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const publish = useMutationToast(usePublishBulletin(churchId), {
     success: (result) =>
       result.bulletin.status === 'published'
@@ -55,11 +55,13 @@ export function BulletinPage() {
     return (
       <Page>
         <PageHeader title={t('comms.bulletins')} backTo={`${base}/bulletins`} />
-        <ErrorState
+        <DetailLoadError
           error={query.error}
-          title={isGone(query.error) ? t('comms.bulletinGoneTitle') : undefined}
-          message={isGone(query.error) ? t('comms.bulletinGoneBody') : getErrorMessage(query.error)}
-          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
+          goneTitle={t('comms.bulletinGoneTitle')}
+          goneBody={t('comms.bulletinGoneBody')}
+          backTo={`${base}/bulletins`}
+          backLabel={t('comms.bulletinBackToList')}
+          onRetry={() => void query.refetch()}
           retrying={query.isFetching}
         />
       </Page>
@@ -166,11 +168,7 @@ export function BulletinPage() {
             variant="warning"
             title={t('comms.bulletinDraftTitle')}
             action={
-              <Button
-                size="sm"
-                loading={publish.isPending}
-                onClick={() => void publish.run({ id: bulletin.id, publish: true })}
-              >
+              <Button size="sm" onClick={() => setPublishOpen(true)}>
                 <Send />
                 {t('comms.bulletinPublish')}
               </Button>
@@ -235,6 +233,20 @@ export function BulletinPage() {
         </footer>
       </PrintSheet>
 
+      <ConfirmDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        title={t('comms.bulletinPublishTitle', { title: bulletin.title })}
+        description={
+          bulletin.publishedAt ? t('comms.bulletinRepublishBody') : t('comms.bulletinPublishBody')
+        }
+        confirmLabel={t('comms.bulletinPublish')}
+        variant="default"
+        loading={publish.isPending}
+        onConfirm={async () => {
+          if (await publish.run({ id: bulletin.id, publish: true })) setPublishOpen(false);
+        }}
+      />
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

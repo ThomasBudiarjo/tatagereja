@@ -35,11 +35,10 @@ import { Input } from '@/components/ui/input';
 import { ListGroup, ListRow } from '@/components/ui/list';
 import { Alert, Segmented } from '@/components/ui/misc';
 import { SkeletonPage } from '@/components/ui/skeleton';
-import { ErrorState } from '@/components/ui/states';
+import { DetailLoadError } from '@/features/comms/load-error';
 import { Markdown } from '@/features/comms/markdown';
-import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
+import { useMutationToast } from '@/lib/use-mutation-toast';
 import { eventQuery, useCancelEvent, useDeleteEvent } from './api';
 import { EVENT_TONE, mapsUrl } from './event-lib';
 import { OrganiserPanel, RegistrationCard, RsvpCard, SelfCheckInCard } from './event-panels';
@@ -68,11 +67,13 @@ export function EventPage() {
     return (
       <Page>
         <PageHeader title={t('events.title')} backTo={`${base}/events`} />
-        <ErrorState
+        <DetailLoadError
           error={query.error}
-          title={isGone(query.error) ? t('events.goneTitle') : undefined}
-          message={isGone(query.error) ? t('events.goneBody') : getErrorMessage(query.error)}
-          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
+          goneTitle={t('events.goneTitle')}
+          goneBody={t('events.goneBody')}
+          backTo={`${base}/events`}
+          backLabel={t('events.backToList')}
+          onRetry={() => void query.refetch()}
           retrying={query.isFetching}
         />
       </Page>

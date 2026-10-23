@@ -74,11 +74,21 @@ export const preferencesQuery = () =>
 
 type Inbox = InfiniteData<NotificationList, number>;
 
+/** The church a cached list or count is limited to, or undefined for every church. */
+const scopeOf = (key: readonly unknown[]): string | undefined => {
+  const scope = key[2];
+  if (typeof scope === 'string') return scope === 'all' ? undefined : scope;
+  if (scope && typeof scope === 'object' && 'churchId' in scope) {
+    return typeof scope.churchId === 'string' ? scope.churchId : undefined;
+  }
+  return undefined;
+};
+
 /** Applies a change to every cached list and count, returning one rollback for all of them. */
 async function patchCaches(
   client: QueryClient,
   update: (item: Notification) => Notification,
-  countDelta: (old: number) => number,
+  countDelta: (old: number, scope: string | undefined) => number,
 ): Promise<() => void> {
   await client.cancelQueries({ queryKey: commsKeys.notifications() });
   const lists = client.getQueriesData<Inbox | NotificationList>({
@@ -95,19 +105,21 @@ async function patchCaches(
         pages: data.pages.map((page) => ({
           ...page,
           items: page.items.map(update),
-          unreadCount: countDelta(page.unreadCount),
+          unreadCount: countDelta(page.unreadCount, scopeOf(key)),
         })),
       });
     } else {
       client.setQueryData<NotificationList>(key, {
         ...data,
         items: data.items.map(update),
-        unreadCount: countDelta(data.unreadCount),
+        unreadCount: countDelta(data.unreadCount, scopeOf(key)),
       });
     }
   }
   for (const [key, data] of counts) {
-    if (data) client.setQueryData<UnreadCount>(key, { count: countDelta(data.count) });
+    if (data) {
+      client.setQueryData<UnreadCount>(key, { count: countDelta(data.count, scopeOf(key)) });
+    }
   }
   return () => {
     for (const [key, data] of [...lists, ...counts]) client.setQueryData(key, data);
@@ -147,11 +159,16 @@ export function useMarkAllRead() {
         url: '/notifications',
         data: { read: true, churchId },
       }),
-    onMutate: () =>
+    // Marking one church read leaves other churches' items (and the all-church count) to the
+    // refetch: only what certainly changed is updated at once.
+    onMutate: (churchId?: string) =>
       patchCaches(
         client,
-        (item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() }),
-        () => 0,
+        (item) =>
+          item.readAt || (churchId && item.churchId !== churchId)
+            ? item
+            : { ...item, readAt: new Date().toISOString() },
+        (old, scope) => (!churchId || scope === churchId ? 0 : old),
       ),
     onError: (_error, _variables, rollback) => rollback?.(),
     onSettled: () => void client.invalidateQueries({ queryKey: commsKeys.notifications() }),
@@ -163,12 +180,18 @@ export type PreferenceChange = { type: NotificationType; inApp: boolean };
 export function useUpdatePreference() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ type, inApp }: PreferenceChange) =>
-      request(okSchema, {
+    mutationFn: ({ type, inApp }: PreferenceChange) => {
+      // Keep the stored email choice; this screen only changes in-app delivery.
+      const email =
+        client
+          .getQueryData<NotificationPreferenceList>(commsKeys.preferences())
+          ?.items.find((item) => item.type === type)?.email ?? false;
+      return request(okSchema, {
         method: 'PUT',
         url: '/notifications/preferences',
-        data: { items: [{ type, inApp, email: false }] },
-      }),
+        data: { items: [{ type, inApp, email }] },
+      });
+    },
     onMutate: ({ type, inApp }) =>
       optimistic<NotificationPreferenceList>(client, commsKeys.preferences(), (old) =>
         old

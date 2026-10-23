@@ -101,13 +101,17 @@ export function RegistrationCard({ detail }: { detail: EventFullDetail }) {
                 ? event.cancelledAt
                   ? t('events.registrationCancelledEvent')
                   : t('events.registrationClosed')
-                : full && event.waitlistEnabled
-                  ? t('events.fullJoinWaitlist')
-                  : event.registrationClosesAt
-                    ? t('events.registrationUntil', {
-                        when: formatDateTime(event.registrationClosesAt),
-                      })
-                    : t('events.registrationOpenHint')}
+                : householdRegistrations.length > 0 && available.length === 0
+                  ? householdRegistrations.some((item) => item.status === 'waitlisted')
+                    ? t('events.registrationWaiting')
+                    : t('events.registrationAllSet')
+                  : full && event.waitlistEnabled
+                    ? t('events.fullJoinWaitlist')
+                    : event.registrationClosesAt
+                      ? t('events.registrationUntil', {
+                          when: formatDateTime(event.registrationClosesAt),
+                        })
+                      : t('events.registrationOpenHint')}
             </p>
           </div>
         </div>
@@ -121,17 +125,19 @@ export function RegistrationCard({ detail }: { detail: EventFullDetail }) {
               >
                 <EntityAvatar name={nameOf(registration.personId)} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{nameOf(registration.personId)}</p>
+                  <p className="line-clamp-2 text-sm font-medium break-words">
+                    {nameOf(registration.personId)}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    {registration.status === 'waitlisted'
-                      ? t('events.waitlistNumber', { position: registration.waitlistPosition ?? 0 })
-                      : registration.checkedInAt
-                        ? t('events.checkedIn')
-                        : t('events.partyOf', { count: registration.partySize })}
+                    {registration.checkedInAt
+                      ? t('events.checkedIn')
+                      : t('events.partyOf', { count: registration.partySize })}
                   </p>
                 </div>
                 <StatusBadge tone={STATUS_TONES[registration.status]} size="sm">
-                  {localize(EVENT_REGISTRATION_STATUS_LABELS[registration.status], locale)}
+                  {registration.status === 'waitlisted'
+                    ? t('events.waitlistNumber', { position: registration.waitlistPosition ?? 0 })
+                    : localize(EVENT_REGISTRATION_STATUS_LABELS[registration.status], locale)}
                 </StatusBadge>
                 {!registration.checkedInAt && !event.cancelledAt ? (
                   <Button

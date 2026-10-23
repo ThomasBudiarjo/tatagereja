@@ -21,10 +21,11 @@ import {
 } from '@/components/ui/sheet';
 import { SkeletonList, SkeletonPage } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
+import { DetailLoadError } from '@/features/comms/load-error';
 import { Markdown } from '@/features/comms/markdown';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
+import { useMutationToast } from '@/lib/use-mutation-toast';
 import {
   announcementQuery,
   readersQuery,
@@ -66,11 +67,13 @@ export function AnnouncementPage() {
     return (
       <Page>
         <PageHeader title={t('announcements.title')} backTo={`${base}/announcements`} />
-        <ErrorState
+        <DetailLoadError
           error={query.error}
-          title={isGone(query.error) ? t('announcements.goneTitle') : undefined}
-          message={isGone(query.error) ? t('announcements.goneBody') : getErrorMessage(query.error)}
-          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
+          goneTitle={t('announcements.goneTitle')}
+          goneBody={t('announcements.goneBody')}
+          backTo={`${base}/announcements`}
+          backLabel={t('announcements.backToList')}
+          onRetry={() => void query.refetch()}
           retrying={query.isFetching}
         />
       </Page>

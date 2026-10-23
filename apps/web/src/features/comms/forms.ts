@@ -26,23 +26,34 @@ function useRuleMessage() {
   );
 }
 
-/** Wraps a form resolver so the comms rules show in the interface language. */
+/**
+ * Wraps a form resolver so the comms rules show in the interface language, and an empty
+ * required field says so plainly instead of zod's "expected string to have >=1 characters".
+ */
 export function useCommsResolver<TInput extends FieldValues, TContext, TOutput>(
   resolver: Resolver<TInput, TContext, TOutput>,
 ): Resolver<TInput, TContext, TOutput> {
+  const { t } = useI18n();
   const translate = useRuleMessage();
-  const walk = (node: unknown) => {
+  const walk = (node: unknown, value: unknown) => {
     if (!node || typeof node !== 'object') return;
-    for (const [key, value] of Object.entries(node)) {
-      if (key === 'ref') continue;
-      if (key === 'message' && typeof value === 'string') {
-        (node as { message: string }).message = translate(value);
-      } else walk(value);
+    const error = node as { type?: unknown; message?: unknown };
+    if (typeof error.message === 'string') {
+      const empty = typeof value === 'string' && value.trim() === '';
+      error.message =
+        error.type === 'too_small' && empty ? t('comms.ruleRequired') : translate(error.message);
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key === 'ref' || key === 'message' || key === 'type') continue;
+      walk(
+        child,
+        value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined,
+      );
     }
   };
   return async (values, context, options) => {
     const result = await resolver(values, context, options);
-    walk(result.errors);
+    walk(result.errors, values);
     return result;
   };
 }

@@ -224,7 +224,11 @@ export function useCheckIn(churchId: string, eventId: string) {
         return { ...old, items, checkedInCount: items.filter((item) => item.checkedInAt).length };
       }),
     onError: (_error, _variables, rollback) => rollback?.(),
-    onSettled: () => void invalidateEvents(client, churchId),
+    onSettled: () => {
+      void invalidateEvents(client, churchId);
+      // Check-in records attendance, shown in each person's history too.
+      void client.invalidateQueries({ queryKey: [...keys.people(churchId), 'attendance'] });
+    },
   });
 }
 
@@ -246,6 +250,10 @@ export function useUndoCheckIn(churchId: string, eventId: string) {
         return { ...old, items, checkedInCount: items.filter((item) => item.checkedInAt).length };
       }),
     onError: (_error, _variables, rollback) => rollback?.(),
-    onSettled: () => void invalidateEvents(client, churchId),
+    onSettled: () => {
+      void invalidateEvents(client, churchId);
+      // Check-in records attendance, shown in each person's history too.
+      void client.invalidateQueries({ queryKey: [...keys.people(churchId), 'attendance'] });
+    },
   });
 }
