@@ -108,12 +108,15 @@ describe('result cache', () => {
     }
     expect(cache.has('c1', 'k') && cache.has('c2', 'k')).toBe(true);
 
-    // Profile changes, account deletion and joining a church can: every church is dropped.
+    // Profile changes, account deletion and joining a church (also by registering with an
+    // invitation) can: every church is dropped. So does a church path that cannot be decoded.
     for (const [method, path] of [
       ['PATCH', '/api/auth/me'],
       ['DELETE', '/api/auth/account'],
+      ['POST', '/api/auth/register'],
       ['POST', '/api/invitations/token/accept'],
       ['POST', '/api/churches'],
+      ['POST', '/api/churches/%E0%A4%A/people'],
     ] as const) {
       seed();
       invalidateForRequest(cache, method, path);

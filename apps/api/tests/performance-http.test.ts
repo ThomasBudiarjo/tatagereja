@@ -162,4 +162,12 @@ describe('web app files', () => {
     const api = await get('/api/unknown');
     expect(api.status).toBe(404);
   });
+
+  it('answers a malformed escape with 400, for files and for API writes alike', async () => {
+    expect((await get('/%E0%A4%A')).status).toBe(400);
+    const write = await t.app.handle(
+      new Request('http://localhost/api/churches/%E0%A4%A/people', { method: 'POST' }),
+    );
+    expect(write.status).toBeLessThan(500);
+  });
 });

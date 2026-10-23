@@ -92,15 +92,29 @@ const CHURCH_PATH = /^\/api\/churches\/([^/]+)(?:\/|$)/;
  * sign-in, two-step setup, notifications and personal exports.
  */
 const ACCOUNT_ONLY =
-  /^\/api\/(?:auth\/(?:login|logout|register|sessions|change-password|export|two-factor)|notifications)(?:\/|$)/;
+  /^\/api\/(?:auth\/(?:login|logout|sessions|change-password|export|two-factor)|notifications)(?:\/|$)/;
 
-/** Invalidates what a request may change; call at the start and at the end of each request. */
+/** The decoded path segment, or null when its escapes are malformed. */
+const decodeSegment = (segment: string): string | null => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Invalidates what a request may change; call at the start and at the end of each request.
+ * Never throws: it also runs after the response, where an error would stop the server.
+ * Registration is not account-only: an invitation token makes the new account join a church.
+ */
 export function invalidateForRequest(cache: ResultCache, method: string, pathname: string): void {
   if (!MUTATING.has(method)) return;
   const church = CHURCH_PATH.exec(pathname);
-  if (church?.[1]) {
-    cache.invalidateChurch(decodeURIComponent(church[1]));
+  const churchId = church?.[1] ? decodeSegment(church[1]) : null;
+  if (churchId) {
+    cache.invalidateChurch(churchId);
     return;
   }
-  if (!ACCOUNT_ONLY.test(pathname)) cache.invalidateAll();
+  if (church || !ACCOUNT_ONLY.test(pathname)) cache.invalidateAll();
 }

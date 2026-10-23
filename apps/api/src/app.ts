@@ -4,7 +4,7 @@ import type { AppConfig } from './config';
 import type { Db } from './db/client';
 import type { Deps } from './deps';
 import { createResultCache, invalidateForRequest } from './lib/cache';
-import { HttpError } from './lib/errors';
+import { HttpError, badRequest } from './lib/errors';
 import { createStaticHandler, finalizeResponse } from './lib/http';
 import { createRateLimiter, type Limiters } from './lib/rate-limit';
 import { securityHeaders } from './lib/security-headers';
@@ -177,7 +177,12 @@ export function createApp(deps: Deps) {
   if (config.webDistDir) {
     const serveStatic = createStaticHandler(config.webDistDir);
     app.get('/*', async ({ request, set }) => {
-      const pathname = decodeURIComponent(new URL(request.url).pathname);
+      let pathname: string;
+      try {
+        pathname = decodeURIComponent(new URL(request.url).pathname);
+      } catch {
+        throw badRequest('Malformed URL');
+      }
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         throw new HttpError(404, 'NOT_FOUND', 'Route not found');
       }

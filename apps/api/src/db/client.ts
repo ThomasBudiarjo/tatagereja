@@ -27,14 +27,15 @@ export type DatabaseHandle = {
 /**
  * Fills columns that copy a value from another table for fast reads, on rows written before the
  * column existed (a migration cannot run this backfill reliably once migrations are squashed or
- * regenerated). Idempotent and quick when there is nothing to fill.
+ * regenerated). Idempotent and quick when there is nothing to fill; a row whose source is gone
+ * keeps its value, so a stray orphan can never stop the server from starting.
  */
 function backfillCopiedColumns(sqlite: Database): void {
   sqlite.exec(`
     UPDATE attendance_records
-    SET session_at = (
+    SET session_at = coalesce((
       SELECT session_at FROM attendance_sessions WHERE attendance_sessions.id = attendance_records.session_id
-    )
+    ), session_at)
     WHERE session_at = ''
   `);
 }
