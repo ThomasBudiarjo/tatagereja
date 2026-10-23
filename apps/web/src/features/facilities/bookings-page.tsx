@@ -36,7 +36,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useUrlState } from '@/lib/use-url-state';
 import { bookingsQuery, resourcesQuery, type BookingListParams } from './api';
 import { CancelBookingDialog, DecisionDialog } from './booking-dialogs';
-import { FACILITIES_TONE } from './facilities-lib';
+import { BOOKING_STATUS_TONES, FACILITIES_TONE } from './facilities-lib';
 import { BookingStatusBadge, FacilitiesNav } from './facilities-ui';
 
 const PAGE_SIZE = 25;
@@ -231,18 +231,37 @@ export function BookingsPage() {
                 ) : null}
               </span>
             )}
-            subtitle={(booking) =>
-              [
-                booking.resourceName,
-                booking.nextOccurrence
-                  ? formatDateRange(booking.nextOccurrence.startsAt, booking.nextOccurrence.endsAt)
-                  : formatDateRange(booking.startsAt, booking.endsAt),
-                booking.groupName ?? booking.requesterName,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            }
-            trailing={(booking) => <BookingStatusBadge status={booking.status} />}
+            subtitle={(booking) => (
+              <>
+                {/* Phones have no room for the badge: the status leads the second line. */}
+                {booking.status !== 'approved' ? (
+                  <span
+                    data-tone={BOOKING_STATUS_TONES[booking.status]}
+                    className="font-medium text-tone-ink sm:hidden"
+                  >
+                    {localize(BOOKING_STATUS_LABELS[booking.status], locale)}
+                    {' · '}
+                  </span>
+                ) : null}
+                {[
+                  booking.resourceName,
+                  booking.nextOccurrence
+                    ? formatDateRange(
+                        booking.nextOccurrence.startsAt,
+                        booking.nextOccurrence.endsAt,
+                      )
+                    : formatDateRange(booking.startsAt, booking.endsAt),
+                  booking.groupName ?? booking.requesterName,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </>
+            )}
+            trailing={(booking) => (
+              <span className="hidden sm:contents">
+                <BookingStatusBadge status={booking.status} />
+              </span>
+            )}
             actionsLabel={(booking) => t('facilities.bookingActions', { title: booking.title })}
             actions={(booking) => [
               {

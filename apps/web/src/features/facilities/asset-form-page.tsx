@@ -156,7 +156,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 {...form.register('name')}
               />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label={t('facilities.fieldCategory')}
                 htmlFor="asset-category"
@@ -177,7 +177,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 <Input id="asset-serial" className="font-mono" {...form.register('serialNumber')} />
               </Field>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Controller
                 control={form.control}
                 name="resourceId"
@@ -210,7 +210,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 />
               </Field>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={t('facilities.fieldCondition')} htmlFor="asset-condition">
                 <Select id="asset-condition" {...form.register('condition')}>
                   {ASSET_CONDITIONS.map((condition) => (
@@ -239,7 +239,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 </Field>
               )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label={t('facilities.fieldAcquisitionDate')}
                 htmlFor="asset-acquired"

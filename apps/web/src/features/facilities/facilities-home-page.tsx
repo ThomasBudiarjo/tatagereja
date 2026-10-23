@@ -179,7 +179,7 @@ export function FacilitiesHomePage() {
             ) : null}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             {facilities ? (
               <Section
                 title={t('facilities.today')}
@@ -334,7 +334,9 @@ export function FacilitiesHomePage() {
                               </span>
                             </span>
                             <StatusBadge tone="danger" size="sm">
-                              {t('facilities.dueOn', { date: formatDate(loan.dueDate) })}
+                              {t('facilities.overdueSinceShort', {
+                                date: formatDate(loan.dueDate, 'dayMonth'),
+                              })}
                             </StatusBadge>
                           </Link>
                         </li>

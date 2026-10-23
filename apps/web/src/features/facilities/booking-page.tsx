@@ -144,7 +144,7 @@ export function BookingPage() {
 
       <Card>
         <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Detail
               icon={CalendarClock}
               label={weekly ? t('facilities.firstDate') : t('facilities.when')}

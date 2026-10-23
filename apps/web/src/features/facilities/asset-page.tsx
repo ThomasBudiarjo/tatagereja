@@ -183,7 +183,7 @@ export function AssetPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card className="overflow-hidden p-0">
             {asset.photoUrl ? (
@@ -197,7 +197,7 @@ export function AssetPage() {
               {asset.description ? (
                 <p className="mb-4 text-sm whitespace-pre-line">{asset.description}</p>
               ) : null}
-              <dl className="grid gap-4 sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail icon={MapPin} label={t('facilities.colLocation')}>
                   {asset.resourceName ? (
                     <Link

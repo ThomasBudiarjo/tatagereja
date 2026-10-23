@@ -17,7 +17,6 @@ import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Field, FormActions } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { Alert } from '@/components/ui/misc';
@@ -37,7 +36,7 @@ import {
   useSaveBooking,
 } from './api';
 import { FACILITIES_TONE } from './facilities-lib';
-import { ConflictList } from './facilities-ui';
+import { ChurchDateTimeInput, ConflictList } from './facilities-ui';
 import { ToggleRow } from './resource-form-page';
 
 type FormInput = z.input<typeof facilityBookingInputSchema>;
@@ -276,7 +275,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
                 {...form.register('title')}
               />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Controller
                 control={form.control}
                 name="startsAt"
@@ -287,7 +286,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
                     error={errors.startsAt?.message}
                     required
                   >
-                    <DateTimeInput
+                    <ChurchDateTimeInput
                       id="booking-start"
                       value={field.value ?? ''}
                       onChange={shiftStart}
@@ -307,7 +306,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
                     error={errors.endsAt?.message}
                     required
                   >
-                    <DateTimeInput
+                    <ChurchDateTimeInput
                       id="booking-end"
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -367,7 +366,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
               <Alert variant="info">{t('facilities.changeNeedsApproval')}</Alert>
             ) : null}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label={t('facilities.fieldExpectedAttendees')}
                 htmlFor="booking-attendees"

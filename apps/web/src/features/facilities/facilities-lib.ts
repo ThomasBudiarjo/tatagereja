@@ -143,3 +143,19 @@ export const isValidDate = (value: string) =>
 
 /** A stable colour for a resource: its own colour, else one derived from the kind. */
 export const resourceTone = (kind: ResourceKind): ModuleTone => RESOURCE_KIND_TONES[kind];
+
+/** An instant as a `datetime-local` value on the church's wall clock. */
+export function toZonedInput(iso: string, timeZone: string): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return '';
+  const parts = zonedParts(new Date(iso), timeZone);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${parts.date}T${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
+/** A `datetime-local` value read on the church's wall clock, as an ISO instant. */
+export function fromZonedInput(local: string, timeZone: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(local);
+  if (!match || !isValidDate(match[1]!)) return '';
+  const minutes = Number(match[2]) * 60 + Number(match[3]);
+  return new Date(startOfZonedDay(match[1]!, timeZone).getTime() + minutes * 60_000).toISOString();
+}

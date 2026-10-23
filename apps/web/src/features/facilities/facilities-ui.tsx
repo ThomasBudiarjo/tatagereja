@@ -2,6 +2,7 @@ import {
   ASSET_CONDITION_LABELS,
   ASSET_STATUS_LABELS,
   BOOKING_STATUS_LABELS,
+  DEFAULT_TIMEZONE,
   canViewFacilities,
   canViewInventory,
   fullName,
@@ -24,11 +25,12 @@ import {
   TriangleAlert,
   Users,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ComponentType } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Combobox } from '@/components/ui/combobox';
+import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useDebounced } from '@/lib/use-debounced';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -39,8 +41,10 @@ import {
   ASSET_STATUS_TONES,
   BOOKING_STATUS_TONES,
   RESOURCE_KIND_ICONS,
+  fromZonedInput,
   minutesInDay,
   resourceTone,
+  toZonedInput,
 } from './facilities-lib';
 
 const BOOKING_STATUS_ICONS: Record<BookingStatus, ComponentType<{ className?: string }>> = {
@@ -342,9 +346,19 @@ export function DayTimeline({
   const position = (minutes: number) => ((minutes - first * 60) / total) * 100;
   const now = minutesInDay(nowIso, day, timeZone);
   const showNow = now > first * 60 && now < last * 60;
+  // On phones the strip scrolls sideways: start at the first booking, else at the current hour.
+  const scroller = useRef<HTMLDivElement>(null);
+  const focusMinutes =
+    spans.length > 0 ? Math.min(...spans.map((span) => span.start)) : showNow ? now : null;
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element || focusMinutes === null || element.scrollWidth <= element.clientWidth) return;
+    const ratio = (focusMinutes - 60 - first * 60) / total;
+    element.scrollLeft = Math.max(0, ratio * element.scrollWidth);
+  }, [day, focusMinutes, first, total]);
 
   return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div ref={scroller} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div className={cn('relative min-w-[40rem]', compact ? 'h-14' : 'h-20')}>
         <div className="absolute inset-x-0 top-0 flex h-5 text-[10px] text-muted-foreground tabular">
           {hours.map((hour) => (
@@ -465,5 +479,29 @@ export function OccurrenceRow({
         <Clock className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
       )}
     </Link>
+  );
+}
+
+/**
+ * A date and time picker on the church's wall clock, so a booking made from a device set to
+ * another zone still means 18:00 at church, matching the schedule. Values are ISO.
+ */
+export function ChurchDateTimeInput({
+  value,
+  onChange,
+  ...props
+}: Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'type'> & {
+  value: string;
+  onChange: (iso: string) => void;
+}) {
+  const { church } = useChurch();
+  const timeZone = church.timezone || DEFAULT_TIMEZONE;
+  return (
+    <Input
+      type="datetime-local"
+      value={toZonedInput(value, timeZone)}
+      onChange={(event) => onChange(fromZonedInput(event.target.value, timeZone))}
+      {...props}
+    />
   );
 }

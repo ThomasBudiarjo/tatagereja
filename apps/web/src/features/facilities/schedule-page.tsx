@@ -94,7 +94,10 @@ export function SchedulePage() {
         >
           <ChevronRight />
         </Button>
-        <p className="min-w-0 flex-1 truncate text-base font-semibold" aria-live="polite">
+        <p
+          className="order-first min-w-0 basis-full truncate text-base font-semibold sm:order-none sm:basis-0 sm:flex-1"
+          aria-live="polite"
+        >
           {formatDate(date, 'dateLong')}
         </p>
         <Input
@@ -104,7 +107,7 @@ export function SchedulePage() {
           onChange={(event) =>
             setState({ date: isValidDate(event.target.value) ? event.target.value : '' })
           }
-          className="w-auto"
+          className="min-w-0 flex-1 sm:w-auto sm:flex-none"
         />
         {date !== today ? (
           <Button variant="ghost" size="sm" onClick={() => setState({ date: '' })}>
@@ -134,7 +137,7 @@ export function SchedulePage() {
           {query.data.items.map(({ resource, occurrences }) => (
             <li
               key={resource.id}
-              className="grid gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-soft md:grid-cols-[13rem_minmax(0,1fr)] md:items-center"
+              className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-soft md:grid-cols-[13rem_minmax(0,1fr)] md:items-center"
             >
               <Link
                 to={`${base}/facilities/rooms/${resource.id}?date=${date}`}

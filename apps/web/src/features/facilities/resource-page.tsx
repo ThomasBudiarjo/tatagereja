@@ -141,7 +141,7 @@ export function ResourcePage() {
       />
       <FacilitiesNav />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <aside className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-1">
           <Card className="overflow-hidden p-0">
             {resource.photoUrl ? (
@@ -377,7 +377,7 @@ function ResourceSchedule({ resourceId, canBook }: { resourceId: string; canBook
             return (
               <div
                 key={day}
-                className="grid gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:items-center"
+                className="grid grid-cols-1 gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:items-center"
               >
                 <button
                   type="button"
