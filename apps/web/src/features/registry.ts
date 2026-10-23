@@ -1,8 +1,10 @@
 import { isModuleEnabled, type ModuleId } from '@tatagereja/shared';
 import { useMemo } from 'react';
-import type { RouteObject } from 'react-router';
+import type { LoaderFunctionArgs, RouteObject } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import type { ModuleTone } from '@/components/ui/tone';
+import { churchQuery } from '@/features/churches/api';
+import { queryClient } from '@/lib/query-client';
 import {
   evaluateAccess,
   MODULE_SECTIONS,
@@ -47,15 +49,48 @@ export const MODULE_MANIFESTS: readonly ModuleManifest[] = [
 export const moduleManifest = (id: ModuleId): ModuleManifest | undefined =>
   MODULE_MANIFESTS.find((manifest) => manifest.id === id);
 
+/**
+ * Opening a route with a `prefetch` handle starts its data while the screen's code downloads
+ * (the loader returns at once, so navigation never waits on it). Access comes from the church,
+ * which every church screen loads anyway.
+ */
+const prefetchLoader =
+  (handle: ModuleRouteHandle & { prefetch: NonNullable<ModuleRouteHandle['prefetch']> }) =>
+  ({ params }: LoaderFunctionArgs) => {
+    const churchId = params.churchId;
+    if (churchId) {
+      void queryClient
+        .ensureQueryData(churchQuery(churchId))
+        .then(({ church, access }) => {
+          // Only what the route guard would let the screen show.
+          const context: ModuleContext = {
+            church,
+            access,
+            churchId,
+            base: `/c/${churchId}`,
+            isEnabled: (id: ModuleId) => isModuleEnabled(church.enabledModules, id),
+          };
+          if (handle.moduleId && !context.isEnabled(handle.moduleId)) return;
+          if (!evaluateAccess(handle.access, context)) return;
+          return handle.prefetch({ churchId, access, client: queryClient, params });
+        })
+        .catch(() => undefined);
+    }
+    return null;
+  };
+
 const withModule = (route: RouteObject, moduleId: ModuleId): RouteObject => {
   const handle: ModuleRouteHandle = {
     ...(route.handle as ModuleRouteHandle | undefined),
     moduleId,
   };
-  if (route.index) return { ...route, handle };
+  const { prefetch } = handle;
+  const loader = prefetch && !route.loader ? prefetchLoader({ ...handle, prefetch }) : route.loader;
+  if (route.index) return { ...route, handle, loader } as RouteObject;
   return {
     ...route,
     handle,
+    loader,
     children: route.children?.map((child) => withModule(child, moduleId)),
   } as RouteObject;
 };

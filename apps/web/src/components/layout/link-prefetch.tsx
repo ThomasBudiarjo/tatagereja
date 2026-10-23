@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { matchRoutes, type RouteObject } from 'react-router';
 import { useModuleMenu } from '@/features/registry';
-import type { ModuleRouteHandle } from '@/lib/modules';
+import { evaluateAccess, type ModuleRouteHandle } from '@/lib/modules';
 import { mayPrefetch, whenQuiet } from '@/lib/prefetch';
 import { useChurch } from './church-provider';
 
@@ -21,7 +21,7 @@ const HOVER_INTENT_MS = 80;
 export function LinkPrefetch({ routes }: { routes: RouteObject[] }) {
   const { churchId, access } = useChurch();
   const client = useQueryClient();
-  const { tabs } = useModuleMenu();
+  const { tabs, context } = useModuleMenu();
 
   useEffect(() => {
     if (!mayPrefetch()) return;
@@ -30,8 +30,14 @@ export function LinkPrefetch({ routes }: { routes: RouteObject[] }) {
       for (const { route, params } of matchRoutes(tree, path) ?? []) {
         const preload = (route.lazy as Preloadable | undefined)?.preload;
         if (preload) void preload().catch(() => undefined);
-        const prefetch = (route.handle as ModuleRouteHandle | undefined)?.prefetch;
-        if (withData && prefetch && params.churchId === churchId) {
+        const handle = route.handle as ModuleRouteHandle | undefined;
+        const prefetch = handle?.prefetch;
+        // Only data the screen would show the caller (`moduleId` is filled in by the registry).
+        const allowed =
+          !!handle &&
+          (!handle.moduleId || context.isEnabled(handle.moduleId)) &&
+          evaluateAccess(handle.access, context);
+        if (withData && prefetch && allowed && params.churchId === churchId) {
           void Promise.resolve(prefetch({ churchId, access, client, params })).catch(
             () => undefined,
           );
@@ -79,7 +85,7 @@ export function LinkPrefetch({ routes }: { routes: RouteObject[] }) {
       document.removeEventListener('touchstart', onIntent, { capture: true });
       document.removeEventListener('focusin', onIntent);
     };
-  }, [routes, churchId, access, client, tabs]);
+  }, [routes, churchId, access, client, tabs, context]);
 
   return null;
 }

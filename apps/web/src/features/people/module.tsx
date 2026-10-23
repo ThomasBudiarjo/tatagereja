@@ -21,12 +21,16 @@ const createGroup: AccessRule = { check: ({ access }) => can.createGroup(access)
 const manageHouseholds: AccessRule = { check: ({ access }) => can.manageHouseholds(access) };
 const manageAreas: AccessRule = { check: ({ access }) => can.manageAreas(access) };
 /** The directory as it opens: the people page's default list, its counts and filters. */
-const prefetchDirectory: RoutePrefetch = async ({ churchId, client }) => {
-  const api = await import('./api');
+const prefetchDirectory: RoutePrefetch = async ({ churchId, access: caller, client }) => {
+  const [api, groups] = await Promise.all([import('./api'), import('@/features/groups/api')]);
   void client.prefetchQuery(
     api.peopleListQuery(churchId, { sort: 'name', order: 'asc', page: 1, limit: 50 }),
   );
   void client.prefetchQuery(api.peopleSummaryQuery(churchId));
+  void client.prefetchQuery(api.areasQuery(churchId));
+  void client.prefetchQuery(api.tagsQuery(churchId));
+  void client.prefetchQuery(api.fieldsQuery(churchId));
+  if (has(caller, 'groups.view')) void client.prefetchQuery(groups.groupsQuery(churchId));
 };
 
 /** Leaders and people with `groups.manage` decide on join requests. */

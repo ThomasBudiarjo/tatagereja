@@ -104,10 +104,12 @@ export const router = createBrowserRouter(
     async patchRoutesOnNavigation({ path, patch, signal }) {
       const churchId = CHURCH_PATH.exec(path)?.[1];
       if (!churchId || churchRoutesPatched) return;
-      // The church, the dictionaries and the likely first screen download while the
-      // registry does, instead of one after the other.
+      // The church, the messages and the likely first screen download while the registry
+      // does, instead of one after the other. Matching only needs the registry: the screen's
+      // code starts as soon as it is there (`lazyPage` waits for the messages).
       prefetchFirstChurchScreen(churchId, path);
-      const [{ CHURCH_CHILDREN }] = await Promise.all([loadChurchRoutes(), loadDictionaries()]);
+      void loadDictionaries().catch(() => undefined);
+      const { CHURCH_CHILDREN } = await loadChurchRoutes();
       if (signal.aborted) return;
       patch(CHURCH_ROUTE_ID, CHURCH_CHILDREN);
       churchRoutesPatched = true;
