@@ -10,7 +10,7 @@ import {
   type PeopleStats,
   type UpcomingCelebration,
 } from '@tatagereja/shared';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
 import { households, people } from '../db/schema';
 import { privacyByPerson, privacyOf } from './people';
@@ -141,19 +141,4 @@ export function peopleStats(
     newThisMonth: rows.filter((row) => row.createdAt.slice(0, 10) >= monthStart).length,
     celebrations: celebrations.slice(0, CELEBRATIONS_MAX),
   };
-}
-
-/** Ids of people in the church, checked: returns those that exist. */
-export function existingPersonIds(
-  db: Queryable,
-  churchId: string,
-  personIds: readonly string[],
-): string[] {
-  if (personIds.length === 0) return [];
-  return db
-    .select({ id: people.id })
-    .from(people)
-    .where(and(eq(people.churchId, churchId), inArray(people.id, [...personIds])))
-    .all()
-    .map((row) => row.id);
 }

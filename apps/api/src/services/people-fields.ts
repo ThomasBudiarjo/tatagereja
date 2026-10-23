@@ -75,6 +75,25 @@ export function customFieldsOf(
     }));
 }
 
+/** Stored custom field values of several people, by person and field (no visibility rules). */
+export function customFieldValuesByPerson(
+  db: Queryable,
+  personIds: readonly string[],
+): Map<string, Map<string, string>> {
+  const result = new Map<string, Map<string, string>>();
+  if (personIds.length === 0) return result;
+  for (const row of db
+    .select()
+    .from(customFieldValues)
+    .where(inArray(customFieldValues.personId, [...personIds]))
+    .all()) {
+    const values = result.get(row.personId) ?? new Map<string, string>();
+    values.set(row.fieldId, row.value);
+    result.set(row.personId, values);
+  }
+  return result;
+}
+
 /**
  * Saves custom field values (null or an empty string clears one). Every field must belong to
  * the church and be active, private fields need the private-details rules, and values must

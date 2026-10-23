@@ -2,6 +2,7 @@ import {
   DEFAULT_PERSON_PRIVACY,
   PERSON_PRIVACY_FIELDS,
   applyPersonPrivacy,
+  canSeeGroup,
   canSeeHiddenContact,
   has,
   type AccessLike,
@@ -28,8 +29,10 @@ import type { Queryable } from '../db/client';
 import type { ChurchRow, PersonRow } from '../db/schema';
 import {
   areaCoordinators,
+  customFieldDefinitions,
   customFieldValues,
   groupMembers,
+  groups,
   householdMembers,
   households,
   people,
@@ -37,6 +40,7 @@ import {
   personPrivacySettings,
   personTagAssignments,
 } from '../db/schema';
+import { notFound } from '../lib/errors';
 import { likePattern } from '../lib/query';
 
 /*
@@ -94,6 +98,43 @@ const showsSql = (column: 'show_phone' | 'show_email' | 'show_birthday'): SQL =>
         : DEFAULT_PERSON_PRIVACY.showBirthday;
   return sql`coalesce((select ${sql.raw(column)} from ${personPrivacySettings} where ${personPrivacySettings.personId} = ${people.id}), ${fallback ? 1 : 0}) = 1`;
 };
+
+/**
+ * Refuses filters that would reveal what the caller may not see: who belongs to a private group,
+ * or who holds a value in a private custom field. Both answer 404 like an unknown id.
+ */
+export function assertDirectoryFilters(
+  db: Queryable,
+  access: AccessLike,
+  churchId: string,
+  query: Pick<DirectoryQuery, 'groupId' | 'fieldId' | 'fieldValue'>,
+): void {
+  if (query.groupId) {
+    const group = db
+      .select()
+      .from(groups)
+      .where(and(eq(groups.id, query.groupId), eq(groups.churchId, churchId)))
+      .get();
+    const isMember =
+      !!group && !!access.personId && groupIdsOfPerson(db, access.personId).includes(group.id);
+    if (!group || !canSeeGroup(access, group, isMember)) throw notFound('Group');
+  }
+  if (query.fieldId && query.fieldValue !== undefined) {
+    const field = db
+      .select({ isPrivate: customFieldDefinitions.isPrivate })
+      .from(customFieldDefinitions)
+      .where(
+        and(
+          eq(customFieldDefinitions.id, query.fieldId),
+          eq(customFieldDefinitions.churchId, churchId),
+        ),
+      )
+      .get();
+    if (!field || (field.isPrivate && !has(access, 'people.private.view'))) {
+      throw notFound('Custom field');
+    }
+  }
+}
 
 /**
  * Conditions for the directory filters. Searching or filtering on a contact field only matches

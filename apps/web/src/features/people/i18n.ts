@@ -412,6 +412,7 @@ export const peopleDictionary = defineDictionary('people', {
     importIssueUnknownTag: 'Labels that do not exist yet are skipped',
     importIssueUnknownField: 'Column {field} is not a custom field and is skipped',
     importIssueInvalidFieldValue: '{field} has a value that does not fit the field',
+    importIssueFieldNotAllowed: '{field} is a private field you cannot fill in, so it is skipped',
     importIssueInFile: 'The same person appears earlier in the file',
     importAllowDuplicate: 'Import anyway',
     importStatusOk: 'Ready',
@@ -851,6 +852,8 @@ export const peopleDictionary = defineDictionary('people', {
     importIssueUnknownTag: 'Label yang belum ada dilewati',
     importIssueUnknownField: 'Kolom {field} bukan kolom tambahan dan dilewati',
     importIssueInvalidFieldValue: 'Isian {field} tidak sesuai jenis kolomnya',
+    importIssueFieldNotAllowed:
+      '{field} adalah kolom rahasia yang tidak dapat Anda isi, jadi dilewati',
     importIssueInFile: 'Jemaat yang sama sudah ada di baris sebelumnya',
     importAllowDuplicate: 'Tetap impor',
     importStatusOk: 'Siap',

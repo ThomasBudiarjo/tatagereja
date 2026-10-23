@@ -109,6 +109,8 @@ export function ImportPeoplePage() {
         return t('people.importIssueUnknownTag');
       case 'unknown_field':
         return t('people.importIssueUnknownField', { field });
+      case 'field_not_allowed':
+        return t('people.importIssueFieldNotAllowed', { field });
       case 'invalid_field_value':
         return t('people.importIssueInvalidFieldValue', { field });
       case 'duplicate_in_file':

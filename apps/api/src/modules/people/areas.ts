@@ -245,6 +245,7 @@ export const areasRouter = (deps: Deps) => {
             and(
               eq(churchMemberships.churchId, church.id),
               eq(churchMemberships.userId, body.userId),
+              eq(churchMemberships.status, 'active'),
             ),
           )
           .get();

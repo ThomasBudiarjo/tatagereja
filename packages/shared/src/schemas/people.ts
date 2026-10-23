@@ -556,6 +556,7 @@ export const PERSON_IMPORT_ISSUE_CODES = [
   'household_ignored',
   'unknown_tag',
   'unknown_field',
+  'field_not_allowed',
   'invalid_field_value',
   'duplicate_in_file',
 ] as const;

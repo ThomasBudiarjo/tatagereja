@@ -1,6 +1,7 @@
 import {
   PERSON_CSV_COLUMNS,
   can,
+  canViewPrivateField,
   churchParamsSchema,
   directoryExportQuerySchema,
   fullName,
@@ -37,6 +38,7 @@ import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { recordAudit } from '../../services/audit';
 import {
+  assertDirectoryFilters,
   directoryConditions,
   hydrateDirectory,
   hydrateDirectoryOne,
@@ -45,7 +47,7 @@ import {
   todayIn,
 } from '../../services/people';
 import {
-  customFieldsOf,
+  customFieldValuesByPerson,
   loadPersonRow,
   savePersonTags,
   toCustomFieldDefinition,
@@ -123,6 +125,7 @@ export const directoryToolsRouter = (deps: Deps) => {
     .get(
       '/export',
       ({ church, access, audit, query, set }) => {
+        assertDirectoryFilters(db, access, church.id, query);
         const today = todayIn(church);
         const rows = db
           .select()
@@ -155,11 +158,14 @@ export const directoryToolsRouter = (deps: Deps) => {
           .all()
           .filter((field) => field.isActive);
         const header = [...PERSON_CSV_COLUMNS, ...fields.map((field) => `field:${field.key}`)];
+        const stored = customFieldValuesByPerson(
+          db,
+          rows.map((row) => row.id),
+        );
         const lines = directory.map((person, index) => {
           const row = rows[index] as PersonRow;
-          const values = new Map(
-            customFieldsOf(db, access, row).map((item) => [item.field.id, item.value]),
-          );
+          const values = stored.get(row.id);
+          const seesPrivate = canViewPrivateField(access, row);
           return [
             person.firstName,
             person.lastName,
@@ -179,8 +185,10 @@ export const directoryToolsRouter = (deps: Deps) => {
               .filter(Boolean)
               .join('; '),
             person.notes,
-            // Private fields the caller may not see are missing from `values` and stay empty.
-            ...fields.map((field) => values.get(field.id) ?? null),
+            // Private fields the caller may not see stay empty.
+            ...fields.map((field) =>
+              field.isPrivate && !seesPrivate ? null : (values?.get(field.id) ?? null),
+            ),
           ];
         });
         db.transaction((tx) =>
@@ -206,6 +214,8 @@ export const directoryToolsRouter = (deps: Deps) => {
         if (!can.createPerson(access)) throw forbidden('You cannot add people');
         const canHouseholds = can.manageHouseholds(access);
         const canTags = has(access, 'people.fields.manage');
+        // A new record is nobody's own profile, so private fields need people.private.edit.
+        const canPrivateFields = has(access, 'people.private.edit');
         const existing = db
           .select({
             id: people.id,
@@ -306,6 +316,12 @@ export const directoryToolsRouter = (deps: Deps) => {
                 code: 'unknown_field',
                 message: `Unknown field "${key}" ignored`,
               });
+            } else if (field.isPrivate && !canPrivateFields) {
+              issues.push({
+                path: `customFields.${key}`,
+                code: 'field_not_allowed',
+                message: `${field.label} ignored: private field`,
+              });
             } else if (!isValidCustomFieldValue(toCustomFieldDefinition(field), value)) {
               issues.push({
                 path: `customFields.${key}`,
@@ -314,6 +330,16 @@ export const directoryToolsRouter = (deps: Deps) => {
               });
               invalid = true;
             }
+          }
+          for (const field of fieldByKey.values()) {
+            if (!field.isRequired || (field.isPrivate && !canPrivateFields)) continue;
+            if (row.customFields[field.key]) continue;
+            issues.push({
+              path: `customFields.${field.key}`,
+              code: 'missing',
+              message: `${field.label} is required`,
+            });
+            invalid = true;
           }
           if (invalid) {
             results.push({ index, status: 'invalid', issues, duplicateOf: [] });
@@ -394,6 +420,19 @@ export const directoryToolsRouter = (deps: Deps) => {
                   .run();
                 householdByName.set(householdName.toLowerCase(), householdId);
               }
+              // The first head becomes the primary contact unless the family already has one.
+              const hasContact =
+                relationship === 'head' &&
+                !!tx
+                  .select({ id: householdMembers.id })
+                  .from(householdMembers)
+                  .where(
+                    and(
+                      eq(householdMembers.householdId, householdId),
+                      eq(householdMembers.isPrimaryContact, true),
+                    ),
+                  )
+                  .get();
               tx.insert(householdMembers)
                 .values({
                   id: newId(),
@@ -401,7 +440,7 @@ export const directoryToolsRouter = (deps: Deps) => {
                   householdId,
                   personId: person.id,
                   relationship: relationship ?? 'other',
-                  isPrimaryContact: relationship === 'head',
+                  isPrimaryContact: relationship === 'head' && !hasContact,
                   addedAt: now,
                 })
                 .run();
@@ -439,7 +478,7 @@ export const directoryToolsRouter = (deps: Deps) => {
             if (tagIds.length > 0) savePersonTags(tx, church.id, person.id, tagIds);
             for (const [key, value] of Object.entries(customFields)) {
               const field = fieldByKey.get(key);
-              if (!field) continue;
+              if (!field || (field.isPrivate && !canPrivateFields)) continue;
               tx.insert(customFieldValues)
                 .values({
                   personId: person.id,
@@ -528,6 +567,10 @@ export const directoryToolsRouter = (deps: Deps) => {
         const merge = loadPersonRow(db, church.id, body.mergeId);
         if (keep.userId && merge.userId) {
           throw conflict('Both records are linked to member accounts. Unlink one first.');
+        }
+        // Moving the caller's own account onto another record would open its private details.
+        if (merge.userId === access.userId && !keep.userId && !has(access, 'people.private.view')) {
+          throw forbidden('Ask another administrator to merge your own record');
         }
         const moved: Record<string, number> = {};
         const updated = db.transaction((tx) => {

@@ -44,6 +44,7 @@ import { toPrivateDetails } from '../serializers';
 import { changes, recordAudit, redact } from '../services/audit';
 import { moduleEnabled } from '../services/modules';
 import {
+  assertDirectoryFilters,
   coordinatedAreaIdsOf,
   daysUntilSql,
   directoryConditions,
@@ -261,19 +262,7 @@ export const peopleModule = (deps: Deps) => {
     .get(
       '/',
       ({ church, access, query }) => {
-        if (query.groupId) {
-          // Filtering by a private group would reveal who belongs to it.
-          const group = db
-            .select()
-            .from(groups)
-            .where(and(eq(groups.id, query.groupId), eq(groups.churchId, church.id)))
-            .get();
-          const isMember =
-            !!group &&
-            !!access.personId &&
-            groupIdsOfPerson(db, access.personId).includes(group.id);
-          if (!group || !canSeeGroup(access, group, isMember)) throw notFound('Group');
-        }
+        assertDirectoryFilters(db, access, church.id, query);
         const today = todayIn(church);
         const where = and(...directoryConditions(db, access, church.id, query, today));
         const total = db.select({ value: count() }).from(people).where(where).get()?.value ?? 0;
@@ -497,6 +486,14 @@ export const peopleModule = (deps: Deps) => {
       ({ church, access, audit, params, body }) => {
         const person = loadPersonRow(db, church.id, params.id);
         if (!can.linkPersonUser(access)) throw forbidden('Only administrators can link accounts');
+        // A linked account sees the record's private details as its own profile.
+        if (
+          body.userId === access.userId &&
+          person.userId !== access.userId &&
+          !has(access, 'people.private.view')
+        ) {
+          throw forbidden('Ask another administrator to link your own account');
+        }
         if (body.userId) {
           const membership = db
             .select({ id: churchMemberships.id })

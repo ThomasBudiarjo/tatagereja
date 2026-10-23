@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PERSON_PRIVACY,
   addGroupMembersBodySchema,
   applyPersonPrivacy,
   can,
@@ -44,11 +45,12 @@ import {
 import type { Deps } from '../deps';
 import { conflict, forbidden, notFound } from '../lib/errors';
 import { likePattern } from '../lib/query';
+import { enforceRateLimit } from '../lib/rate-limit';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toPersonSummary } from '../serializers';
-import { recordAudit } from '../services/audit';
+import { changes, recordAudit } from '../services/audit';
 import { notify } from '../services/notifications';
 import { groupIdsOfPerson, privacyByPerson, privacyOf, sendCsv, toCsv } from '../services/people';
 
@@ -102,6 +104,28 @@ export const groupsModule = (deps: Deps) => {
       counts.set(row.groupId, row.value);
     }
     const leaders = new Map<string, GroupLeader[]>();
+    // A leader's account e-mail follows the e-mail choice on their person record.
+    const leaderPeople = db
+      .select({ id: people.id, userId: people.userId })
+      .from(groupLeaders)
+      .innerJoin(
+        people,
+        and(eq(people.userId, groupLeaders.userId), eq(people.churchId, groupLeaders.churchId)),
+      )
+      .where(inArray(groupLeaders.groupId, ids))
+      .all();
+    const leaderPrivacy = privacyByPerson(
+      db,
+      leaderPeople.map((row) => row.id),
+    );
+    const personOfLeader = new Map(leaderPeople.map((row) => [row.userId, row.id]));
+    const showsEmail = (userId: string) => {
+      if (userId === access.userId || has(access, 'people.private.view')) return true;
+      const personId = personOfLeader.get(userId);
+      return personId
+        ? privacyOf(leaderPrivacy, personId).showEmail
+        : DEFAULT_PERSON_PRIVACY.showEmail;
+    };
     for (const row of db
       .select({
         groupId: groupLeaders.groupId,
@@ -116,7 +140,12 @@ export const groupsModule = (deps: Deps) => {
       .orderBy(asc(users.name))
       .all()) {
       const list = leaders.get(row.groupId) ?? [];
-      list.push({ userId: row.userId, name: row.name, email: row.email, avatarUrl: row.avatarUrl });
+      list.push({
+        userId: row.userId,
+        name: row.name,
+        email: showsEmail(row.userId) ? row.email : '',
+        avatarUrl: row.avatarUrl,
+      });
       leaders.set(row.groupId, list);
     }
     const pending = new Map<string, number>();
@@ -240,12 +269,16 @@ export const groupsModule = (deps: Deps) => {
       .all()
       .map((row) => row.userId);
 
-  /** Adds people to a group, approving their pending requests and telling them. */
+  /**
+   * Adds people to a group, approving their pending requests and telling them (unless the
+   * caller sends its own message, as the join request decision does).
+   */
   const addMembers = (
     tx: Queryable,
     access: AccessLike,
     group: GroupRow,
     personIds: string[],
+    { notifyAdded = true } = {},
   ): void => {
     const existing = new Set(
       tx
@@ -289,7 +322,7 @@ export const groupsModule = (deps: Deps) => {
       .where(and(inArray(people.id, added), isNotNull(people.userId)))
       .all()
       .flatMap((row) => (row.userId ? [row.userId] : []));
-    if (userIds.length > 0) {
+    if (notifyAdded && userIds.length > 0) {
       notify(tx, {
         churchId: group.churchId,
         userIds,
@@ -536,7 +569,7 @@ export const groupsModule = (deps: Deps) => {
     )
     .patch(
       '/:id',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.manageGroup(access, group.id)) throw forbidden('You cannot edit this group');
         if (body.capacity !== undefined && body.capacity !== null) {
@@ -548,13 +581,36 @@ export const groupsModule = (deps: Deps) => {
         const patch = Object.fromEntries(
           Object.entries(body).filter(([, value]) => value !== undefined),
         );
-        const updated = db
-          .update(groups)
-          .set({ ...patch, updatedAt: nowIso() })
-          .where(eq(groups.id, group.id))
-          .returning()
-          .get();
-        if (!updated) throw notFound('Group');
+        const updated = db.transaction((tx) => {
+          const row = tx
+            .update(groups)
+            .set({ ...patch, updatedAt: nowIso() })
+            .where(eq(groups.id, group.id))
+            .returning()
+            .get();
+          if (!row) throw notFound('Group');
+          // Who can see and join the group is audited; schedule details are not.
+          const pick = (value: GroupRow) => ({
+            name: value.name,
+            type: value.type,
+            isActive: value.isActive,
+            visibility: value.visibility,
+            joinPolicy: value.joinPolicy,
+            capacity: value.capacity,
+          });
+          const diff = changes(pick(group), pick(row));
+          if (diff.after) {
+            recordAudit(tx, audit, {
+              module: 'people',
+              action: 'group.update',
+              entityType: 'group',
+              entityId: row.id,
+              summary: `Updated the group ${row.name}`,
+              ...diff,
+            });
+          }
+          return row;
+        });
         return { group: hydrateOne(access, updated) };
       },
       { church: 'people', params: churchIdParamsSchema, body: groupDetailsPatchSchema },
@@ -641,6 +697,11 @@ export const groupsModule = (deps: Deps) => {
         if (group.capacity !== null && details.memberCount >= group.capacity) {
           throw conflict('This group is full');
         }
+        // Every request notifies the leaders; asking and cancelling in a loop must not spam them.
+        enforceRateLimit(deps.limiters, 'groups.join_request', `${church.id}:${auth.user.id}`, {
+          windowMs: 60 * 60_000,
+          max: 20,
+        });
         const personId = access.personId as string;
         const now = nowIso();
         const row = db.transaction((tx) => {
@@ -656,8 +717,11 @@ export const groupsModule = (deps: Deps) => {
               createdAt: now,
               updatedAt: now,
             })
+            .onConflictDoNothing()
             .returning()
             .get();
+          // A request sent twice at once meets the one-open-request index.
+          if (!request) throw conflict('You already asked to join this group');
           const person = tx.select().from(people).where(eq(people.id, personId)).get();
           const name = person ? fullName(person) : auth.user.name;
           const link = `/c/${church.id}/groups/${group.id}?tab=requests`;
@@ -757,7 +821,9 @@ export const groupsModule = (deps: Deps) => {
         if (request.status !== 'pending') throw conflict('This request was already answered');
         const now = nowIso();
         const row = db.transaction((tx) => {
-          if (body.decision === 'approved') addMembers(tx, access, group, [request.personId]);
+          if (body.decision === 'approved') {
+            addMembers(tx, access, group, [request.personId], { notifyAdded: false });
+          }
           const updated = tx
             .update(groupJoinRequests)
             .set({

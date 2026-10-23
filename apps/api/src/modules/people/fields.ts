@@ -22,7 +22,7 @@ import { conflict, forbidden, notFound } from '../../lib/errors';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
-import { recordAudit } from '../../services/audit';
+import { changes, recordAudit } from '../../services/audit';
 import { fieldDefinitionsOf, toCustomFieldDefinition } from '../../services/people-fields';
 
 /** Church-defined tags (label) and custom fields (kolom tambahan) on person records. */
@@ -242,7 +242,7 @@ export const directoryFieldsRouter = (deps: Deps) => {
     )
     .patch(
       '/fields/:id',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         requireManage(access);
         const field = loadField(church.id, params.id);
         assertFieldKey(church.id, body.key, field.id);
@@ -258,18 +258,42 @@ export const directoryFieldsRouter = (deps: Deps) => {
             );
           }
         }
-        const row = db
-          .update(customFieldDefinitions)
-          .set({
-            ...body,
-            options: body.type === 'select' ? body.options : [],
-            updatedAt: nowIso(),
-          })
-          .where(eq(customFieldDefinitions.id, field.id))
-          .returning()
-          .get();
-        if (!row) throw notFound('Custom field');
-        return { field: toCustomFieldDefinition(row) };
+        const updated = db.transaction((tx) => {
+          const row = tx
+            .update(customFieldDefinitions)
+            .set({
+              ...body,
+              options: body.type === 'select' ? body.options : [],
+              updatedAt: nowIso(),
+            })
+            .where(eq(customFieldDefinitions.id, field.id))
+            .returning()
+            .get();
+          if (!row) throw notFound('Custom field');
+          // Making a field public (or inactive) changes who sees its values, so it is audited.
+          const pick = (value: CustomFieldDefinitionRow) => ({
+            key: value.key,
+            label: value.label,
+            type: value.type,
+            options: value.options,
+            isRequired: value.isRequired,
+            isPrivate: value.isPrivate,
+            isActive: value.isActive,
+          });
+          const diff = changes(pick(field), pick(row));
+          if (diff.after) {
+            recordAudit(tx, audit, {
+              module: 'people',
+              action: 'custom_field.update',
+              entityType: 'custom_field',
+              entityId: row.id,
+              summary: `Updated the custom field ${row.label}`,
+              ...diff,
+            });
+          }
+          return row;
+        });
+        return { field: toCustomFieldDefinition(updated) };
       },
       {
         church: 'people',
