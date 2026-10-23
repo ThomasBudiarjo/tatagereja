@@ -1,5 +1,6 @@
 import {
   PERSON_STATUS_TEXT,
+  RECORD_ISSUES,
   REGISTRY_RECORD_TYPES,
   isMaritalStatus,
   isPersonMembershipStatus,
@@ -203,5 +204,22 @@ export function useEffectValue() {
       return formatDate(value, 'dateShort');
     }
     return value;
+  };
+}
+
+const ISSUE_BY_MESSAGE = new Map<string, MessageKey>(
+  Object.entries(RECORD_ISSUES).map(([issue, message]) => [
+    message,
+    `records.issue_${issue}` as MessageKey,
+  ]),
+);
+
+/** Shows the registry's own validation messages (from the schema or the API) in the locale. */
+export function useIssueText() {
+  const { t } = useI18n();
+  return (message: string | undefined): string | undefined => {
+    if (!message) return message;
+    const key = ISSUE_BY_MESSAGE.get(message);
+    return key ? t(key) : message;
   };
 }

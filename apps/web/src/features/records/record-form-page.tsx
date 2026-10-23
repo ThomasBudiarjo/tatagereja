@@ -52,6 +52,7 @@ import {
   otherChurchLabelKey,
   recordTitle,
   roleLabelKey,
+  useIssueText,
 } from './records-lib';
 import { RecordNumber, SideEffectList } from './records-ui';
 
@@ -212,6 +213,7 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const meta = RECORD_TYPE_META[type];
+  const issueText = useIssueText();
   const correcting = !!record;
   const form = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(correcting ? correctionFormSchema : entryFormSchema) as Resolver<
@@ -247,6 +249,8 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
     null,
   );
   const [apply, setApply] = useState(true);
+  /** A once-per-person record that already exists: saving would be refused, so say so here. */
+  const [duplicate, setDuplicate] = useState<RecordPreview['duplicate']>(null);
   const preview = usePreviewRecord(churchId);
   const create = useCreateRecord(churchId);
   const correct = useCorrectRecord(churchId, record?.id ?? '');
@@ -280,6 +284,11 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
     if (preview.isPending || saving) return;
     try {
       const result = await preview.mutateAsync({ record: toInput(values), recordId: record?.id });
+      setDuplicate(result.duplicate);
+      if (result.duplicate) {
+        toast.error(t('records.duplicateTitle'));
+        return;
+      }
       setApply(true);
       setPending({ values, preview: result });
     } catch (error) {
@@ -348,7 +357,10 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
                 control={form.control}
                 name="subtype"
                 render={({ field }) => (
-                  <Field label={t('records.fieldBaptismKind')} error={errors.subtype?.message}>
+                  <Field
+                    label={t('records.fieldBaptismKind')}
+                    error={issueText(errors.subtype?.message)}
+                  >
                     <Segmented
                       aria-label={t('records.fieldBaptismKind')}
                       value={field.value === 'adult' ? 'adult' : 'infant'}
@@ -366,7 +378,7 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
               <Field
                 label={t('records.fieldMilestone')}
                 htmlFor="record-subtype"
-                error={errors.subtype?.message}
+                error={issueText(errors.subtype?.message)}
                 description={t('records.fieldMilestoneHint')}
                 required
               >
@@ -450,7 +462,7 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
             <CardContent className="grid gap-4 sm:grid-cols-2">
               {details.map((key) => {
                 const id = `record-detail-${key}`;
-                const error = errors.details?.[key]?.message;
+                const error = issueText(errors.details?.[key]?.message);
                 const label =
                   key === 'otherChurchName'
                     ? t(otherChurchLabelKey(type))
@@ -539,6 +551,17 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
           </Card>
         ) : null}
 
+        {duplicate ? (
+          <Alert variant="warning" title={t('records.duplicateTitle')}>
+            {t('records.duplicateBody', { number: duplicate.number })}{' '}
+            <Link
+              to={`${base}/records/${duplicate.id}`}
+              className="font-medium underline underline-offset-2"
+            >
+              {t('records.openRecord')}
+            </Link>
+          </Alert>
+        ) : null}
         <FormActions>
           <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>
             {t('common.cancel')}
@@ -574,17 +597,6 @@ function RecordFormPage({ type, record }: { type: RegistryRecordType; record?: R
               </span>
               <RecordNumber number={pending.preview.number} className="text-sm" />
             </div>
-            {pending.preview.duplicate ? (
-              <Alert variant="warning" title={t('records.duplicateTitle')}>
-                {t('records.duplicateBody', { number: pending.preview.duplicate.number })}{' '}
-                <Link
-                  to={`${base}/records/${pending.preview.duplicate.id}`}
-                  className="font-medium underline underline-offset-2"
-                >
-                  {t('records.openRecord')}
-                </Link>
-              </Alert>
-            ) : null}
             {pending.preview.effects.length > 0 ? (
               <div className="flex flex-col gap-2.5">
                 <p className="flex items-center gap-1.5 text-sm font-semibold">
@@ -654,6 +666,7 @@ function PeopleEditor({
   onPicked: (person: { id: string; name: string; birthDate: string | null }) => void;
 }) {
   const { t } = useI18n();
+  const issueText = useIssueText();
   const primary = recordPrimaryRole(type);
   const indexed = value.map((entry, index) => ({ entry, index }));
   const ofRole = (role: RecordPersonRole) => indexed.filter((item) => item.entry.role === role);
@@ -663,7 +676,7 @@ function PeopleEditor({
     const item = (peopleErrors as Record<number, { name?: { message?: string } }> | undefined)?.[
       index
     ];
-    return item?.name?.message;
+    return issueText(item?.name?.message);
   };
 
   const update = (index: number, next: PersonValue) =>
@@ -701,7 +714,7 @@ function PeopleEditor({
     <div className="flex flex-col gap-5">
       {peopleErrors?.message ? (
         <p role="alert" className="text-sm font-medium text-destructive">
-          {peopleErrors.message}
+          {issueText(peopleErrors.message)}
         </p>
       ) : null}
       <div className={cn('grid gap-4', type === 'marriage' && 'sm:grid-cols-2')}>

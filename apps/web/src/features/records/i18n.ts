@@ -162,7 +162,7 @@ export const recordsDictionary = defineDictionary('records', {
     keepsNumber: 'Keeps number',
     duplicateTitle: 'This person already has such a record',
     duplicateBody:
-      'Record {number} is still valid. Saving will be refused; correct or void it first.',
+      'Record {number} is still valid, so this one cannot be saved. Correct or void that record first.',
     openRecord: 'Open it',
     effectsTitle: 'This also updates their profile',
     applyEffects: 'Apply these changes to the profiles',
@@ -204,7 +204,9 @@ export const recordsDictionary = defineDictionary('records', {
     someone: 'someone',
     voidTitle: 'Void record {number}?',
     voidBody:
-      'The {type} record stays in the register marked as voided, and its number is never used again. Membership status is not changed back automatically.',
+      'The {type} record stays in the register marked as voided, and its number is never used again.',
+    revertTitle: 'This record changed their profile',
+    revertEffects: 'Undo these changes as well',
     voidReason: 'Reason',
     voidReasonRequired: 'Give a reason of at least 3 characters.',
     voidedToast: 'Record {number} voided',
@@ -266,6 +268,19 @@ export const recordsDictionary = defineDictionary('records', {
     signatoryTitlePlaceholder: 'Chair of the church council',
     fieldCertificateFooter: 'Footer',
     settingsSaved: 'Registry settings saved',
+
+    issue_patternSequence: 'The pattern needs a sequence such as {NNN}',
+    issue_patternYear:
+      'The pattern needs the year ({YYYY} or {YY}) because numbers restart every year',
+    issue_patternTaken: 'Another kind of record already uses this pattern',
+    issue_personRequired: 'Choose a person or enter a name',
+    issue_peopleCount: 'A marriage needs two spouses; other records need exactly one person',
+    issue_roleMismatch: 'A person has a role that does not fit this kind of record',
+    issue_personTwice: 'The same person is named twice',
+    issue_baptismKind: 'Choose infant or adult baptism',
+    issue_milestoneRequired: 'Name the milestone',
+    issue_funeralBeforeDeath: 'The funeral cannot be before the death',
+    issue_typeLocked: 'Void this record and enter a new one instead',
 
     // Own records and the person page
     myTitle: 'My church records',
@@ -436,7 +451,7 @@ export const recordsDictionary = defineDictionary('records', {
     keepsNumber: 'Nomor tetap',
     duplicateTitle: 'Orang ini sudah punya catatan serupa',
     duplicateBody:
-      'Catatan {number} masih berlaku. Penyimpanan akan ditolak; koreksi atau batalkan dahulu.',
+      'Catatan {number} masih berlaku, jadi catatan ini tidak dapat disimpan. Koreksi atau batalkan catatan itu dahulu.',
     openRecord: 'Buka catatan',
     effectsTitle: 'Data jemaat juga diperbarui',
     applyEffects: 'Terapkan perubahan ini pada data jemaat',
@@ -477,7 +492,9 @@ export const recordsDictionary = defineDictionary('records', {
     someone: 'seseorang',
     voidTitle: 'Batalkan catatan {number}?',
     voidBody:
-      'Catatan {type} tetap ada di buku induk dengan tanda dibatalkan, dan nomornya tidak dipakai lagi. Status keanggotaan tidak dikembalikan otomatis.',
+      'Catatan {type} tetap ada di buku induk dengan tanda dibatalkan, dan nomornya tidak dipakai lagi.',
+    revertTitle: 'Catatan ini telah mengubah data jemaat',
+    revertEffects: 'Kembalikan juga perubahan ini',
     voidReason: 'Alasan',
     voidReasonRequired: 'Tulis alasan minimal 3 karakter.',
     voidedToast: 'Catatan {number} dibatalkan',
@@ -535,6 +552,18 @@ export const recordsDictionary = defineDictionary('records', {
     signatoryTitlePlaceholder: 'Ketua Majelis Jemaat',
     fieldCertificateFooter: 'Kaki surat',
     settingsSaved: 'Pengaturan catatan gerejawi disimpan',
+
+    issue_patternSequence: 'Pola perlu nomor urut, misalnya {NNN}',
+    issue_patternYear: 'Pola perlu tahun ({YYYY} atau {YY}) karena nomor dimulai lagi setiap tahun',
+    issue_patternTaken: 'Pola ini sudah dipakai jenis catatan lain',
+    issue_personRequired: 'Pilih anggota jemaat atau tulis namanya',
+    issue_peopleCount: 'Pemberkatan nikah perlu dua mempelai; catatan lain tepat satu orang',
+    issue_roleMismatch: 'Ada orang dengan peran yang tidak sesuai untuk jenis catatan ini',
+    issue_personTwice: 'Orang yang sama tercatat dua kali',
+    issue_baptismKind: 'Pilih baptis anak atau baptis dewasa',
+    issue_milestoneRequired: 'Tulis nama peristiwanya',
+    issue_funeralBeforeDeath: 'Ibadah pemakaman tidak boleh sebelum tanggal meninggal',
+    issue_typeLocked: 'Batalkan catatan ini dan catat yang baru',
 
     myTitle: 'Catatan gerejawi saya',
     myDescription: 'Catatan baptis, sidi, pemberkatan nikah, dan lainnya, beserta suratnya.',

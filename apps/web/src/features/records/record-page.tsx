@@ -7,6 +7,7 @@ import {
   recordTypeText,
   voidRegistryRecordBodySchema,
   type RecordHistoryEntry,
+  type RecordSideEffect,
   type RegistryRecord,
 } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +23,7 @@ import {
   PenLine,
   Printer,
   Sparkles,
+  Undo2,
   UserRound,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,6 +34,7 @@ import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Field } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/misc';
 import { SkeletonText } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
@@ -57,7 +61,7 @@ import {
   recordTitle,
   roleLabelKey,
 } from './records-lib';
-import { RecordStatusBadge, RecordTypeBadge, SideEffectList } from './records-ui';
+import { RecordNotFound, RecordStatusBadge, RecordTypeBadge, SideEffectList } from './records-ui';
 
 export function RecordPage() {
   const { recordId = '' } = useParams();
@@ -82,18 +86,21 @@ export function RecordPage() {
     return (
       <Page>
         <PageHeader title={t('records.recordTitle')} breadcrumbs={crumbs} />
-        <ErrorState
-          title={gone ? t('records.notFoundTitle') : undefined}
-          error={query.error}
-          message={gone ? t('records.notFoundBody') : getErrorMessage(query.error)}
-          onRetry={gone ? undefined : () => void query.refetch()}
-          retrying={query.isFetching}
-        />
+        {gone ? (
+          <RecordNotFound />
+        ) : (
+          <ErrorState
+            error={query.error}
+            message={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        )}
       </Page>
     );
   }
 
-  const { record, canManage, history } = query.data;
+  const { record, canManage, history, revertibleEffects } = query.data;
   const meta = RECORD_TYPE_META[record.type];
   const title = recordTitle(record);
   const active = record.status === 'active';
@@ -180,7 +187,12 @@ export function RecordPage() {
       {history.length > 0 ? <RecordHistory history={history} /> : null}
 
       {canManage && active ? (
-        <VoidDialog record={record} open={voiding} onOpenChange={setVoiding} />
+        <VoidDialog
+          record={record}
+          effects={revertibleEffects}
+          open={voiding}
+          onOpenChange={setVoiding}
+        />
       ) : null}
     </Page>
   );
@@ -405,19 +417,25 @@ function RecordHistory({ history }: { history: RecordHistoryEntry[] }) {
   );
 }
 
-/** Voiding keeps the number in the register; people type the number to confirm. */
+/**
+ * Voiding keeps the number in the register; people type the number to confirm. The profile
+ * changes the record made can be undone at the same time.
+ */
 function VoidDialog({
   record,
+  effects,
   open,
   onOpenChange,
 }: {
   record: RegistryRecord;
+  effects: RecordSideEffect[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const { churchId } = useChurch();
   const { t, locale } = useI18n();
   const [reason, setReason] = useState('');
+  const [revert, setRevert] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const action = useMutationToast(useVoidRecord(churchId, record.id), {
     success: t('records.voidedToast', { number: record.number }),
@@ -428,6 +446,7 @@ function VoidDialog({
       onOpenChange={(next) => {
         if (!next) {
           setReason('');
+          setRevert(true);
           setError(null);
         }
         onOpenChange(next);
@@ -438,7 +457,10 @@ function VoidDialog({
       confirmText={record.number}
       loading={action.isPending}
       onConfirm={async () => {
-        const parsed = voidRegistryRecordBodySchema.safeParse({ reason });
+        const parsed = voidRegistryRecordBodySchema.safeParse({
+          reason,
+          revertEffects: effects.length > 0 && revert,
+        });
         if (!parsed.success) {
           setError(t('records.voidReasonRequired'));
           return;
@@ -465,6 +487,26 @@ function VoidDialog({
           }}
         />
       </Field>
+      {effects.length > 0 ? (
+        <div className="mt-4 flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
+            <Undo2 className="size-4 text-muted-foreground" />
+            {t('records.revertTitle')}
+          </p>
+          <SideEffectList effects={effects} />
+          <div className="flex items-start gap-2.5">
+            <Checkbox
+              id="void-revert-effects"
+              checked={revert}
+              onCheckedChange={(checked) => setRevert(checked === true)}
+              className="mt-0.5"
+            />
+            <Label htmlFor="void-revert-effects" className="leading-snug font-normal">
+              {t('records.revertEffects')}
+            </Label>
+          </div>
+        </div>
+      ) : null}
     </ConfirmDialog>
   );
 }

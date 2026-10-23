@@ -1,5 +1,5 @@
 import type * as React from 'react';
-import { recordPrimaryRole, type RegistryRecord } from '@tatagereja/shared';
+import { canViewRegistry, recordPrimaryRole, type RegistryRecord } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ScrollText } from 'lucide-react';
 import { Link, useParams } from 'react-router';
@@ -15,6 +15,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { recordQuery } from './api';
 import { RECORD_TYPE_META, recordTitle, roleLabelKey } from './records-lib';
+import { RecordNotFound } from './records-ui';
 
 /** What the certificate says happened, per type. */
 const STATEMENT_KEYS: Record<RegistryRecord['type'], MessageKey> = {
@@ -37,7 +38,7 @@ const PAPER_TONES = {
 /** A printable certificate (surat baptis, surat sidi, surat nikah gerejawi, atestasi, ...). */
 export function CertificatePage() {
   const { recordId = '' } = useParams();
-  const { churchId, base } = useChurch();
+  const { churchId, base, access } = useChurch();
   const { t } = useI18n();
   const query = useQuery(recordQuery(churchId, recordId));
   useDocumentTitle(
@@ -57,13 +58,20 @@ export function CertificatePage() {
     const gone = isApiClientError(query.error) && query.error.status === 404;
     return (
       <Page>
-        <PageHeader title={t('records.certificate')} backTo={`${base}/records`} />
-        <ErrorState
-          title={gone ? t('records.notFoundTitle') : undefined}
-          error={query.error}
-          message={gone ? t('records.notFoundBody') : getErrorMessage(query.error)}
-          onRetry={gone ? undefined : () => void query.refetch()}
+        <PageHeader
+          title={t('records.certificate')}
+          backTo={canViewRegistry(access) ? `${base}/records` : `${base}/records/mine`}
         />
+        {gone ? (
+          <RecordNotFound />
+        ) : (
+          <ErrorState
+            error={query.error}
+            message={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        )}
       </Page>
     );
   }

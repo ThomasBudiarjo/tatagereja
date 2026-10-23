@@ -45,9 +45,11 @@ export function PersonField({
 }) {
   const { churchId } = useChurch();
   const { t, formatDate } = useI18n();
-  const [mode, setMode] = useState<'member' | 'name'>(
+  const [preferred, setPreferred] = useState<'member' | 'name'>(
     !value.personId && value.name && allowName ? 'name' : 'member',
   );
+  // A filled value decides the mode, so a field reused for another person shows it correctly.
+  const mode = value.personId ? 'member' : value.name && allowName ? 'name' : preferred;
   const [search, setSearch] = useState('');
   const people = useQuery({ ...recordsPeopleQuery(churchId, search), enabled: mode === 'member' });
 
@@ -76,8 +78,7 @@ export function PersonField({
   }, [people.data, value.personId, value.name, t, formatDate]);
 
   const switchMode = () => {
-    const next = mode === 'member' ? 'name' : 'member';
-    setMode(next);
+    setPreferred(mode === 'member' ? 'name' : 'member');
     onChange({ personId: null, name: null });
   };
 

@@ -28,7 +28,7 @@ import { getErrorMessage } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { settingsQuery, useSaveRecordsSettings } from './api';
-import { RECORDS_TONE, RECORD_TYPE_META, yearNow } from './records-lib';
+import { RECORDS_TONE, RECORD_TYPE_META, useIssueText, yearNow } from './records-lib';
 import { RecordNumber, RecordsNav } from './records-ui';
 
 /** The form edits every pattern as a plain string; empty means "use the default". */
@@ -83,6 +83,7 @@ function SettingsForm({
 }) {
   const { churchId, base, church } = useChurch();
   const { t, locale } = useI18n();
+  const issueText = useIssueText();
   const navigate = useNavigate();
   const year = yearNow(church.timezone);
   const form = useForm<FormValues, unknown, FormOutput>({
@@ -166,7 +167,7 @@ function SettingsForm({
                     ? nextNumbers[type]
                     : formatRecordNumber(value, { type, year, sequence: 1 })
                   : null;
-                const error = errors.numberPatterns?.[type]?.message;
+                const error = issueText(errors.numberPatterns?.[type]?.message);
                 return (
                   <Field
                     key={type}

@@ -13,7 +13,15 @@ import {
   type RegistryRecordType,
 } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Ban, CheckCircle2, ChevronDown, Plus, ScrollText } from 'lucide-react';
+import {
+  ArrowRight,
+  Ban,
+  CheckCircle2,
+  ChevronDown,
+  Plus,
+  ScrollText,
+  SearchX,
+} from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
@@ -140,10 +148,13 @@ export function SideEffectList({
   );
 }
 
-/** The rows of a person's records (their own list, or the person page). */
+/**
+ * The rows of one person's records (their own list, or the person page). The person is known,
+ * so each row says what happened; a couple or a parent's record also names who it is about.
+ */
 export function PersonRecordList({ items }: { items: PersonRecordItem[] }) {
   const { base } = useChurch();
-  const { t, formatDate } = useI18n();
+  const { t, locale, formatDate } = useI18n();
   return (
     <DataList
       items={items}
@@ -152,14 +163,16 @@ export function PersonRecordList({ items }: { items: PersonRecordItem[] }) {
       leading={(item) => <RecordTypeIcon type={item.type} />}
       title={(item) => (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="truncate">{recordTitle(item)}</span>
+          <span className="truncate">{recordTypeText(item, locale)}</span>
           {item.status === 'voided' ? <RecordStatusBadge status="voided" /> : null}
         </span>
       )}
       subtitle={(item) =>
         [
           formatDate(item.date, 'dateShort'),
-          item.place,
+          item.type === 'marriage' || (item.role !== 'subject' && item.role !== 'spouse')
+            ? recordTitle(item)
+            : item.place,
           item.role === 'subject' || item.role === 'spouse'
             ? null
             : t(roleLabelKey(item.type, item.role)),
@@ -167,12 +180,7 @@ export function PersonRecordList({ items }: { items: PersonRecordItem[] }) {
           .filter(Boolean)
           .join(' · ')
       }
-      trailing={(item) => (
-        <span className="hidden flex-col items-end gap-1 sm:flex">
-          <RecordTypeBadge record={item} />
-          <RecordNumber number={item.number} />
-        </span>
-      )}
+      trailing={(item) => <RecordNumber number={item.number} className="hidden sm:inline-flex" />}
     />
   );
 }
@@ -314,5 +322,29 @@ export function NewRecordMenu({ size = 'sm', label }: { size?: 'sm' | 'default';
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** A record that does not exist, or is not the caller's own: where to go instead. */
+export function RecordNotFound() {
+  const { base, access } = useChurch();
+  const { t } = useI18n();
+  const viewer = canViewRegistry(access);
+  return (
+    <EmptyState
+      icon={SearchX}
+      tone={RECORDS_TONE}
+      title={t('records.notFoundTitle')}
+      description={t('records.notFoundBody')}
+      action={
+        viewer || access.personId ? (
+          <Button asChild variant="outline">
+            <Link to={viewer ? `${base}/records/register` : `${base}/records/mine`}>
+              {t(viewer ? 'records.openRegister' : 'records.myTitle')}
+            </Link>
+          </Button>
+        ) : null
+      }
+    />
   );
 }
