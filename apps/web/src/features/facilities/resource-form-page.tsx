@@ -27,8 +27,9 @@ import { Switch } from '@/components/ui/switch';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { resourceQuery, useSaveResource } from './api';
+import { useFacilitiesResolver, useServerErrors } from './facilities-forms';
 import { FACILITIES_TONE } from './facilities-lib';
 
 type FormInput = z.input<typeof facilityResourceInputSchema>;
@@ -52,6 +53,7 @@ export function NewResourcePage() {
 export function EditResourcePage() {
   const { resourceId = '' } = useParams();
   const { churchId } = useChurch();
+  const { t } = useI18n();
   const query = useQuery(resourceQuery(churchId, resourceId));
   if (query.isPending) {
     return (
@@ -65,8 +67,9 @@ export function EditResourcePage() {
       <Page size="narrow">
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.resourceGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );
@@ -79,7 +82,7 @@ function ResourceFormPage({ resource }: { resource?: FacilityResource }) {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const form = useForm<FormInput, unknown, FormOutput>({
-    resolver: zodResolver(facilityResourceInputSchema),
+    resolver: useFacilitiesResolver(zodResolver(facilityResourceInputSchema)),
     defaultValues: {
       name: resource?.name ?? '',
       kind: resource?.kind ?? 'room',
@@ -93,11 +96,12 @@ function ResourceFormPage({ resource }: { resource?: FacilityResource }) {
       isActive: resource?.isActive ?? true,
     },
   });
+  const serverErrors = useServerErrors(form);
   const { errors, isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
   const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
   const save = useMutationToast(useSaveResource(churchId, resource?.id), {
     success: (result) => t('facilities.roomSaved', { name: result.resource.name }),
-    form,
+    form: serverErrors,
   });
   const submit = form.handleSubmit(async (values) => {
     const result = await save.run(values);

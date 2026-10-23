@@ -29,9 +29,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Segmented } from '@/components/ui/misc';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
-import { getErrorMessage, isApiClientError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { useUrlState } from '@/lib/use-url-state';
 import { resourceQuery, scheduleQuery, useDeleteResource } from './api';
 import {
@@ -84,12 +84,9 @@ export function ResourcePage() {
         <PageHeader title={t('facilities.roomsTitle')} breadcrumbs={crumbs} />
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.resourceGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={
-            isApiClientError(query.error) && query.error.status === 404
-              ? undefined
-              : () => void query.refetch()
-          }
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );

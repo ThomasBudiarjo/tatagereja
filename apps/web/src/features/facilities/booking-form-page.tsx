@@ -27,7 +27,7 @@ import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { getErrorMessage } from '@/lib/api';
 import { useDebounced } from '@/lib/use-debounced';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import {
   availabilityQuery,
   bookingQuery,
@@ -35,6 +35,7 @@ import {
   resourcesQuery,
   useSaveBooking,
 } from './api';
+import { useFacilitiesResolver, useServerErrors } from './facilities-forms';
 import { FACILITIES_TONE } from './facilities-lib';
 import { ChurchDateTimeInput, ConflictList } from './facilities-ui';
 import { ToggleRow } from './resource-form-page';
@@ -75,8 +76,9 @@ export function EditBookingPage() {
       <Page size="narrow">
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.bookingGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );
@@ -110,7 +112,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
     return requested && !Number.isNaN(Date.parse(requested)) ? requested : nextHour();
   });
   const form = useForm<FormInput, unknown, FormOutput>({
-    resolver: zodResolver(facilityBookingInputSchema),
+    resolver: useFacilitiesResolver(zodResolver(facilityBookingInputSchema)),
     defaultValues: {
       resourceId: booking?.resourceId ?? params.get('resourceId') ?? '',
       title: booking?.title ?? '',
@@ -125,6 +127,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
       notes: booking?.notes ?? '',
     },
   });
+  const serverErrors = useServerErrors(form);
   const { errors, isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
   const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
   const [resourceId, startsAt, endsAt, recurrence, recurrenceUntil, expected] = useWatch({
@@ -170,7 +173,7 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
       result.booking.status === 'approved'
         ? t('facilities.bookingConfirmed', { title: result.booking.title })
         : t('facilities.bookingRequested', { title: result.booking.title }),
-    form,
+    form: serverErrors,
   });
   const submit = form.handleSubmit(async (values) => {
     const result = await save.run(values);

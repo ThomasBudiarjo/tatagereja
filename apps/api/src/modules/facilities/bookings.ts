@@ -24,6 +24,7 @@ import { facilityBookingExceptions, facilityBookings, facilityResources } from '
 import type { Deps } from '../../deps';
 import { conflict, forbidden, notFound, validationError } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
+import { enforceRateLimit } from '../../lib/rate-limit';
 import { nowIso, toUtcIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
@@ -48,6 +49,8 @@ const REQUEST = ['facilities.book', 'facilities.manage'] as const;
 const PAST_GRACE_MS = 5 * 60_000;
 const OCCURRENCES_SHOWN = 26;
 const FAR_FUTURE = '9999-12-31T00:00:00.000Z';
+/** Requests (and changed times) notify every manager, so members may send only so many. */
+const REQUEST_LIMIT = { windowMs: 60 * 60_000, max: 30 };
 
 type Times = Pick<
   FacilityBookingInput,
@@ -101,6 +104,17 @@ export const bookingsRouter = (deps: Deps) => {
     const [booking] = hydrateBookings(db, [row], access);
     if (!booking) throw notFound('Booking');
     return booking;
+  };
+
+  /** Managers book freely; everyone else is limited, since each request notifies the managers. */
+  const limitRequests = (church: ChurchRow, access: Pick<AccessLike, 'permissions' | 'userId'>) => {
+    if (canManageFacilities(access)) return;
+    enforceRateLimit(
+      deps.limiters,
+      'facilities.booking_request',
+      `${church.id}:${access.userId}`,
+      REQUEST_LIMIT,
+    );
   };
 
   /** A resource people can book: inactive ones are hidden from requesters and refused for managers. */
@@ -293,6 +307,7 @@ export const bookingsRouter = (deps: Deps) => {
     .post(
       '/bookings',
       ({ church, access, auth, audit, body, set }) => {
+        limitRequests(church, access);
         const resource = bookableResource(church.id, access, body.resourceId);
         validateRequest(church, access, resource, body, true);
         const times = normalizeTimes(body);
@@ -403,6 +418,7 @@ export const bookingsRouter = (deps: Deps) => {
           times.recurrence !== row.recurrence ||
           times.recurrenceUntil !== row.recurrenceUntil;
         validateRequest(church, access, resource, body, times.startsAt !== row.startsAt);
+        if (timesChanged) limitRequests(church, access);
         const manager = canManageFacilities(access);
         // A requester's new times go back for approval when the resource needs it.
         const status =
@@ -414,10 +430,29 @@ export const bookingsRouter = (deps: Deps) => {
         const updated = db.transaction((tx) => {
           if (timesChanged) assertFree(tx, church, resource, times, row.id);
           if (times.startsAt !== row.startsAt || times.recurrence !== 'weekly') {
-            // Skipped dates belong to the old start; they no longer match.
-            tx.delete(facilityBookingExceptions)
+            // Skipped dates stay only while the new times still take place on them.
+            const dates = new Set(
+              bookingOccurrences(times, times.startsAt, FAR_FUTURE).map((item) =>
+                occurrenceDateOf(item.startsAt),
+              ),
+            );
+            const gone = tx
+              .select({ date: facilityBookingExceptions.occurrenceDate })
+              .from(facilityBookingExceptions)
               .where(eq(facilityBookingExceptions.bookingId, row.id))
-              .run();
+              .all()
+              .map((item) => item.date)
+              .filter((date) => times.recurrence !== 'weekly' || !dates.has(date));
+            if (gone.length > 0) {
+              tx.delete(facilityBookingExceptions)
+                .where(
+                  and(
+                    eq(facilityBookingExceptions.bookingId, row.id),
+                    inArray(facilityBookingExceptions.occurrenceDate, gone),
+                  ),
+                )
+                .run();
+            }
           }
           const next = tx
             .update(facilityBookings)
@@ -473,6 +508,9 @@ export const bookingsRouter = (deps: Deps) => {
         }
         const resource = loadResource(db, church.id, row.resourceId);
         const approve = body.decision === 'approved';
+        if (approve && !resource.isActive) {
+          throw conflict(`${resource.name} is not available for booking at the moment`);
+        }
         const updated = db.transaction((tx) => {
           if (approve) {
             const skipped = tx

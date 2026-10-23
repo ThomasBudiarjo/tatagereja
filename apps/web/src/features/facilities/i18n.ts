@@ -105,7 +105,7 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     deleteRoom: 'Delete room',
     deleteRoomTitle: 'Delete {name}?',
     deleteRoomBody:
-      'Every booking of this room, past and upcoming, is deleted with it, and assets stored here lose their location. To keep the history, make the room inactive instead.',
+      'Every booking of this room, past and upcoming, is deleted with it, and whoever booked an upcoming date is told. Assets stored here lose their location. To keep the history, make the room inactive instead.',
     roomDeleted: 'Room deleted',
 
     // Room form
@@ -384,6 +384,19 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     choosePerson: 'Choose a person',
     searchPeople: 'Search the directory',
     noPeopleFound: 'Nobody found',
+
+    // Gone and form rules
+    bookingGone: 'This booking is no longer available',
+    resourceGone: 'This room or resource is no longer available',
+    assetGone: 'This asset is no longer in the inventory',
+    ruleBookingLength: 'A booking can last at most one week',
+    ruleRecurrenceLength: 'A weekly booking can repeat for at most two years',
+    ruleFutureStart: 'Choose a start time in the future',
+    ruleRecurrenceUntil: 'Choose when the weekly booking ends',
+    ruleBorrower: 'Choose who borrows it',
+    ruleEndAfterStart: 'End time must be after the start time',
+    ruleDueDatePast: 'The due date cannot be in the past',
+    ruleNextService: 'The next service date must be after this one',
   },
   id: {
     nav: 'Sarana & inventaris',
@@ -477,7 +490,7 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     deleteRoom: 'Hapus ruangan',
     deleteRoomTitle: 'Hapus {name}?',
     deleteRoomBody:
-      'Semua peminjaman ruangan ini, yang lalu maupun mendatang, ikut terhapus, dan aset yang disimpan di sini kehilangan lokasinya. Untuk menyimpan riwayatnya, nonaktifkan ruangan saja.',
+      'Semua peminjaman ruangan ini, yang lalu maupun mendatang, ikut terhapus, dan peminjam jadwal mendatang akan diberi tahu. Aset yang disimpan di sini kehilangan lokasinya. Untuk menyimpan riwayatnya, nonaktifkan ruangan saja.',
     roomDeleted: 'Ruangan dihapus',
 
     roomFormNew: 'Ruangan atau sarana baru',
@@ -739,5 +752,17 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     choosePerson: 'Pilih orang',
     searchPeople: 'Cari di direktori',
     noPeopleFound: 'Tidak ada yang ditemukan',
+
+    bookingGone: 'Peminjaman ini sudah tidak tersedia',
+    resourceGone: 'Ruangan atau sarana ini sudah tidak tersedia',
+    assetGone: 'Aset ini sudah tidak ada di inventaris',
+    ruleBookingLength: 'Satu peminjaman paling lama satu minggu',
+    ruleRecurrenceLength: 'Peminjaman mingguan paling lama berulang dua tahun',
+    ruleFutureStart: 'Pilih waktu mulai yang belum lewat',
+    ruleRecurrenceUntil: 'Pilih kapan peminjaman mingguan berakhir',
+    ruleBorrower: 'Pilih siapa yang meminjam',
+    ruleEndAfterStart: 'Waktu selesai harus setelah waktu mulai',
+    ruleDueDatePast: 'Tanggal pengembalian tidak boleh sudah lewat',
+    ruleNextService: 'Tanggal servis berikutnya harus setelah tanggal ini',
   },
 });

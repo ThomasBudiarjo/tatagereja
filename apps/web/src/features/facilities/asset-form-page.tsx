@@ -26,8 +26,9 @@ import { ErrorState } from '@/components/ui/states';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { assetQuery, categoriesQuery, resourcesQuery, useSaveAsset } from './api';
+import { useFacilitiesResolver, useServerErrors } from './facilities-forms';
 import { INVENTORY_TONE, todayIn } from './facilities-lib';
 import { PersonPicker } from './facilities-ui';
 
@@ -54,6 +55,7 @@ export function NewAssetPage() {
 export function EditAssetPage() {
   const { assetId = '' } = useParams();
   const { churchId } = useChurch();
+  const { t } = useI18n();
   const query = useQuery(assetQuery(churchId, assetId));
   if (query.isPending) {
     return (
@@ -67,8 +69,9 @@ export function EditAssetPage() {
       <Page size="narrow">
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.assetGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );
@@ -84,7 +87,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
   const categories = useQuery(categoriesQuery(churchId));
   const onLoan = asset?.status === 'on_loan';
   const form = useForm<FormInput, unknown, FormOutput>({
-    resolver: zodResolver(inventoryAssetInputSchema),
+    resolver: useFacilitiesResolver(zodResolver(inventoryAssetInputSchema)),
     defaultValues: {
       name: asset?.name ?? '',
       category: asset?.category ?? '',
@@ -101,6 +104,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
       notes: asset?.notes ?? '',
     },
   });
+  const serverErrors = useServerErrors(form);
   const { errors, isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
   const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
   const save = useMutationToast(useSaveAsset(churchId, asset?.id), {
@@ -108,7 +112,7 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
       asset
         ? t('facilities.assetSaved', { name: result.asset.name })
         : t('facilities.assetCreated', { code: result.asset.code }),
-    form,
+    form: serverErrors,
   });
   const submit = form.handleSubmit(async (values) => {
     const result = await save.run(values);

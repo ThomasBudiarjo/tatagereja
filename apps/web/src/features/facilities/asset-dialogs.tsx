@@ -33,6 +33,7 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useCheckOutAsset, useLogMaintenance, useReturnAsset } from './api';
+import { useFacilitiesResolver, useServerErrors } from './facilities-forms';
 import { shiftDate, todayIn } from './facilities-lib';
 import { PersonPicker } from './facilities-ui';
 
@@ -53,24 +54,27 @@ export function CheckOutSheet({
   const { t, locale } = useI18n();
   const today = todayIn(church.timezone);
   const [mode, setMode] = useState<'person' | 'name'>('person');
-  const form = useForm<CheckOutInput, unknown, CheckOutOutput>({
-    resolver: zodResolver(checkOutAssetBodySchema),
-    defaultValues: {
-      borrowerPersonId: null,
-      borrowerName: '',
-      groupId: null,
-      dueDate: shiftDate(today, 7),
-      conditionOut: asset.condition,
-      notes: '',
-    },
+  // Built afresh on every reset, so the next loan starts from the asset's current condition.
+  const defaults = (): CheckOutInput => ({
+    borrowerPersonId: null,
+    borrowerName: '',
+    groupId: null,
+    dueDate: shiftDate(today, 7),
+    conditionOut: asset.condition,
+    notes: '',
   });
+  const form = useForm<CheckOutInput, unknown, CheckOutOutput>({
+    resolver: useFacilitiesResolver(zodResolver(checkOutAssetBodySchema)),
+    defaultValues: defaults(),
+  });
+  const serverErrors = useServerErrors(form);
   const { errors } = form.formState;
   const lend = useMutationToast(useCheckOutAsset(churchId, asset.id), {
     success: (result) => t('facilities.lentTo', { name: result.loan.borrowerName }),
-    form,
+    form: serverErrors,
   });
   const close = (next: boolean) => {
-    if (!next) form.reset();
+    if (!next) form.reset(defaults());
     onOpenChange(next);
   };
   const submit = form.handleSubmit(async (values) => {
@@ -203,13 +207,14 @@ export function ReturnSheet({
   const { churchId } = useChurch();
   const { t, locale } = useI18n();
   const form = useForm<ReturnInput, unknown, ReturnOutput>({
-    resolver: zodResolver(returnAssetBodySchema),
+    resolver: useFacilitiesResolver(zodResolver(returnAssetBodySchema)),
     values: { conditionIn: loan?.conditionOut ?? 'good', notes: '' },
   });
+  const serverErrors = useServerErrors(form);
   const conditionIn = useWatch({ control: form.control, name: 'conditionIn' });
   const giveBack = useMutationToast(useReturnAsset(churchId), {
     success: (result) => t('facilities.returned', { name: result.loan.assetName }),
-    form,
+    form: serverErrors,
   });
   const submit = form.handleSubmit(async (values) => {
     if (!loan) return;
@@ -296,7 +301,7 @@ export function MaintenanceSheet({
   const { t, locale } = useI18n();
   const today = todayIn(church.timezone);
   const form = useForm<MaintenanceInput, unknown, MaintenanceOutput>({
-    resolver: zodResolver(assetMaintenanceInputSchema),
+    resolver: useFacilitiesResolver(zodResolver(assetMaintenanceInputSchema)),
     defaultValues: {
       date: today,
       kind: 'service',
@@ -306,10 +311,11 @@ export function MaintenanceSheet({
       nextDueDate: '',
     },
   });
+  const serverErrors = useServerErrors(form);
   const { errors } = form.formState;
   const log = useMutationToast(useLogMaintenance(churchId, asset.id), {
     success: t('facilities.maintenanceLogged'),
-    form,
+    form: serverErrors,
   });
   const close = (next: boolean) => {
     if (!next) form.reset();

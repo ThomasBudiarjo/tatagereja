@@ -6,11 +6,11 @@ import {
   facilityResourceListQuerySchema,
   type FacilityResourceInput,
 } from '@tatagereja/shared';
-import { and, asc, eq, like, or, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { FacilityResourceRow } from '../../db/schema';
-import { facilityResources } from '../../db/schema';
+import { facilityBookings, facilityResources } from '../../db/schema';
 import type { Deps } from '../../deps';
 import { conflict, notFound } from '../../lib/errors';
 import { likePattern } from '../../lib/query';
@@ -18,11 +18,13 @@ import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { changes, recordAudit } from '../../services/audit';
-import { hydrateResources } from '../../services/facilities';
+import { hydrateResources, intersectsWindow } from '../../services/facilities';
+import { notify } from '../../services/notifications';
 import { loadResource } from './load';
 
 /** Who may see rooms, resources and their schedule. */
 export const FACILITIES_VIEW = ['facilities.view', 'facilities.book', 'facilities.manage'] as const;
+const FAR_FUTURE = '9999-12-31T00:00:00.000Z';
 
 const snapshot = (row: FacilityResourceRow) => ({
   name: row.name,
@@ -187,18 +189,50 @@ export const resourcesRouter = (deps: Deps) => {
     )
     .delete(
       '/:id',
-      ({ church, audit, params }) => {
+      ({ church, access, audit, params }) => {
         const row = loadResource(db, church.id, params.id);
         // Bookings go with the resource (cascade); assets keep their record without the room.
+        // Whoever still counts on an upcoming booking of it is told.
+        const affected = db
+          .select({ title: facilityBookings.title, requestedBy: facilityBookings.requestedBy })
+          .from(facilityBookings)
+          .where(
+            and(
+              eq(facilityBookings.churchId, church.id),
+              eq(facilityBookings.resourceId, row.id),
+              inArray(facilityBookings.status, ['pending', 'approved']),
+              intersectsWindow(nowIso(), FAR_FUTURE),
+            ),
+          )
+          .all();
+        const titlesByRequester = new Map<string, string[]>();
+        for (const booking of affected) {
+          if (!booking.requestedBy || booking.requestedBy === access.userId) continue;
+          const titles = titlesByRequester.get(booking.requestedBy) ?? [];
+          titles.push(booking.title);
+          titlesByRequester.set(booking.requestedBy, titles);
+        }
         db.transaction((tx) => {
           tx.delete(facilityResources).where(eq(facilityResources.id, row.id)).run();
+          for (const [userId, titles] of titlesByRequester) {
+            notify(tx, {
+              churchId: church.id,
+              userIds: [userId],
+              type: 'booking.cancelled',
+              title: `Your booking of ${row.name} was cancelled`,
+              body: `${row.name} is no longer available · ${titles.join(', ')}`,
+              link: `/c/${church.id}/facilities/bookings`,
+              entityType: 'facility_resource',
+              entityId: row.id,
+            });
+          }
           recordAudit(tx, audit, {
             module: 'facilities',
             action: 'resource.delete',
             entityType: 'facility_resource',
             entityId: row.id,
             summary: `Deleted the resource ${row.name} and its bookings`,
-            before: snapshot(row),
+            before: { ...snapshot(row), upcomingBookings: affected.length },
           });
         });
         return { ok: true as const };

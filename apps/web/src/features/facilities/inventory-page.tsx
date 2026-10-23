@@ -147,7 +147,10 @@ export function InventoryPage() {
       id: 'location',
       header: t('facilities.colLocation'),
       cell: (asset) => (
-        <span className="line-clamp-2 max-w-48">{asset.resourceName ?? asset.location ?? '—'}</span>
+        // Wraps inside the truncating cells of the phone cards too.
+        <span className="line-clamp-2 max-w-48 whitespace-normal">
+          {asset.resourceName ?? asset.location ?? '—'}
+        </span>
       ),
     },
     {

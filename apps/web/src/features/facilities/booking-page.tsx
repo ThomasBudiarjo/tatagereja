@@ -25,8 +25,9 @@ import { Alert } from '@/components/ui/misc';
 import { SkeletonText } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ErrorState } from '@/components/ui/states';
-import { getErrorMessage, isApiClientError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { isGone } from '@/lib/use-mutation-toast';
 import { bookingQuery } from './api';
 import { CancelBookingDialog, DecisionDialog } from './booking-dialogs';
 import { FACILITIES_TONE } from './facilities-lib';
@@ -58,12 +59,9 @@ export function BookingPage() {
         <PageHeader title={t('facilities.bookingsTitle')} breadcrumbs={crumbs} />
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.bookingGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={
-            isApiClientError(query.error) && query.error.status === 404
-              ? undefined
-              : () => void query.refetch()
-          }
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );
@@ -182,7 +180,7 @@ export function BookingPage() {
                 <span className="whitespace-pre-line">{booking.notes}</span>
               </Detail>
             ) : null}
-            {booking.decidedAt && booking.status !== 'pending' ? (
+            {(booking.decidedAt && booking.status !== 'pending') || booking.cancelledAt ? (
               <Detail
                 icon={MessageSquareText}
                 label={
@@ -196,7 +194,7 @@ export function BookingPage() {
               >
                 {booking.status === 'cancelled' && booking.cancelledAt
                   ? formatDateTime(booking.cancelledAt)
-                  : `${booking.deciderName ?? '—'} · ${formatDateTime(booking.decidedAt)}`}
+                  : `${booking.deciderName ?? '—'} · ${booking.decidedAt ? formatDateTime(booking.decidedAt) : ''}`}
                 {booking.decisionNote ? (
                   <span className="mt-0.5 block text-sm font-normal text-muted-foreground">
                     “{booking.decisionNote}”
@@ -242,7 +240,11 @@ export function BookingPage() {
           {booking.skippedDates.length > 0 ? (
             <p className="text-xs text-muted-foreground">
               {t('facilities.skippedDates', {
-                dates: booking.skippedDates.map((date) => formatDate(date, 'dayMonth')).join(', '),
+                // A skipped date is the UTC date of that start; rebuild the instant so it reads
+                // as the church's own date.
+                dates: booking.skippedDates
+                  .map((date) => formatDate(`${date}${booking.startsAt.slice(10)}`, 'dayMonth'))
+                  .join(', '),
               })}
             </p>
           ) : null}

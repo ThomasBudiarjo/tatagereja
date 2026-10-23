@@ -18,6 +18,7 @@ import {
   lt,
   notInArray,
   or,
+  sql,
   sum,
   type SQL,
 } from 'drizzle-orm';
@@ -237,7 +238,11 @@ const facilitiesHomeRouter = (deps: Deps) => {
           conditions.push(inArray(people.id, query.ids));
         } else if (query.q) {
           const pattern = likePattern(query.q);
-          const match = or(like(people.firstName, pattern), like(people.lastName, pattern));
+          const match = or(
+            like(people.firstName, pattern),
+            like(people.lastName, pattern),
+            like(sql`${people.firstName} || ' ' || coalesce(${people.lastName}, '')`, pattern),
+          );
           if (match) conditions.push(match);
         }
         return {

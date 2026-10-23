@@ -1,5 +1,4 @@
 import {
-  ASSET_CONDITION_LABELS,
   MAINTENANCE_KIND_LABELS,
   canManageInventory,
   fullName,
@@ -37,9 +36,9 @@ import { SkeletonText } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ErrorState } from '@/components/ui/states';
 import { Timeline, TimelineItem } from '@/components/ui/timeline';
-import { getErrorMessage, isApiClientError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { assetQuery, useDeleteAsset, useDeleteMaintenance } from './api';
 import { CheckOutSheet, MaintenanceSheet, ReturnSheet } from './asset-dialogs';
 import { INVENTORY_TONE, MAINTENANCE_KIND_ICONS, todayIn } from './facilities-lib';
@@ -83,12 +82,9 @@ export function AssetPage() {
         <PageHeader title={t('facilities.inventoryTitle')} breadcrumbs={crumbs} />
         <ErrorState
           error={query.error}
+          title={isGone(query.error) ? t('facilities.assetGone') : undefined}
           message={getErrorMessage(query.error)}
-          onRetry={
-            isApiClientError(query.error) && query.error.status === 404
-              ? undefined
-              : () => void query.refetch()
-          }
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
         />
       </Page>
     );
@@ -382,8 +378,6 @@ export function AssetPage() {
           </Card>
           <p className="px-1 text-xs text-muted-foreground">
             {t('facilities.updatedAt', { date: formatDateTime(asset.updatedAt) })}
-            {' · '}
-            {localize(ASSET_CONDITION_LABELS[asset.condition], locale)}
           </p>
         </aside>
       </div>
