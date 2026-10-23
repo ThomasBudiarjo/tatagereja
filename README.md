@@ -4,22 +4,39 @@ TataGereja is an open-source church management application: a mobile-first singl
 [Elysia](https://elysiajs.com) API. Churches can use a hosted server or run the same backend themselves.
 
 One account can belong to several churches with a different role in each. Everything a church records —
-people, groups, events, attendance and announcements — is scoped to that church and protected by the
-same permission rules on the server and in the interface.
+people and households, worship services, pastoral care, the church register, finance, facilities and
+kids check-in — is scoped to that church and protected by the same permission rules on the server and
+in the interface. The interface is in Indonesian and English and uses the terms Indonesian churches
+use (Jemaat, Majelis, Komisi, Wilayah, Warta Jemaat, Persembahan, Atestasi and so on).
 
 ## Features
 
-| Module        | What it does                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| Accounts      | Email and password sign-up, per-server sessions, password change, session list and revocation     |
-| Servers       | Choose the hosted server or enter a self-hosted address; the app verifies it before showing login |
-| Churches      | Create a church, edit its profile, manage members and roles, transfer ownership, delete           |
-| Invitations   | Invitation links and QR codes with expiry, usage limits and revocation                            |
-| People        | Directory with search, filters and pagination, profiles, private details, linking a login account |
-| Groups        | Ministries and small groups, assigned leaders, membership management                              |
-| Events        | Church-wide and group events, participants, RSVP                                                  |
-| Attendance    | Sessions from an event or standalone, a fast present/absent/excused sheet, personal history       |
-| Announcements | Drafts and published posts for the whole church or a single group                                 |
+| Module                   | What it does                                                                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Accounts                 | Email and password sign-up, per-server sessions, password change with a strength meter, session list and revocation                                                                                                                  |
+| Account security         | Two-step sign-in with an authenticator app (TOTP) and recovery codes, progressive lockout after failed sign-ins, sign-in history                                                                                                     |
+| Data rights              | Download everything stored about your account, delete your account (after handing over any church you own)                                                                                                                           |
+| Servers                  | Choose the hosted server or enter a self-hosted address; the app verifies it before showing login                                                                                                                                    |
+| Churches                 | Church profile, logo and colour, members and suspension, custom roles, invitations, module switches, audit log, ownership transfer, deletion                                                                                         |
+| Church security          | Security overview, a policy requiring 2FA for everyone with management permissions, owner-only church backup                                                                                                                         |
+| Invitations              | Invitation links and QR codes with expiry, usage limits and revocation                                                                                                                                                               |
+| People (Jemaat)          | Directory with search, filters and pagination, profiles with family and timeline, private details, privacy settings, tags, custom fields, import/export, merge                                                                       |
+| Households and areas     | Families (keluarga) with their members, Wilayah/Sektor with coordinators                                                                                                                                                             |
+| Groups (Komisi)          | Ministries and small groups, assigned leaders, membership and join requests                                                                                                                                                          |
+| Events and calendar      | Church-wide and group events, recurring series, registration and RSVP, a church calendar with private iCal feeds                                                                                                                     |
+| Announcements and Warta  | Scheduled, pinned and targeted announcements with read tracking; the weekly Warta Jemaat, printable                                                                                                                                  |
+| Notifications            | In-app notifications in the reader's language, per-person preferences                                                                                                                                                                |
+| Attendance               | Sessions from an event or standalone, a fast present/absent/excused sheet or a headcount, absence alerts, personal history                                                                                                           |
+| Home and reports         | A home dashboard with widgets chosen per person; reports on membership growth, demographics, attendance, visitor conversion, volunteers and giving                                                                                   |
+| Worship (Ibadah)         | Services and service types, liturgy (Liturgi) editor and print, song library, serving teams and Jadwal Pelayanan with blockout dates, "my schedule"                                                                                  |
+| Pastoral care            | Care cases (pendampingan) with confidentiality, Perkunjungan, prayer requests with moderation, visitor follow-up, tasks and diakonia aid                                                                                             |
+| Church registry          | Baptis, Sidi, Pemberkatan Nikah, Penyerahan Anak, Atestasi and Kedukaan in a numbered register book, corrections and voiding, certificates                                                                                           |
+| Finance (Keuangan)       | Ledger, funds and accounts, offerings counted by two counters and a verifier, Persembahan and Perpuluhan with receipts, expenses with approval, budgets (RAPB), campaigns and pledges, closed periods, reports and giving statements |
+| Facilities and inventory | Rooms and resources with booking and conflict detection, inventory with labels, loans and maintenance                                                                                                                                |
+| Kids check-in            | Sekolah Minggu classes, check-in stations, printed labels with a security code for pick-up, allergy and custody alerts, authorised pick-ups                                                                                          |
+
+Every church amount is stored in integer minor units of the church currency (IDR by default, shown
+without decimals).
 
 Every member has a base role (`owner`, `administrator` or `member`) and any number of church-defined
 **custom roles** built from a catalog of granular permissions. Suggested roles for Pendeta, Majelis,
@@ -114,9 +131,16 @@ server with a clear message. See `apps/api/.env.example` for the full list.
 | `SERVER_NAME`                                 | `TataGereja`            | Name shown to people choosing this server       |
 | `MAX_BODY_KB`                                 | `2048`                  | Largest accepted request body                   |
 | `TRUST_PROXY`                                 | `0`                     | Reverse proxies in front of the API (see below) |
+| `TWO_FACTOR_ENCRYPTION_KEY`                   | empty (key file)        | Key for two-factor secrets (see below)          |
 
 Registration mode, invitation validity, Turnstile verification and rate limits are all enforced by the API,
-so they cannot be bypassed by calling it directly.
+so they cannot be bypassed by calling it directly. Sign-in has per-IP and per-email rate limits, a
+progressive lockout per account (after five failures each further one doubles the wait, up to an hour)
+and, for accounts that turned it on, a TOTP second step.
+
+Two-factor secrets are encrypted at rest. Without `TWO_FACTOR_ENCRYPTION_KEY` the API creates a key file
+(`.tatagereja-2fa.key`, mode 0600) next to the database; keep it with your backups, because a database
+restored without it cannot check the codes of accounts that use two-step sign-in.
 
 Rate limits and sign-in history use the client address. Behind a reverse proxy, set `TRUST_PROXY` to the
 number of proxies in front of the API (usually `1`) so the address the proxy saw is used; the API then reads

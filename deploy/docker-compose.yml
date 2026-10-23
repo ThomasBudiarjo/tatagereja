@@ -26,6 +26,8 @@ services:
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
       # Reverse proxies in front of this container. Rate limits trust X-Forwarded-For only from them.
       TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Key for two-factor secrets. Empty keeps a key file next to the database in the volume.
+      TWO_FACTOR_ENCRYPTION_KEY: ${TWO_FACTOR_ENCRYPTION_KEY:-}
     volumes:
       - tatagereja-data:/data
 
