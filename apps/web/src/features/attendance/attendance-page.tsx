@@ -43,14 +43,8 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useUrlState } from '@/lib/use-url-state';
 import { attendanceSessionsQuery, useCreateAttendanceSession } from './api';
-import {
-  ATTENDANCE_TONE,
-  DateChip,
-  MarkBar,
-  canStartSession,
-  seesAbsences,
-  seesSessions,
-} from './components';
+import { ATTENDANCE_TONE, canStartSession, seesAbsences, seesSessions } from './attendance-lib';
+import { DateChip, MarkBar } from './components';
 import { MyAttendancePage } from './history-page';
 
 const PAGE_SIZE = 25;

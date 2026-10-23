@@ -1,12 +1,25 @@
-import { can, has } from '@tatagereja/shared';
-import { ChartColumnIncreasing, ClipboardCheck, Home } from 'lucide-react';
+import { availableReports, can, canViewAbsences, has } from '@tatagereja/shared';
+import {
+  BellRing,
+  CalendarCheck2,
+  ChartColumnIncreasing,
+  ClipboardCheck,
+  ClipboardPlus,
+  Home,
+} from 'lucide-react';
 import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
 
 const viewReports: AccessRule = { anyOf: ['reports.view'] };
 const viewSessions: AccessRule = { check: ({ access }) => can.viewAttendanceOverview(access) };
+const viewAbsences: AccessRule = { check: ({ access }) => canViewAbsences(access) };
 /** Recorders and group leaders take attendance; everyone sees their own history. */
 const takeAttendance: AccessRule = {
   check: ({ access }) => has(access, 'attendance.record') || access.leaderGroupIds.length > 0,
+};
+/** Reports appear only when at least one report is open to the caller in this church. */
+const anyReport: AccessRule = {
+  anyOf: ['reports.view'],
+  check: ({ access, church }) => availableReports(access, church.enabledModules).length > 0,
 };
 
 export const insightsModule = defineModule({
@@ -24,6 +37,20 @@ export const insightsModule = defineModule({
     {
       path: 'attendance',
       lazy: lazyPage(() => import('@/features/attendance/attendance-page'), 'AttendancePage'),
+    },
+    {
+      path: 'attendance/me',
+      lazy: lazyPage(() => import('@/features/attendance/history-page'), 'MyAttendancePage'),
+    },
+    {
+      path: 'attendance/absences',
+      lazy: lazyPage(() => import('@/features/attendance/absences-page'), 'AbsencesPage'),
+      handle: { access: viewAbsences },
+    },
+    {
+      // The API decides: the person themselves, leaders of their groups and `attendance.view`.
+      path: 'attendance/people/:personId',
+      lazy: lazyPage(() => import('@/features/attendance/history-page'), 'PersonAttendancePage'),
     },
     {
       path: 'attendance/:id',
@@ -59,7 +86,7 @@ export const insightsModule = defineModule({
       descriptionKey: 'insights.attendanceDescription',
       icon: ClipboardCheck,
       order: 50,
-      keywords: ['kehadiran', 'absensi', 'presensi', 'attendance'],
+      keywords: ['kehadiran', 'absensi', 'presensi', 'attendance', 'headcount', 'hitung jemaat'],
     },
     {
       id: 'reports',
@@ -69,18 +96,60 @@ export const insightsModule = defineModule({
       icon: ChartColumnIncreasing,
       section: 'admin',
       order: 30,
-      access: viewReports,
-      keywords: ['laporan', 'statistik', 'reports', 'statistics'],
+      access: anyReport,
+      keywords: ['laporan', 'statistik', 'reports', 'statistics', 'pertumbuhan', 'demografi'],
     },
   ],
   quickActions: [
     {
       id: 'take-attendance',
-      to: 'attendance',
+      to: 'attendance?new=1',
       labelKey: 'insights.takeAttendance',
-      icon: ClipboardCheck,
+      icon: ClipboardPlus,
       order: 40,
       access: takeAttendance,
+    },
+    {
+      id: 'absence-alerts',
+      to: 'attendance/absences',
+      labelKey: 'insights.absenceAlerts',
+      icon: BellRing,
+      tone: 'rose',
+      order: 45,
+      access: viewAbsences,
+    },
+    {
+      id: 'reports',
+      to: 'reports',
+      labelKey: 'insights.reports',
+      icon: ChartColumnIncreasing,
+      order: 90,
+      access: anyReport,
+    },
+  ],
+  commands: [
+    {
+      id: 'new-attendance-session',
+      to: 'attendance?new=1',
+      labelKey: 'insights.newSession',
+      icon: ClipboardPlus,
+      keywords: ['sesi', 'absen', 'presensi', 'session'],
+      access: takeAttendance,
+    },
+    {
+      id: 'absence-alerts',
+      to: 'attendance/absences',
+      labelKey: 'insights.absenceAlerts',
+      icon: BellRing,
+      keywords: ['tidak hadir', 'absen', 'perkunjungan', 'absent', 'missing'],
+      access: viewAbsences,
+    },
+    {
+      id: 'my-attendance',
+      to: 'attendance/me',
+      labelKey: 'insights.myAttendance',
+      icon: CalendarCheck2,
+      keywords: ['kehadiran saya', 'riwayat', 'history'],
     },
   ],
 });

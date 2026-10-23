@@ -15,7 +15,8 @@ import { ErrorState } from '@/components/ui/states';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { myAttendanceQuery, personAttendanceQuery } from './api';
-import { ATTENDANCE_TONE, AttendanceStatusBadge, DateChip, seesSessions } from './components';
+import { ATTENDANCE_TONE, seesSessions } from './attendance-lib';
+import { AttendanceStatusBadge, DateChip } from './components';
 
 /** The caller's own attendance: streaks, the last twelve months and recent sessions. */
 export function MyAttendancePage() {

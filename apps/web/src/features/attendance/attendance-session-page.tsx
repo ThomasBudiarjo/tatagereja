@@ -37,7 +37,7 @@ import {
   X,
 } from 'lucide-react';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -82,7 +82,7 @@ import {
   useUpdateAttendanceSession,
   type MarkInput,
 } from './api';
-import { ATTENDANCE_TONE, STATUS_TONES } from './components';
+import { ATTENDANCE_TONE, STATUS_TONES } from './attendance-lib';
 
 /** Marks are saved in one request once tapping pauses for this long. */
 const SAVE_DELAY_MS = 600;
@@ -236,7 +236,9 @@ function RosterSheet({ detail }: { detail: AttendanceSessionDetail }) {
   const bulk = useBulkMarkAttendance(churchId, session.id);
   const [pending, setPending] = useState<Map<string, AttendanceStatus | null>>(new Map());
   const pendingRef = useRef(pending);
-  pendingRef.current = pending;
+  useLayoutEffect(() => {
+    pendingRef.current = pending;
+  });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [picker, setPicker] = useState(false);
@@ -291,7 +293,9 @@ function RosterSheet({ detail }: { detail: AttendanceSessionDetail }) {
 
   // Leaving the page saves what is still waiting.
   const flushRef = useRef(flush);
-  flushRef.current = flush;
+  useLayoutEffect(() => {
+    flushRef.current = flush;
+  });
   useEffect(() => () => void flushRef.current(), []);
   const guard = useUnsavedChangesGuard(pending.size > 0 && !saving);
 
