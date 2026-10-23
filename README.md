@@ -76,6 +76,25 @@ bun run build       # production build of the web app
 bun run check       # all of the above
 ```
 
+## Demo data
+
+`scripts/seed-demo.ts` fills a fresh server with a complete demo church through the public API:
+GKI Kebon Jati with about seventy people in households and areas, komisi, worship services with
+rosters, events, Warta Jemaat, pastoral care, records, Sekolah Minggu check-in, finance,
+facilities and attendance history.
+
+```sh
+bun run build
+WEB_DIST_DIR=$PWD/apps/web/dist PORT=3950 DATABASE_PATH=/tmp/demo.db bun run start
+bun scripts/seed-demo.ts --port 3950
+```
+
+Every account uses the password `demo-password`: `demo@tatagereja.test` (owner),
+`admin@tatagereja.test` (administrator and Sekretaris), `bendahara@tatagereja.test` (Bendahara),
+`penatua@tatagereja.test` (Majelis / Penatua), `pendeta@tatagereja.test` (Pendeta),
+`guru@tatagereja.test` (Guru Sekolah Minggu) and `jemaat@tatagereja.test` (member).
+`bun scripts/screenshots.ts --port 3950 --email <account>` captures the screens as any of them.
+
 ## Configuration
 
 The API reads its configuration from the environment and validates it at startup; an invalid value stops the
