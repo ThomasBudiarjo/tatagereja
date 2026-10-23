@@ -1,4 +1,4 @@
-import type { Locale } from '@tatagereja/shared';
+import { dateTimeFormat, type Locale } from '@tatagereja/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Queryable } from '../../db/client';
 import type {
@@ -120,9 +120,9 @@ export function serviceWhen(startsAt: string, timeZone: string, locale: Locale =
     hourCycle: 'h23',
   };
   try {
-    return new Intl.DateTimeFormat(tag, { ...options, timeZone }).format(new Date(startsAt));
+    return dateTimeFormat(tag, { ...options, timeZone }).format(new Date(startsAt));
   } catch {
-    return new Intl.DateTimeFormat(tag, options).format(new Date(startsAt));
+    return dateTimeFormat(tag, options).format(new Date(startsAt));
   }
 }
 

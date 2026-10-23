@@ -1,6 +1,7 @@
 import {
   FOLLOW_UP_ACTIVE_STAGES,
   FOLLOW_UP_ENDED_VISIBLE_DAYS,
+  dateTimeFormat,
   has,
   isCareTeam,
   type AccessLike,
@@ -30,7 +31,7 @@ import { notify } from './notifications';
 /** Today's date (`YYYY-MM-DD`) in the church time zone. */
 export function todayIn(timeZone: string, now = new Date()): string {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',

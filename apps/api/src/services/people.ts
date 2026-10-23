@@ -4,6 +4,7 @@ import {
   applyPersonPrivacy,
   canSeeGroup,
   canSeeHiddenContact,
+  dateTimeFormat,
   has,
   type AccessLike,
   type DirectoryPerson,
@@ -51,7 +52,7 @@ import { likePattern } from '../lib/query';
 /** Today's date (YYYY-MM-DD) in the church time zone. */
 export const todayIn = (church: Pick<ChurchRow, 'timezone'>): string => {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone: church.timezone,
       year: 'numeric',
       month: '2-digit',

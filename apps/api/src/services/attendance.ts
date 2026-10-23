@@ -1,6 +1,7 @@
 import {
   INSIGHTS_LIMITS,
   attendanceStreakOf,
+  dateTimeFormat,
   has,
   headcountTotal,
   type AbsenceAlert,
@@ -121,7 +122,7 @@ export function hydrateSessions(db: Db, rows: AttendanceSessionRow[]): Attendanc
 /** The calendar day (YYYY-MM-DD) of an instant in the church time zone. */
 export function localDayOf(instant: string, timeZone: string): string {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',

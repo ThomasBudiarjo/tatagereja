@@ -17,9 +17,23 @@ import { churches } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import { nowIso } from '../lib/time';
 
+/*
+ * Parsed module lists per stored array. A request's church row comes from one query and is
+ * never mutated, so its list is computed once however many guards and widgets ask for it.
+ */
+const enabledModulesCache = new WeakMap<readonly string[], readonly ModuleId[]>();
+
 /** Optional modules switched on for the church; unknown stored ids are ignored. */
-export const enabledModulesOf = (church: Pick<ChurchRow, 'enabledModules'>): ModuleId[] =>
-  Array.isArray(church.enabledModules) ? church.enabledModules.filter(isModuleId) : [];
+export const enabledModulesOf = (church: Pick<ChurchRow, 'enabledModules'>): ModuleId[] => {
+  const stored = church.enabledModules;
+  if (!Array.isArray(stored)) return [];
+  let enabled = enabledModulesCache.get(stored);
+  if (!enabled) {
+    enabled = stored.filter(isModuleId);
+    enabledModulesCache.set(stored, enabled);
+  }
+  return [...enabled];
+};
 
 export const moduleEnabled = (church: Pick<ChurchRow, 'enabledModules'>, id: ModuleId): boolean =>
   isModuleEnabled(enabledModulesOf(church), id);

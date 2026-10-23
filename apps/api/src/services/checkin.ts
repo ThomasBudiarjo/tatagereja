@@ -2,6 +2,7 @@ import {
   GUARDIAN_RELATIONSHIPS,
   checkinSettingsSchema,
   childAge,
+  dateTimeFormat,
   isRatioExceeded,
   phoneLast4,
   suggestClass,
@@ -55,7 +56,7 @@ export const checkinSettingsOf = (church: Pick<ChurchRow, 'settings'>): CheckinS
 /** Today's date (YYYY-MM-DD) in the church time zone. */
 export const todayIn = (timezone: string): string => {
   try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+    return dateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
@@ -640,7 +641,7 @@ export const uniqueSecurityCode = (
 export const zonedIso = (date: string, time: string, timeZone: string): string => {
   const guess = new Date(`${date}T${time}:00Z`);
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const parts = dateTimeFormat('en-US', {
       timeZone,
       hourCycle: 'h23',
       year: 'numeric',
@@ -687,9 +688,7 @@ const sessionMoment = (db: Queryable, session: CheckinSessionRow, timezone: stri
   }
   const openedOn = (() => {
     try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-        new Date(session.openedAt),
-      );
+      return dateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(session.openedAt));
     } catch {
       return session.openedAt.slice(0, 10);
     }

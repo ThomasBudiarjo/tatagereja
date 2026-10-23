@@ -1,6 +1,6 @@
 import { loadConfig } from './config';
 import { createApp, createDeps } from './app';
-import { openDatabase } from './db/client';
+import { OPTIMIZE_INTERVAL_MS, openDatabase } from './db/client';
 
 const config = loadConfig();
 const database = openDatabase(config.databasePath);
@@ -35,7 +35,11 @@ console.log(
     `db: ${config.databasePath})`,
 );
 
+const optimizer = setInterval(() => database.optimize(), OPTIMIZE_INTERVAL_MS);
+optimizer.unref();
+
 const shutdown = () => {
+  clearInterval(optimizer);
   app.stop();
   database.close();
   process.exit(0);

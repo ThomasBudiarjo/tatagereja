@@ -8,6 +8,7 @@ import {
   recordSideEffectSchema,
   recordSideEffects,
   recordsSettingsSchema,
+  dateTimeFormat,
   type RecordSideEffect,
   type RecordsSettings,
   type RegistryRecord,
@@ -153,7 +154,7 @@ export const nextNumber = (
 export const currentYearIn = (timezone: string): number => {
   try {
     return Number(
-      new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric' }).format(new Date()),
+      dateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric' }).format(new Date()),
     );
   } catch {
     return new Date().getUTCFullYear();

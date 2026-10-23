@@ -1,4 +1,9 @@
-import { financePeriodOf, periodKey, type FinanceCategoryKind } from '@tatagereja/shared';
+import {
+  dateTimeFormat,
+  financePeriodOf,
+  periodKey,
+  type FinanceCategoryKind,
+} from '@tatagereja/shared';
 import { and, desc, eq, gt, gte, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Queryable } from '../db/client';
@@ -52,7 +57,7 @@ export const periodLabel = (year: number, month: number): string =>
 export function dayIn(instant: string | Date, timeZone: string): string {
   const date = typeof instant === 'string' ? new Date(instant) : instant;
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',

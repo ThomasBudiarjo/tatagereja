@@ -1,14 +1,14 @@
 import { hasAny, type Access, type ModuleId, type Permission, type User } from '@tatagereja/shared';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { ChurchRow, MembershipRow } from '../db/schema';
-import { churches, churchMemberships, sessions, users } from '../db/schema';
+import { churches, sessions, users } from '../db/schema';
 import type { Deps } from '../deps';
 import { HttpError, forbidden, notFound, unauthorized } from '../lib/errors';
 import { requestMeta } from '../lib/request';
 import { hashToken } from '../lib/tokens';
 import { toUser } from '../serializers';
-import { loadAccess, seedRoleTemplates } from '../services/access';
+import { loadAccess, loadChurchMembership, seedRoleTemplates } from '../services/access';
 import type { AuditContext } from '../services/audit';
 import { assertModuleEnabled } from '../services/modules';
 import { enforceChurchSecurityPolicy } from '../services/security-policy';
@@ -65,14 +65,10 @@ export function createAuthService(deps: Deps) {
   };
 
   const loadChurchContext = (churchId: string, userId: string): ChurchContext => {
-    let church = db.select().from(churches).where(eq(churches.id, churchId)).get();
-    if (!church) throw notFound('Church');
-    const membership = db
-      .select()
-      .from(churchMemberships)
-      .where(and(eq(churchMemberships.churchId, churchId), eq(churchMemberships.userId, userId)))
-      .get();
-    if (!membership) throw forbidden('You are not a member of this church');
+    const loaded = loadChurchMembership(db, churchId, userId);
+    if (!loaded) throw notFound('Church');
+    const { church, membership, access } = loaded;
+    if (!membership || !access) throw forbidden('You are not a member of this church');
     if (membership.status !== 'active') {
       throw new HttpError(
         403,
@@ -83,9 +79,10 @@ export function createAuthService(deps: Deps) {
     // Churches created before custom roles existed get their suggested roles on first use.
     if (!church.roleTemplatesSeededAt) {
       db.transaction((tx) => seedRoleTemplates(tx, churchId));
-      church = db.select().from(churches).where(eq(churches.id, churchId)).get() ?? church;
+      const seeded = db.select().from(churches).where(eq(churches.id, churchId)).get() ?? church;
+      return { church: seeded, membership, access: loadAccess(db, seeded, membership) };
     }
-    return { church, membership, access: loadAccess(db, church, membership) };
+    return { church, membership, access };
   };
 
   const auditContext = (
