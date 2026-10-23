@@ -174,9 +174,10 @@ export function applyChurchGuard(context: ChurchContext, guard: ChurchGuard): vo
 export function authPlugin(deps: Deps) {
   const service = createAuthService(deps);
   /*
-   * The session is checked in `transform`, which runs before body, query and params are
-   * validated, so a request without a valid session gets 401 and never learns the schema.
-   * The result is kept per request for `resolve`.
+   * The session, the membership and the route's guard are checked in `transform`, which runs
+   * before body, query and params are validated: a request without a valid session gets 401,
+   * and a non-member, a suspended member or a member without the permission gets 403, without
+   * learning the schema. The results are kept per request for `resolve`.
    */
   const verified = new WeakMap<Request, AuthContext>();
   const authenticate = (request: Request, headers: Record<string, string | undefined>) => {
@@ -185,6 +186,24 @@ export function authPlugin(deps: Deps) {
     const auth = service.authenticate(request, headers);
     verified.set(request, auth);
     return auth;
+  };
+  const admitted = new WeakMap<Request, ChurchContext>();
+  const admit = (
+    request: Request,
+    headers: Record<string, string | undefined>,
+    params: unknown,
+    guard: ChurchGuard,
+  ) => {
+    const known = admitted.get(request);
+    if (known) return known;
+    const auth = authenticate(request, headers);
+    const churchId = (params as Record<string, string | undefined> | undefined)?.churchId;
+    if (!churchId) throw notFound('Church');
+    const context = service.loadChurchContext(churchId, auth.user.id);
+    enforceChurchSecurityPolicy(deps.db, { ...context, user: auth.user });
+    applyChurchGuard(context, guard);
+    admitted.set(request, context);
+    return context;
   };
   return new Elysia().macro({
     auth: {
@@ -199,16 +218,12 @@ export function authPlugin(deps: Deps) {
     church: (guard: ChurchGuard) => ({
       // Route tests read each route's requirement from its `detail` (kept out of the types).
       ...({ detail: { [CHURCH_GUARD_DETAIL]: guard } } as object),
-      transform: ({ headers, request }) => {
-        authenticate(request, headers);
+      transform: ({ headers, params, request }) => {
+        admit(request, headers, params, guard);
       },
       resolve: ({ headers, params, request, server }) => {
         const auth = authenticate(request, headers);
-        const churchId = (params as Record<string, string | undefined>).churchId;
-        if (!churchId) throw notFound('Church');
-        const context = service.loadChurchContext(churchId, auth.user.id);
-        enforceChurchSecurityPolicy(deps.db, { ...context, user: auth.user });
-        applyChurchGuard(context, guard);
+        const context = admit(request, headers, params, guard);
         return {
           auth,
           ...context,

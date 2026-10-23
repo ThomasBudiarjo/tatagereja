@@ -53,8 +53,9 @@ describe('churches, memberships and invitations', () => {
       token: stranger.token,
     });
     expect(missing.status).toBe(404);
+    // Membership is checked before the parameters are validated: a malformed id is just unknown.
     const invalid = await t.request('GET', `/api/churches/not-a-uuid`, { token: stranger.token });
-    expect(invalid.status).toBe(422);
+    expect(invalid.status).toBe(404);
   });
 
   it('handles invitations end to end', async () => {

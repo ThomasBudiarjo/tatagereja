@@ -197,6 +197,23 @@ export const can = {
 } as const;
 
 /**
+ * The attendance of a person the caller may read: `null` for every session (`attendance.view`,
+ * or their own history), otherwise only the sessions of the groups they lead. Leading one of a
+ * person's groups never opens their history in other groups.
+ */
+export const personAttendanceScope = (
+  access: AccessLike,
+  person: { id: string; userId: string | null },
+): readonly string[] | null =>
+  has(access, 'attendance.view') || isSelf(access, person) ? null : access.leaderGroupIds;
+
+/** Whether one session of a person's history is inside `personAttendanceScope`. */
+export const inAttendanceScope = (
+  scope: readonly string[] | null,
+  groupId: string | null,
+): boolean => scope === null || (!!groupId && scope.includes(groupId));
+
+/**
  * Group ids the caller may create scoped content (events, announcements, attendance) for:
  * every group with the church-wide `permission`, otherwise the groups they lead.
  */

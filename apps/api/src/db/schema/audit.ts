@@ -17,6 +17,10 @@ export const auditLogs = sqliteTable(
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id'),
     summary: text('summary').notNull(),
+    /** Names and counts the summary is built from, so the viewer can say it in any language. */
+    params: text('params', { mode: 'json' }).$type<
+      Record<string, string | number | boolean | null>
+    >(),
     before: text('before', { mode: 'json' }).$type<unknown>(),
     after: text('after', { mode: 'json' }).$type<unknown>(),
     ip: text('ip'),

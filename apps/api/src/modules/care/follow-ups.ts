@@ -34,6 +34,7 @@ import {
   todayIn,
 } from '../../services/care';
 import { notify } from '../../services/notifications';
+import { onVisibleContact } from '../../services/people';
 import { hydrateFollowUps } from './serializers';
 
 const SECRET_FIELDS = ['notes'];
@@ -143,7 +144,7 @@ export const followUpsRouter = (deps: Deps) => {
           const pattern = likePattern(query.q);
           const match = or(
             like(sql`${people.firstName} || ' ' || coalesce(${people.lastName}, '')`, pattern),
-            like(people.phone, pattern),
+            onVisibleContact(access, 'show_phone', like(people.phone, pattern)),
             like(visitorFollowUps.source, pattern),
           );
           if (match) base.push(match);

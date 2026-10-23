@@ -2,6 +2,7 @@ import {
   addFamilyMemberBodySchema,
   assignAreaBodySchema,
   can,
+  personAttendanceScope,
   canEditPersonPrivacy,
   canEditPersonProfile,
   canSeeGroup,
@@ -34,6 +35,7 @@ import type { Deps } from '../../deps';
 import { conflict, forbidden, notFound } from '../../lib/errors';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
+import { attendanceScopeCondition } from '../../services/attendance';
 import { authPlugin } from '../../plugins/auth';
 import { changes, recordAudit } from '../../services/audit';
 import { moduleEnabled } from '../../services/modules';
@@ -239,13 +241,16 @@ export const personExtrasRouter = (deps: Deps) => {
         }
         let attendance = { present: 0, total: 0, lastPresentAt: null as string | null };
         if (can.viewPersonAttendance(access, person, groupIdsOfPerson(db, person.id))) {
+          // A leader counts only the sessions of the groups they lead.
+          const scope = attendanceScopeCondition(personAttendanceScope(access, person));
           const totals = db
             .select({
               total: count(),
               present: sql<number>`sum(case when ${attendanceRecords.status} = 'present' then 1 else 0 end)`,
             })
             .from(attendanceRecords)
-            .where(eq(attendanceRecords.personId, person.id))
+            .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
+            .where(and(eq(attendanceRecords.personId, person.id), scope))
             .get();
           const last = db
             .select({ title: attendanceSessions.title, sessionAt: attendanceSessions.sessionAt })
@@ -255,6 +260,7 @@ export const personExtrasRouter = (deps: Deps) => {
               and(
                 eq(attendanceRecords.personId, person.id),
                 eq(attendanceRecords.status, 'present'),
+                scope,
               ),
             )
             .orderBy(desc(attendanceSessions.sessionAt))

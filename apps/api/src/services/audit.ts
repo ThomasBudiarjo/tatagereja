@@ -1,4 +1,4 @@
-import { LIMITS, type ModuleId } from '@tatagereja/shared';
+import { LIMITS, type AuditParams, type ModuleId } from '@tatagereja/shared';
 import type { Queryable } from '../db/client';
 import { auditLogs } from '../db/schema';
 import type { RequestMeta } from '../lib/request';
@@ -19,6 +19,12 @@ export type AuditEntry = {
   entityId?: string | null;
   /** One human sentence, e.g. "Deleted Budi Santoso". Keep secrets and confidential text out. */
   summary: string;
+  /**
+   * The values the summary names, for the viewer to describe the action in its own language:
+   * `name` (the item), `member` or `person` (who it is about), counts. `name` is taken from the
+   * recorded values (`name`, `title`, `label`) when not given.
+   */
+  params?: AuditParams;
   before?: unknown;
   after?: unknown;
   /** Overrides the context's church, e.g. `null` for the final entry of a deleted church. */
@@ -88,6 +94,27 @@ export function changes<T extends Record<string, unknown>>(
   return { before: empty ? null : changedBefore, after: empty ? null : changedAfter };
 }
 
+const NAME_FIELDS = ['name', 'title', 'label'] as const;
+
+/** The entry's params: the given ones, plus the item's name from its recorded values. */
+const paramsOf = (entry: AuditEntry): AuditParams => {
+  const params: AuditParams = {};
+  for (const side of [entry.after, entry.before]) {
+    if (params.name !== undefined || !side || typeof side !== 'object') continue;
+    for (const field of NAME_FIELDS) {
+      const value = (side as Record<string, unknown>)[field];
+      if (typeof value === 'string' && value.trim()) {
+        params.name = value.trim().slice(0, LIMITS.nameMax);
+        break;
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(entry.params ?? {})) {
+    params[key] = typeof value === 'string' ? value.slice(0, LIMITS.shortTextMax) : value;
+  }
+  return redact(params);
+};
+
 const snapshot = (value: unknown): unknown => {
   if (value === undefined || value === null) return null;
   const json = JSON.stringify(value);
@@ -111,6 +138,7 @@ export function recordAudit(db: Queryable, context: AuditContext, entry: AuditEn
       entityType: entry.entityType.slice(0, LIMITS.shortTextMax),
       entityId: entry.entityId ?? null,
       summary: entry.summary.slice(0, LIMITS.auditSummaryMax),
+      params: paramsOf(entry),
       before: snapshot(redact(entry.before)),
       after: snapshot(redact(entry.after)),
       ip: context.ip,

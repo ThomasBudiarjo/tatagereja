@@ -426,13 +426,18 @@ export function cachedAbsences(
  * The recorder's note on a mark is shown only where `showNote` allows it (the person themselves,
  * or someone who may open that session), so a leader does not read notes from other groups.
  */
+/** SQL for `personAttendanceScope`: every session, or only those of the given groups. */
+export const attendanceScopeCondition = (scope: readonly string[] | null): SQL | undefined =>
+  scope === null ? undefined : inArray(attendanceSessions.groupId, [...scope]);
+
 export function attendanceHistory(
   db: Queryable,
   church: { id: string; timezone: string },
   person: Pick<PersonRow, 'id' | 'firstName' | 'lastName' | 'photoUrl' | 'membershipStatus'>,
   limit: number,
   today: string,
-  showNote: (groupId: string | null) => boolean,
+  /** Sessions the caller may read (see `personAttendanceScope`); `null` for all. */
+  scope: readonly string[] | null,
 ): AttendanceHistory {
   const rows = db
     .select({
@@ -448,7 +453,11 @@ export function attendanceHistory(
     .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
     .leftJoin(groups, eq(groups.id, attendanceSessions.groupId))
     .where(
-      and(eq(attendanceRecords.churchId, church.id), eq(attendanceRecords.personId, person.id)),
+      and(
+        eq(attendanceRecords.churchId, church.id),
+        eq(attendanceRecords.personId, person.id),
+        attendanceScopeCondition(scope),
+      ),
     )
     .orderBy(desc(attendanceSessions.sessionAt))
     .all();
@@ -479,7 +488,6 @@ export function attendanceHistory(
     items: rows.slice(0, limit).map((row) => ({
       ...row,
       groupName: row.groupName ?? null,
-      note: showNote(row.groupId) ? row.note : null,
     })),
   };
 }

@@ -1,10 +1,13 @@
 import {
+  auditRedactionFor,
   invitationStatusOf,
   isRoleTemplateKey,
   normalizePermissions,
+  type AccessLike,
   type Announcement,
   type AttendanceSession,
   type AuditLog,
+  type AuditRedaction,
   type Church,
   type CustomRole,
   type Event,
@@ -265,22 +268,41 @@ export const toCustomRole = (row: ChurchRoleRow, memberCount: number): CustomRol
   updatedAt: row.updatedAt,
 });
 
-export const toAuditLog = (row: AuditLogRow, actorName: string | null): AuditLog => ({
-  id: row.id,
-  churchId: row.churchId,
-  actorUserId: row.actorUserId,
-  actorName,
-  module: row.module,
-  action: row.action,
-  entityType: row.entityType,
-  entityId: row.entityId,
-  summary: row.summary,
-  before: row.before ?? null,
-  after: row.after ?? null,
-  ip: row.ip,
-  userAgent: row.userAgent,
-  createdAt: row.createdAt,
-});
+/** Generic sentences for entries whose content the viewer may not read. */
+const REDACTED_SUMMARY: Record<AuditRedaction, string> = {
+  finance: 'Changed finance records (details need finance access)',
+  care: 'Changed pastoral care records (details need care access)',
+};
+
+/**
+ * An audit entry for one viewer: finance and pastoral care content the viewer may not read is
+ * replaced by a generic sentence (`auditRedactionFor`).
+ */
+export const toAuditLog = (
+  row: AuditLogRow,
+  actorName: string | null,
+  viewer: Pick<AccessLike, 'permissions'>,
+): AuditLog => {
+  const redacted = auditRedactionFor(viewer, row.module);
+  return {
+    id: row.id,
+    churchId: row.churchId,
+    actorUserId: row.actorUserId,
+    actorName,
+    module: row.module,
+    action: row.action,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    summary: redacted ? REDACTED_SUMMARY[redacted] : row.summary,
+    params: redacted ? {} : (row.params ?? {}),
+    redacted,
+    before: redacted ? null : (row.before ?? null),
+    after: redacted ? null : (row.after ?? null),
+    ip: row.ip,
+    userAgent: row.userAgent,
+    createdAt: row.createdAt,
+  };
+};
 
 /** The title and body in the caller's language: English when it was stored, else Indonesian. */
 export const localizedNotificationText = (
