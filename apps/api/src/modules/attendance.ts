@@ -451,6 +451,7 @@ export const attendanceModule = (deps: Deps) => {
             person,
             INSIGHTS_LIMITS.historyMax,
             todayIn(church),
+            () => true,
           ),
         };
       },
@@ -463,6 +464,7 @@ export const attendanceModule = (deps: Deps) => {
         if (!can.viewPersonAttendance(access, person, groupIdsOfPerson(db, person.id))) {
           throw forbidden("You cannot view this person's attendance");
         }
+        const self = access.personId === person.id;
         return {
           history: attendanceHistory(
             db,
@@ -470,6 +472,7 @@ export const attendanceModule = (deps: Deps) => {
             person,
             INSIGHTS_LIMITS.historyMax,
             todayIn(church),
+            (groupId) => self || can.viewAttendanceSession(access, { groupId }),
           ),
         };
       },
@@ -585,6 +588,21 @@ export const attendanceModule = (deps: Deps) => {
               .returning()
               .get();
             careTaskId = task.id;
+            // The care log lists every task wherever it was created; the note stays out of it.
+            recordAudit(tx, audit, {
+              module: 'care',
+              action: 'care_task.create',
+              entityType: 'care_task',
+              entityId: task.id,
+              summary: 'Created a follow-up task',
+              after: {
+                title: task.title,
+                dueDate: task.dueDate,
+                status: task.status,
+                assignedUserId: task.assignedUserId,
+                personId: task.personId,
+              },
+            });
           }
           const values = {
             streak: streak.streak,

@@ -11,10 +11,13 @@ import {
   PERSON_STATUS_TEXT,
   REPORT_LABELS,
   REPORT_MODULES,
+  REPORT_RATIO_TOTALS,
   REPORT_TEXT,
+  REPORT_TOTAL_TEXT,
   ageBandOf,
   ageOn,
   canViewReport,
+  fromMinorUnits,
   headcountTotal,
   localize,
   periodStartOf,
@@ -59,7 +62,7 @@ import { authPlugin } from '../../plugins/auth';
 import { attendeesOf, headcountOf, localDayOf } from '../../services/attendance';
 import { recordAudit } from '../../services/audit';
 import { assertModuleEnabled, moduleEnabled } from '../../services/modules';
-import { sendCsv, toCsv } from '../../services/people';
+import { sendCsv } from '../../services/people';
 import { effectiveAreaByPerson } from '../../services/people-households';
 
 /** Series per service or group in the attendance trend, besides the total. */
@@ -467,12 +470,13 @@ export const insightsReportsRouter = (deps: Deps) => {
       : [];
     const followUpOf = new Map(followUps.map((row) => [row.personId, row]));
     const persons = peopleOf(context);
+    const personOf = new Map(persons.map((row) => [row.id, row]));
     const visitors = new Map<
       string,
       { day: string; converted: boolean; stage: string | null; source: string | null }
     >();
     for (const followUp of followUps) {
-      const person = persons.find((row) => row.id === followUp.personId);
+      const person = personOf.get(followUp.personId);
       if (!person) continue;
       const day = followUp.firstVisitDate ?? localDayOf(followUp.createdAt, church.timezone);
       visitors.set(person.id, {
@@ -782,10 +786,15 @@ export const insightsReportsRouter = (deps: Deps) => {
     giving_trend: givingTrend,
   };
 
-  /** Trend rows per period, then each breakdown and the headline numbers. */
+  /**
+   * Trend rows per period, then each breakdown and the headline numbers. Money is written in
+   * major units of the church currency (dollars, not cents), so spreadsheets sum it directly.
+   */
   const csvOf = (report: Report, locale: Locale, currency: string) => {
     const text = (key: ReportTextKey) => localize(REPORT_TEXT[key], locale);
-    const unit = report.unit === 'money' ? ` (${currency})` : '';
+    const money = report.unit === 'money';
+    const unit = money ? ` (${currency})` : '';
+    const amount = (value: number) => (money ? fromMinorUnits(value, currency) : value);
     const rows: (string | number)[][] = [
       [localize(REPORT_LABELS[report.kind], locale)],
       [`${report.from} – ${report.to}`],
@@ -794,16 +803,23 @@ export const insightsReportsRouter = (deps: Deps) => {
       rows.push([], [text('period'), ...report.series.map((series) => `${series.label}${unit}`)]);
       const first = report.series[0]?.points ?? [];
       first.forEach((point, index) => {
-        rows.push([point.x, ...report.series.map((series) => series.points[index]?.y ?? 0)]);
+        rows.push([
+          point.x,
+          ...report.series.map((series) => amount(series.points[index]?.y ?? 0)),
+        ]);
       });
     }
     for (const breakdown of report.breakdowns) {
       rows.push([], [breakdown.label, `${text('value')}${unit}`]);
-      for (const item of breakdown.items) rows.push([item.label, item.value]);
+      for (const item of breakdown.items) rows.push([item.label, amount(item.value)]);
     }
     rows.push([], [text('summary'), text('value')]);
-    for (const [key, value] of Object.entries(report.totals)) rows.push([key, value]);
-    return toCsv(rows);
+    for (const [key, value] of Object.entries(report.totals)) {
+      const label = REPORT_TOTAL_TEXT[key] ? localize(REPORT_TOTAL_TEXT[key], locale) : key;
+      const ratio = REPORT_RATIO_TOTALS.includes(key);
+      rows.push(ratio ? [label, value] : [`${label}${unit}`, amount(value)]);
+    }
+    return reportCsv(rows);
   };
 
   return new Elysia({ prefix: '/churches/:churchId/insights/reports' }).use(authPlugin(deps)).get(
@@ -872,6 +888,19 @@ export const insightsReportsRouter = (deps: Deps) => {
       query: reportQuerySchema,
     },
   );
+};
+
+/**
+ * CSV with a byte-order mark for spreadsheets. Text that could start a formula is prefixed with
+ * an apostrophe; numbers are written as they are, so negative changes stay numeric.
+ */
+const reportCsv = (rows: readonly (readonly (string | number)[])[]) => {
+  const cell = (value: string | number) => {
+    if (typeof value === 'number') return String(value);
+    const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return `\uFEFF${rows.map((row) => row.map(cell).join(',')).join('\r\n')}\r\n`;
 };
 
 const rangeOf = (query: ReportQuery) => ({

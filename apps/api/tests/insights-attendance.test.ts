@@ -515,6 +515,14 @@ describe('insights attendance', () => {
         (item) => item.action === 'absence_alert.follow_up',
       );
       expect(entry?.after.careTaskId).toBe(taskId);
+      const careLog = await t.request(
+        'GET',
+        `/api/churches/${s.church.id}/audit-logs?module=care&action=care_task.create`,
+        { token: s.owner.token },
+      );
+      expect(careLog.json.items.map((item: { entityId: string }) => item.entityId)).toContain(
+        taskId,
+      );
 
       const duplicate = await t.request('POST', `${base}/absences/${s.alice.id}`, {
         token: carer.token,
@@ -588,6 +596,41 @@ describe('insights attendance', () => {
       expect(cross.status).toBe(404);
       const badId = await t.request('GET', `${base}/people/not-an-id`, { token: viewer.token });
       expect(badId.status).toBe(422);
+    });
+
+    it('shows recorder notes only to the person and to those who may open the session', async () => {
+      const churchWide = await createSession(s.admin.token, {
+        title: 'Ibadah Pengucapan Syukur',
+        sessionAt: weeksAgo(0, 3),
+      });
+      const sessionId = churchWide.json.session.id as string;
+      const noted = await t.request('PUT', `${base}/sessions/${sessionId}/records`, {
+        token: s.admin.token,
+        body: {
+          records: [
+            { personId: s.alice.id, status: 'excused', note: 'Dirawat di rumah sakit' },
+            { personId: s.memberPerson.id, status: 'excused', note: 'Dinas ke luar kota' },
+          ],
+        },
+      });
+      expect(noted.status).toBe(200);
+      const noteOf = (response: { json: any }) =>
+        response.json.history.items.find(
+          (item: { sessionId: string }) => item.sessionId === sessionId,
+        )?.note;
+
+      // The leader sees Alice's history through their group, but not notes from other sessions.
+      const leader = await t.request('GET', `${base}/people/${s.alice.id}`, {
+        token: s.leader.token,
+      });
+      expect(leader.status).toBe(200);
+      expect(noteOf(leader)).toBeNull();
+      const viewed = await t.request('GET', `${base}/people/${s.alice.id}`, {
+        token: viewer.token,
+      });
+      expect(noteOf(viewed)).toBe('Dirawat di rumah sakit');
+      const own = await t.request('GET', `${base}/me`, { token: s.member.token });
+      expect(noteOf(own)).toBe('Dinas ke luar kota');
     });
   });
 });

@@ -332,13 +332,18 @@ export function listAbsences(
     .slice(0, INSIGHTS_LIMITS.absenceListMax);
 }
 
-/** A person's attendance history: streaks, counts, the last twelve months and recent sessions. */
+/**
+ * A person's attendance history: streaks, counts, the last twelve months and recent sessions.
+ * The recorder's note on a mark is shown only where `showNote` allows it (the person themselves,
+ * or someone who may open that session), so a leader does not read notes from other groups.
+ */
 export function attendanceHistory(
   db: Queryable,
   church: { id: string; timezone: string },
   person: Pick<PersonRow, 'id' | 'firstName' | 'lastName' | 'photoUrl' | 'membershipStatus'>,
   limit: number,
   today: string,
+  showNote: (groupId: string | null) => boolean,
 ): AttendanceHistory {
   const rows = db
     .select({
@@ -382,6 +387,10 @@ export function attendanceHistory(
     streak: attendanceStreakOf(rows),
     counts,
     months,
-    items: rows.slice(0, limit).map((row) => ({ ...row, groupName: row.groupName ?? null })),
+    items: rows.slice(0, limit).map((row) => ({
+      ...row,
+      groupName: row.groupName ?? null,
+      note: showNote(row.groupId) ? row.note : null,
+    })),
   };
 }

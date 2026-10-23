@@ -446,6 +446,51 @@ export const REPORT_TEXT = {
 } as const satisfies Record<string, LocalizedText>;
 export type ReportTextKey = keyof typeof REPORT_TEXT;
 
+/** Labels of the headline numbers (`Report.totals`) where they appear as text, as in the CSV. */
+export const REPORT_TOTAL_TEXT: Record<string, LocalizedText> = {
+  total: { en: 'Total', id: 'Total' },
+  new: { en: 'New people', id: 'Jemaat baru' },
+  newMembers: { en: 'New members', id: 'Anggota baru' },
+  startTotal: { en: 'Total at the start', id: 'Total di awal periode' },
+  growthRate: { en: 'Growth rate', id: 'Laju pertumbuhan' },
+  member: { en: 'Members', id: 'Anggota' },
+  regular: { en: 'Regular attenders', id: 'Jemaat tetap' },
+  visitor: { en: 'Visitors', id: 'Simpatisan' },
+  inactive: { en: 'Inactive', id: 'Tidak aktif' },
+  people: { en: 'People', id: 'Jemaat' },
+  averageAge: { en: 'Average age', id: 'Usia rata-rata' },
+  withBirthDate: { en: 'With a birth date', id: 'Dengan tanggal lahir' },
+  inHousehold: { en: 'In a household', id: 'Tercatat dalam keluarga' },
+  sessions: { en: 'Sessions', id: 'Sesi' },
+  attendance: { en: 'Total attendance', id: 'Total kehadiran' },
+  average: { en: 'Average per session', id: 'Rata-rata per sesi' },
+  peak: { en: 'Highest attendance', id: 'Kehadiran tertinggi' },
+  visitors: { en: 'New visitors', id: 'Simpatisan baru' },
+  converted: { en: 'Became regular or member', id: 'Menjadi jemaat tetap / anggota' },
+  conversionRate: { en: 'Conversion rate', id: 'Tingkat konversi' },
+  counted: { en: 'Visitors counted at services', id: 'Tamu terhitung di ibadah' },
+  activeVolunteers: { en: 'Active volunteers', id: 'Pelayan aktif' },
+  assignments: { en: 'Assignments', id: 'Penugasan' },
+  declined: { en: 'Declined', id: 'Ditolak' },
+  acceptanceRate: { en: 'Acceptance rate', id: 'Tingkat penerimaan' },
+  teamMembers: { en: 'Team members', id: 'Anggota tim' },
+  engagementRate: { en: 'Engagement rate', id: 'Tingkat keterlibatan' },
+  offerings: { en: 'Offerings', id: 'Persembahan ibadah' },
+  contributions: { en: 'Tithes and gifts', id: 'Perpuluhan & persembahan khusus' },
+  averagePerPeriod: { en: 'Average per period', id: 'Rata-rata per periode' },
+  previousTotal: { en: 'Previous period', id: 'Periode sebelumnya' },
+  change: { en: 'Change', id: 'Perubahan' },
+};
+
+/** Headline numbers that are shares (0–1), never money, even in a money report. */
+export const REPORT_RATIO_TOTALS: readonly string[] = [
+  'growthRate',
+  'conversionRate',
+  'acceptanceRate',
+  'engagementRate',
+  'change',
+];
+
 export const reportQuerySchema = z
   .object({
     from: isoDateSchema,

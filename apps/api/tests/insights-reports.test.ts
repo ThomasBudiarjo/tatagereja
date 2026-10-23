@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import {
   areas,
   attendanceRecords,
+  churches,
   attendanceSessions,
   personAreas,
   rosterAssignments,
@@ -488,5 +490,31 @@ describe('insights reports', () => {
     expect(audit.json.items.map((item: { entityId: string }) => item.entityId)).toEqual(
       expect.arrayContaining(['demographics', 'giving_trend']),
     );
+  });
+
+  it('exports money in major units, keeps negative numbers numeric and labels the totals', async () => {
+    t.db.update(churches).set({ currency: 'USD' }).where(eq(churches.id, s.church.id)).run();
+    try {
+      // June has no gifts; the 750,000 cents of May 3 fall in the previous period.
+      const csv = await report(
+        'giving_trend',
+        financeReporter.token,
+        'from=2026-06-01&to=2026-06-30&format=csv&locale=en',
+      );
+      expect(csv.status).toBe(200);
+      const text = csv.json as string;
+      expect(text).toContain('Total (USD)');
+      expect(text).toContain('Previous period (USD),7500');
+      expect(text).toContain('Change,-1');
+      expect(text).not.toContain("'-1");
+      const indonesian = await report(
+        'giving_trend',
+        financeReporter.token,
+        'from=2026-06-01&to=2026-06-30&format=csv',
+      );
+      expect(indonesian.json).toContain('Periode sebelumnya (USD),7500');
+    } finally {
+      t.db.update(churches).set({ currency: 'IDR' }).where(eq(churches.id, s.church.id)).run();
+    }
   });
 });
