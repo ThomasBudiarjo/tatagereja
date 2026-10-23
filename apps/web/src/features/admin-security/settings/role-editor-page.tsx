@@ -412,7 +412,7 @@ function RoleForm({
       <form
         onSubmit={(event) => void submit(event)}
         noValidate
-        className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]"
+        className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]"
       >
         <div className="flex min-w-0 flex-col gap-5">
           <Card>
@@ -588,20 +588,25 @@ function RoleForm({
         </aside>
 
         {/* Phones and tablets: a sticky bar with the count, the preview and saving. */}
-        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 md:bottom-4 -mx-1 flex items-center gap-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-raised backdrop-blur lg:hidden">
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-1 flex min-w-0 items-center gap-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-raised backdrop-blur md:bottom-4 lg:hidden">
           <Button
             type="button"
             variant="ghost"
             onClick={() => setPreviewOpen(true)}
-            className="flex-1 justify-start"
+            className="min-w-0 flex-1 justify-start"
           >
             <Eye />
             <span className="truncate">
-              {t('admin-security.permissionsSelected', { count: permissions.length })}
+              {t('admin-security.selectedCount', { count: permissions.length })}
             </span>
           </Button>
           {editable ? (
-            <Button type="submit" loading={save.isPending} disabled={!isDirty && !!role}>
+            <Button
+              type="submit"
+              loading={save.isPending}
+              disabled={!isDirty && !!role}
+              className="shrink-0"
+            >
               <Save />
               {role ? t('common.save') : t('admin-security.createRole')}
             </Button>

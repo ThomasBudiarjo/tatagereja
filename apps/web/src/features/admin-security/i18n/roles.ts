@@ -51,6 +51,8 @@ export const rolesMessages = messages(
       one: '{count} selected',
       other: '{count} selected',
     },
+    /** The phone save bar: always a number, so it fits next to the button. */
+    selectedCount: '{count} selected',
     fillFrom: 'Fill from',
     fillFromTemplate: 'Suggested roles',
     fillFromRole: 'Existing roles',
@@ -126,6 +128,7 @@ export const rolesMessages = messages(
     roleDescriptionHint: 'Opsional. Siapa yang memegang peran ini dan mengapa.',
     permissions: 'Hak akses',
     permissionsSelected: { zero: 'Belum ada yang dipilih', other: '{count} dipilih' },
+    selectedCount: '{count} dipilih',
     fillFrom: 'Isi dari',
     fillFromTemplate: 'Peran saran',
     fillFromRole: 'Peran yang ada',
