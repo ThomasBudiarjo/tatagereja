@@ -445,6 +445,69 @@ describe('permission and data-scope matrix', () => {
     expect(problems).toEqual([]);
   });
 
+  /**
+   * Searches, filters and downloads the plain route calls do not exercise: searching by a
+   * hidden phone number finds nobody, and a birthday list, calendar or export never shows a
+   * hidden birthday. `{choir}` and `{hana}` are filled in.
+   */
+  const VARIANTS: { path: string; oracle?: { text: string; allowed: Permission[] } }[] = [
+    { path: '/people?q=Hana' },
+    { path: '/people?q=7000-1111', oracle: { text: 'Rahasia', allowed: ['people.private.view'] } },
+    {
+      path: '/people?q=hana.canary',
+      oracle: { text: 'Rahasia', allowed: ['people.private.view'] },
+    },
+    { path: '/people?celebration=birthday&withinDays=366' },
+    { path: '/people/export' },
+    { path: '/people/export?q=Hana' },
+    {
+      path: '/calendar?from=2026-08-01T00:00:00.000Z&to=2026-08-31T00:00:00.000Z&sources=birthdays',
+    },
+    {
+      path: '/care/follow-ups?q=7000',
+      oracle: { text: 'Rahasia', allowed: ['people.private.view'] },
+    },
+    {
+      path: '/checkin/households?q=1111',
+      oracle: { text: 'Rahasia', allowed: ['people.private.view'] },
+    },
+    { path: '/audit-logs?q=Hana' },
+    {
+      path: '/audit-logs?q=7654321',
+      oracle: { text: 'contribution', allowed: ['finance.view', 'finance.manage'] },
+    },
+    { path: '/attendance/sessions?groupId={choir}' },
+    { path: '/finance/contributions?personId={hana}' },
+    { path: '/records/people?q=Hana' },
+    { path: '/worship/people?q=Hana' },
+  ];
+
+  it('keeps searches, filters and downloads within what the caller may see', async () => {
+    const problems: string[] = [];
+    for (const variant of VARIANTS) {
+      const path = `${church()}${variant.path}`
+        .replace('{choir}', home.seed.otherGroup.id)
+        .replace('{hana}', home.created.get(':personId') ?? '');
+      const route: Route = { method: 'GET', path: `/api/churches/:churchId${variant.path}` };
+      for (const caller of callers) {
+        const response = await t.request('GET', path, caller.token ? as(caller.token) : {});
+        if (caller.kind !== 'member') continue;
+        problems.push(...check(route, caller, response));
+        const text = JSON.stringify(response.json);
+        const { oracle } = variant;
+        if (
+          oracle &&
+          response.status === 200 &&
+          text.includes(oracle.text) &&
+          !hasAny(caller, oracle.allowed)
+        ) {
+          problems.push(`${variant.path} as ${caller.name}: a hidden value finds its owner`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
   it('refuses every church write to outsiders and suspended members', async () => {
     const problems: string[] = [];
     const writes = world.writes.filter((route) => isChurchRoute(route));
