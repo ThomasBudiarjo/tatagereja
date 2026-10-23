@@ -149,6 +149,38 @@ export const announcementsModule = (deps: Deps) => {
   return new Elysia({ prefix: '/churches/:churchId/announcements' })
     .use(authPlugin(deps))
     .get(
+      '/audience-options',
+      ({ church, access }) => {
+        const churchWide = canTargetChurchWide(access);
+        if (!churchWide && access.leaderGroupIds.length === 0) {
+          throw forbidden('You cannot publish announcements');
+        }
+        return {
+          churchWide,
+          groups: db
+            .select({ id: groups.id, name: groups.name })
+            .from(groups)
+            .where(
+              and(
+                eq(groups.churchId, church.id),
+                churchWide ? undefined : inArray(groups.id, access.leaderGroupIds),
+              ),
+            )
+            .orderBy(asc(groups.name))
+            .all(),
+          roles: churchWide
+            ? db
+                .select({ id: churchRoles.id, name: churchRoles.name })
+                .from(churchRoles)
+                .where(eq(churchRoles.churchId, church.id))
+                .orderBy(asc(churchRoles.name))
+                .all()
+            : [],
+        };
+      },
+      { church: { permission: 'announcements.view' }, params: churchParamsSchema },
+    )
+    .get(
       '/',
       ({ church, access, query }) => {
         releaseDueAnnouncements(db, [church.id]);

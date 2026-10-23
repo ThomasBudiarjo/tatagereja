@@ -1,319 +1,328 @@
-import { PARTICIPANT_STATUS_LABELS, fullName, type ParticipantStatus } from '@tatagereja/shared';
+import { EVENT_RECURRENCE_LABELS, localize, type EventEditScope } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarClock,
   ClipboardCheck,
+  ClipboardList,
+  Clock,
   MapPin,
+  MoreHorizontal,
   Pencil,
+  Repeat,
+  RotateCcw,
+  Share2,
   Trash2,
-  UserPlus,
-  Users,
-  X,
+  XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader, Section } from '@/components/layout/page';
 import { ConfirmDialog } from '@/components/ui/alert-dialog';
-import { EntityAvatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { copyText } from '@/components/ui/copy-button';
 import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { ListGroup, ListRow } from '@/components/ui/list';
-import { EmptyState, ErrorState, PageLoader } from '@/components/ui/misc';
-import { Select } from '@/components/ui/select';
-import { useCreateAttendanceSession } from '@/features/attendance/api';
-import { PersonPickerDialog } from '@/features/people/person-picker';
+import { Alert, Segmented } from '@/components/ui/misc';
+import { SkeletonPage } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
+import { Markdown } from '@/features/comms/markdown';
 import { getErrorMessage } from '@/lib/api';
-import { formatEventRange } from '@/lib/format';
-import {
-  eventQuery,
-  useAddParticipants,
-  useDeleteEvent,
-  useRemoveParticipant,
-  useUpdateEvent,
-  useUpdateParticipant,
-} from './api';
-import { EventForm } from './event-form';
-
-const statusVariant = (status: ParticipantStatus) =>
-  status === 'going' ? 'success' : status === 'not_going' ? 'destructive' : 'muted';
+import { useI18n } from '@/lib/i18n';
+import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
+import { eventQuery, useCancelEvent, useDeleteEvent } from './api';
+import { EVENT_TONE, mapsUrl } from './event-lib';
+import { OrganiserPanel, RegistrationCard, RsvpCard, SelfCheckInCard } from './event-panels';
+import { EventBadges, EventDateTile } from './event-ui';
 
 export function EventPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { churchId, base, access } = useChurch();
+  const { churchId, base } = useChurch();
+  const { t, locale, formatDateRange, formatDate, formatDateTime, formatNumber } = useI18n();
   const navigate = useNavigate();
   const query = useQuery(eventQuery(churchId, id));
-  const update = useUpdateEvent(churchId, id);
-  const remove = useDeleteEvent(churchId);
-  const addParticipants = useAddParticipants(churchId, id);
-  const updateParticipant = useUpdateParticipant(churchId, id);
-  const removeParticipant = useRemoveParticipant(churchId, id);
-  const createSession = useCreateAttendanceSession(churchId);
-  const [editOpen, setEditOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<EventEditScope>('this');
+  const cancel = useMutationToast(useCancelEvent(churchId, id), {
+    success: (result) =>
+      result.event.cancelledAt ? t('events.cancelledToast') : t('events.restoredToast'),
+  });
+  const remove = useMutationToast(useDeleteEvent(churchId), {
+    success: (result) => t('events.deletedToast', { count: result.deleted }),
+  });
 
-  if (query.isPending) return <PageLoader />;
+  if (query.isPending) return <SkeletonPage />;
   if (query.isError) {
     return (
       <Page>
-        <PageHeader backTo={`${base}/events`} title="Event" />
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
+        <PageHeader title={t('events.title')} backTo={`${base}/events`} />
+        <ErrorState
+          error={query.error}
+          title={isGone(query.error) ? t('events.goneTitle') : undefined}
+          message={isGone(query.error) ? t('events.goneBody') : getErrorMessage(query.error)}
+          onRetry={isGone(query.error) ? undefined : () => void query.refetch()}
+          retrying={query.isFetching}
+        />
       </Page>
     );
   }
 
-  const { event, participants, sessions, canManage, canRecordAttendance } = query.data;
-  const myParticipation = access.personId
-    ? participants.find((participant) => participant.id === access.personId)
-    : undefined;
+  const detail = query.data;
+  const { event, canManage, canCheckIn, canRecordAttendance, sessions } = detail;
+  const cancelled = !!event.cancelledAt;
 
-  const startAttendance = async () => {
-    try {
-      const result = await createSession.mutateAsync({
-        title: event.title,
-        eventId: event.id,
-        groupId: null,
-        sessionAt: event.startsAt,
-        notes: null,
-      });
-      navigate(`${base}/attendance/${result.session.id}`);
-    } catch (error) {
-      toast.error(getErrorMessage(error));
+  const share = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: event.title,
+          text: formatDateRange(event.startsAt, event.endsAt, event.isAllDay),
+          url,
+        });
+        return;
+      } catch {
+        // Cancelled: fall back to copying the link.
+      }
     }
+    if (await copyText(url)) toast.success(t('common.copied'));
+    else toast.error(t('common.copyFailed'));
   };
 
   return (
     <Page>
       <PageHeader
-        backTo={`${base}/events`}
-        eyebrow={event.groupName ?? 'Church-wide'}
+        breadcrumbs={[{ label: t('events.title'), to: `${base}/events` }, { label: event.title }]}
+        eyebrow={event.groupName ?? t('events.churchWide')}
+        tone={EVENT_TONE}
         title={event.title}
         actions={
-          canManage ? (
-            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-              <Pencil /> Edit
-            </Button>
-          ) : null
-        }
-      />
-
-      <Card>
-        <CardContent className="space-y-3 text-sm">
-          <p className="flex items-center gap-2 font-medium">
-            <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
-            {formatEventRange(event.startsAt, event.endsAt, event.isAllDay)}
-          </p>
-          {event.location ? (
-            <p className="flex items-center gap-2">
-              <MapPin className="size-4 shrink-0 text-muted-foreground" />
-              {event.location}
-            </p>
-          ) : null}
-          {event.description ? (
-            <p className="whitespace-pre-wrap text-muted-foreground">{event.description}</p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {myParticipation || access.personId ? (
-        <Card>
-          <CardContent className="flex items-center justify-between gap-3">
-            <div className="text-sm">
-              <p className="font-medium">Are you going?</p>
-              <p className="text-muted-foreground">Your response is visible to the organisers.</p>
-            </div>
-            <Select
-              aria-label="Your response"
-              className="w-36"
-              value={myParticipation?.status ?? ''}
-              onChange={async (selectEvent) => {
-                const status = selectEvent.target.value as ParticipantStatus;
-                if (!status || !access.personId) return;
-                try {
-                  await updateParticipant.mutateAsync({ personId: access.personId, status });
-                  toast.success('Response saved');
-                } catch (error) {
-                  toast.error(getErrorMessage(error));
-                }
-              }}
-            >
-              <option value="" disabled>
-                Respond…
-              </option>
-              <option value="going">Going</option>
-              <option value="not_going">Not going</option>
-              <option value="invited">Undecided</option>
-            </Select>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Section
-        title={`Participants (${participants.length})`}
-        action={
-          canManage ? (
-            <Button size="sm" variant="ghost" onClick={() => setPickerOpen(true)}>
-              <UserPlus /> Add
-            </Button>
-          ) : null
-        }
-      >
-        {participants.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No participants yet"
-            description={canManage ? 'Invite people from the directory.' : undefined}
-          />
-        ) : (
-          <ListGroup>
-            {participants.map((participant) => (
-              <ListRow
-                key={participant.id}
-                to={`${base}/people/${participant.id}`}
-                leading={
-                  <EntityAvatar name={fullName(participant)} src={participant.photoUrl} size="sm" />
-                }
-                title={fullName(participant)}
-                trailing={
-                  <span className="flex items-center gap-1">
-                    <Badge variant={statusVariant(participant.status)}>
-                      {PARTICIPANT_STATUS_LABELS[participant.status]}
-                    </Badge>
-                    {canManage ? (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remove ${fullName(participant)}`}
-                        onClick={async (clickEvent) => {
-                          clickEvent.preventDefault();
-                          try {
-                            await removeParticipant.mutateAsync(participant.id);
-                            toast.success('Participant removed');
-                          } catch (error) {
-                            toast.error(getErrorMessage(error));
-                          }
-                        }}
-                      >
-                        <X />
-                      </Button>
-                    ) : null}
-                  </span>
-                }
-                chevron={false}
-              />
-            ))}
-          </ListGroup>
-        )}
-      </Section>
-
-      {canRecordAttendance ? (
-        <Section
-          title="Attendance"
-          action={
+          <>
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => void startAttendance()}
-              loading={createSession.isPending}
+              onClick={() => void share()}
+              aria-label={t('common.share')}
             >
-              <ClipboardCheck /> New session
+              <Share2 />
+              <span className="hidden sm:inline">{t('common.share')}</span>
             </Button>
-          }
-        >
-          {sessions.length === 0 ? (
-            <EmptyState
-              icon={ClipboardCheck}
-              title="No attendance sessions"
-              description="Create a session to mark who attended this event."
-            />
-          ) : (
-            <ListGroup>
-              {sessions.map((session) => (
-                <ListRow
-                  key={session.id}
-                  to={`${base}/attendance/${session.id}`}
-                  title={session.title}
-                  subtitle={formatEventRange(session.sessionAt, null, false)}
-                  trailing={`${session.presentCount}/${session.totalCount} present`}
-                />
-              ))}
-            </ListGroup>
-          )}
+            {canManage ? (
+              <Button asChild size="sm" variant="outline">
+                <Link to={`${base}/events/${event.id}/edit`}>
+                  <Pencil />
+                  <span className="hidden sm:inline">{t('common.edit')}</span>
+                </Link>
+              </Button>
+            ) : null}
+            {canManage ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="size-9"
+                    aria-label={t('common.moreActions')}
+                  >
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {cancelled ? (
+                    <DropdownMenuItem onSelect={() => void cancel.run({ cancel: false })}>
+                      <RotateCcw />
+                      {t('events.restore')}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
+                      <XCircle />
+                      {t('events.cancelEvent')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onSelect={() => setDeleteOpen(true)}>
+                    <Trash2 />
+                    {t('common.delete')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </>
+        }
+      />
+
+      {cancelled ? (
+        <Alert variant="error" title={t('events.cancelledTitle')}>
+          {t('events.cancelledBody', { when: formatDateTime(event.cancelledAt) })}
+        </Alert>
+      ) : null}
+
+      <Card className="overflow-hidden">
+        {event.coverColor ? (
+          <div className="h-1.5" style={{ backgroundColor: event.coverColor }} aria-hidden />
+        ) : null}
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <EventDateTile
+            startsAt={event.startsAt}
+            color={event.coverColor}
+            muted={cancelled}
+            size="lg"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+            <p className="flex items-start gap-2.5 text-[0.9375rem]">
+              <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="font-medium">
+                {formatDateRange(event.startsAt, event.endsAt, event.isAllDay)}
+              </span>
+            </p>
+            {event.location ? (
+              <p className="flex items-start gap-2.5 text-[0.9375rem]">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <a
+                  href={mapsUrl(event.location)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {event.location}
+                </a>
+              </p>
+            ) : null}
+            {event.series ? (
+              <p className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                <Repeat className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  {t('events.seriesSummary', {
+                    frequency: localize(EVENT_RECURRENCE_LABELS[event.series.frequency], locale),
+                    until: formatDate(event.series.untilDate, 'dateShort'),
+                  })}
+                  {event.isSeriesException ? ` · ${t('events.editedSeparately')}` : ''}
+                </span>
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              <EventBadges event={event} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <SelfCheckInCard detail={detail} />
+      {event.registrationRequired ? (
+        <RegistrationCard detail={detail} />
+      ) : (
+        <RsvpCard detail={detail} />
+      )}
+
+      {event.description ? (
+        <Section title={t('events.about')}>
+          <Card>
+            <CardContent>
+              <Markdown source={event.description} />
+            </CardContent>
+          </Card>
         </Section>
       ) : null}
 
-      {canManage ? (
-        <Button variant="outline" className="text-destructive" onClick={() => setDeleteOpen(true)}>
-          <Trash2 /> Delete event
+      {canCheckIn && !cancelled ? (
+        <Button asChild variant="soft" size="lg" className="w-full sm:w-fit">
+          <Link to={`${base}/events/${event.id}/check-in`}>
+            <ClipboardCheck />
+            {t('events.openCheckIn')}
+          </Link>
         </Button>
       ) : null}
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit event</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <EventForm
-              event={event}
-              submitLabel="Save changes"
-              onCancel={() => setEditOpen(false)}
-              onSubmit={async (values) => {
-                await update.mutateAsync(values);
-                setEditOpen(false);
-                toast.success('Event updated');
-              }}
-            />
-          </DialogBody>
-        </DialogContent>
-      </Dialog>
+      {canManage ? <OrganiserPanel detail={detail} /> : null}
 
-      <PersonPickerDialog
-        churchId={churchId}
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        title="Add participants"
-        excludeIds={participants.map((participant) => participant.id)}
-        confirmLabel="Invite"
-        loading={addParticipants.isPending}
-        onConfirm={async (personIds) => {
-          try {
-            await addParticipants.mutateAsync({ personIds, status: 'invited' });
-            setPickerOpen(false);
-            toast.success('Participants added');
-          } catch (error) {
-            toast.error(getErrorMessage(error));
+      {canRecordAttendance && sessions.length > 0 ? (
+        <Section title={t('events.attendanceTitle')} icon={ClipboardList}>
+          <ListGroup>
+            {sessions.map((session) => (
+              <ListRow
+                key={session.id}
+                to={`${base}/attendance/${session.id}`}
+                title={session.title}
+                subtitle={formatDateTime(session.sessionAt)}
+                trailing={t('events.presentOf', {
+                  present: formatNumber(session.presentCount),
+                  total: formatNumber(session.totalCount),
+                })}
+              />
+            ))}
+          </ListGroup>
+        </Section>
+      ) : null}
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title={t('events.cancelTitle', { title: event.title })}
+        description={t('events.cancelBody')}
+        confirmLabel={t('events.cancelEvent')}
+        cancelLabel={t('events.keepEvent')}
+        loading={cancel.isPending}
+        onConfirm={async () => {
+          if (await cancel.run({ cancel: true, reason })) {
+            setCancelOpen(false);
+            setReason('');
           }
         }}
-      />
+      >
+        <Field
+          label={t('events.cancelReason')}
+          htmlFor="cancel-reason"
+          description={t('events.cancelReasonHint')}
+        >
+          <Input
+            id="cancel-reason"
+            value={reason}
+            maxLength={200}
+            onChange={(input) => setReason(input.target.value)}
+          />
+        </Field>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={`Delete ${event.title}?`}
-        description="Participants and linked attendance sessions are removed as well."
-        confirmLabel="Delete"
+        title={t('events.deleteTitle', { title: event.title })}
+        description={t('events.deleteBody')}
+        confirmLabel={t('common.delete')}
+        confirmText={event.registeredCount > 0 || event.goingCount > 0 ? event.title : undefined}
         loading={remove.isPending}
         onConfirm={async () => {
-          try {
-            await remove.mutateAsync(event.id);
-            toast.success('Event deleted');
-            navigate(`${base}/events`, { replace: true });
-          } catch (error) {
-            toast.error(getErrorMessage(error));
+          const result = await remove.run({ id: event.id, scope: deleteScope });
+          if (result) {
+            setDeleteOpen(false);
+            void navigate(`${base}/events`, { replace: true });
           }
         }}
-      />
+      >
+        {event.seriesId ? (
+          <Segmented
+            aria-label={t('events.deleteScope')}
+            value={deleteScope}
+            onChange={setDeleteScope}
+            options={[
+              { value: 'this', label: t('events.scopeThisShort') },
+              { value: 'future', label: t('events.scopeFutureShort'), icon: CalendarClock },
+            ]}
+          />
+        ) : null}
+      </ConfirmDialog>
     </Page>
   );
 }

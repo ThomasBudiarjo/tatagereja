@@ -354,6 +354,25 @@ describe('comms announcements', () => {
     ).toBe(true);
   });
 
+  it('offers the audiences each person may address', async () => {
+    const announcer = await t.request('GET', `${url}/audience-options`, {
+      token: c.announcer.token,
+    });
+    expect(announcer.status).toBe(200);
+    expect(announcer.json.churchWide).toBe(true);
+    expect(announcer.json.groups).toHaveLength(2);
+    expect(announcer.json.roles.map((role: { name: string }) => role.name)).toContain(
+      'Paduan Suara',
+    );
+    const leader = await t.request('GET', `${url}/audience-options`, { token: c.s.leader.token });
+    expect(leader.json.churchWide).toBe(false);
+    expect(leader.json.groups).toEqual([{ id: c.s.group.id, name: 'Youth Ministry' }]);
+    expect(leader.json.roles).toEqual([]);
+    expect(
+      (await t.request('GET', `${url}/audience-options`, { token: c.s.member.token })).status,
+    ).toBe(403);
+  });
+
   it('refuses ids from another church', async () => {
     const foreign = await t.request('POST', `/api/churches/${c.otherChurch.id}/announcements`, {
       token: c.other.token,

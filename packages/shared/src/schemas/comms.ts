@@ -236,6 +236,14 @@ export const announcementDetailsResponseSchema = z.object({
   announcement: announcementDetailsSchema,
 });
 
+/** Who the caller may address: groups they may post to and, with `announcements.manage`, roles. */
+export const announcementAudienceOptionsSchema = z.object({
+  churchWide: z.boolean(),
+  groups: z.array(z.object({ id: idSchema, name: z.string() })),
+  roles: z.array(z.object({ id: idSchema, name: z.string() })),
+});
+export type AnnouncementAudienceOptions = z.infer<typeof announcementAudienceOptionsSchema>;
+
 export const pinAnnouncementBodySchema = z.object({ pinned: z.boolean() });
 
 export const announcementReadersSchema = z.object({
