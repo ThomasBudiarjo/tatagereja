@@ -1,7 +1,11 @@
 import {
   FOLLOW_UP_ACTIVE_STAGES,
   FOLLOW_UP_STAGES,
+  PERSON_MEMBERSHIP_STATUS_LABELS,
+  canAddVisitorPerson,
+  canApplyStatusSuggestion,
   canManageFollowUp,
+  followUpStatusSuggestion,
   churchIdParamsSchema,
   churchParamsSchema,
   fullName,
@@ -13,6 +17,7 @@ import {
   visitorFollowUpUpdateSchema,
   type AccessLike,
   type FollowUpStage,
+  type PersonMembershipStatus,
 } from '@tatagereja/shared';
 import { and, count, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
@@ -25,7 +30,7 @@ import { likePattern } from '../../lib/query';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
-import { recordAudit, redact } from '../../services/audit';
+import { recordAudit, redact, type AuditContext } from '../../services/audit';
 import {
   assertActiveMembers,
   followUpOnBoardCondition,
@@ -128,6 +133,59 @@ export const followUpsRouter = (deps: Deps) => {
     if (active.length > 0) throw conflict('This person is already being followed up');
   };
 
+  /** Sets the person's new directory status, audited in the people module. */
+  const applyStatus = (
+    tx: Queryable,
+    audit: AuditContext,
+    person: PersonRow,
+    status: PersonMembershipStatus,
+  ) => {
+    tx.update(people)
+      .set({ membershipStatus: status, updatedAt: nowIso() })
+      .where(eq(people.id, person.id))
+      .run();
+    recordAudit(tx, audit, {
+      module: 'people',
+      action: 'person.status_change',
+      entityType: 'person',
+      entityId: person.id,
+      summary: `Changed the status of ${fullName(person)} from ${PERSON_MEMBERSHIP_STATUS_LABELS[person.membershipStatus].toLowerCase()} to ${PERSON_MEMBERSHIP_STATUS_LABELS[status].toLowerCase()} after their follow-up`,
+      params: { person: fullName(person), status },
+      before: { membershipStatus: person.membershipStatus },
+      after: { membershipStatus: status },
+    });
+  };
+
+  const suggestStatus = (
+    tx: Queryable,
+    church: ChurchRow,
+    access: AccessLike,
+    audit: AuditContext,
+    row: VisitorFollowUpRow,
+  ) => {
+    const person = tx.select().from(people).where(eq(people.id, row.personId)).get();
+    if (!person) return;
+    const status = followUpStatusSuggestion(row.stage, person.membershipStatus);
+    if (!status) return;
+    if (canApplyStatusSuggestion(access)) {
+      applyStatus(tx, audit, person, status);
+      return;
+    }
+    notify(tx, {
+      churchId: church.id,
+      audience: { kind: 'permission', permission: 'people.edit' },
+      excludeUserIds: [access.userId],
+      type: 'care.status_suggested',
+      title: {
+        id: `${fullName(person)} sudah bergabung: ubah statusnya menjadi simpatisan?`,
+        en: `${fullName(person)} joined: change their status to regular attendee?`,
+      },
+      link: `/c/${church.id}/care/follow-ups/${row.id}`,
+      entityType: 'visitor_follow_up',
+      entityId: row.id,
+    });
+  };
+
   return new Elysia({ prefix: '/churches/:churchId/care/follow-ups' })
     .use(authPlugin(deps))
     .get(
@@ -187,6 +245,11 @@ export const followUpsRouter = (deps: Deps) => {
     .post(
       '/',
       ({ church, auth, access, audit, body, set }) => {
+        if (body.newVisitor && !canAddVisitorPerson(access)) {
+          throw forbidden(
+            'Adding a new person to the directory needs permission to add people; choose someone who is already in it',
+          );
+        }
         let person: PersonRow | null = body.personId
           ? loadPersonInChurch(db, church.id, body.personId)
           : null;
@@ -320,26 +383,41 @@ export const followUpsRouter = (deps: Deps) => {
             .returning()
             .get();
           if (!next) throw notFound('Follow-up');
-          // A visitor who joined becomes a regular attendee (simpatisan) in the directory.
-          if (body.stage === 'joined') {
-            tx.update(people)
-              .set({ membershipStatus: 'regular', updatedAt: now })
-              .where(and(eq(people.id, row.personId), eq(people.membershipStatus, 'visitor')))
-              .run();
-          }
           recordAudit(tx, audit, {
             module: 'care',
             action: 'visitor_follow_up.stage',
             entityType: 'visitor_follow_up',
             entityId: row.id,
             summary: `Moved the follow-up of ${personName(row.personId)} to ${body.stage}`,
+            params: { person: personName(row.personId), stage: body.stage },
             ...redactedChanges(auditable(row), auditable(next), SECRET_FIELDS),
           });
+          // A visitor who joined becomes a regular attendee (simpatisan) in the directory: done
+          // at once by someone who may edit people, otherwise suggested to those who may.
+          if (row.stage !== 'joined') suggestStatus(tx, church, access, audit, next);
           return next;
         });
         return { followUp: hydrateOne(church, access, updated) };
       },
       { church: 'care', params: churchIdParamsSchema, body: moveFollowUpBodySchema },
+    )
+    .post(
+      '/:id/apply-status',
+      ({ church, access, audit, params }) => {
+        const row = loadVisible(church.id, access, params.id);
+        if (!canApplyStatusSuggestion(access)) {
+          throw forbidden('Changing a membership status needs permission to edit people');
+        }
+        const person = loadPersonInChurch(db, church.id, row.personId);
+        const status = followUpStatusSuggestion(row.stage, person.membershipStatus);
+        if (!status) throw conflict('There is no status change to make for this follow-up');
+        db.transaction((tx) => applyStatus(tx, audit, person, status));
+        return { followUp: hydrateOne(church, access, row) };
+      },
+      {
+        church: { module: 'care', permission: 'people.edit' },
+        params: churchIdParamsSchema,
+      },
     )
     .delete(
       '/:id',

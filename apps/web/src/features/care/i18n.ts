@@ -326,6 +326,14 @@ export const careDictionary = defineDictionary('care', {
     followUpCreated: '{name} added to the follow-up board',
     followUpSaved: 'Follow-up saved',
     followUpDeleted: 'Follow-up deleted',
+    statusSuggestionTitle: 'Suggested status: {status}',
+    statusSuggestionCan: '{name} joined. Change their status in the directory now.',
+    statusSuggestionCannot:
+      '{name} joined. Someone who may edit people in the directory has been asked to change their status.',
+    applyStatus: 'Change status',
+    statusApplied: 'Status of {name} changed',
+    newGuestNeedsPermission:
+      'Adding a new person to the directory needs permission to add people. Choose someone who is already in it.',
     editFollowUp: 'Edit follow-up',
     editFollowUpDescription: 'Details about the visitor and who follows up.',
     followUpDetail: 'Follow-up',
@@ -768,6 +776,14 @@ export const careDictionary = defineDictionary('care', {
     followUpCreated: '{name} ditambahkan ke papan tindak lanjut',
     followUpSaved: 'Tindak lanjut disimpan',
     followUpDeleted: 'Tindak lanjut dihapus',
+    statusSuggestionTitle: 'Saran status: {status}',
+    statusSuggestionCan: '{name} sudah bergabung. Ubah statusnya di data jemaat sekarang.',
+    statusSuggestionCannot:
+      '{name} sudah bergabung. Pengurus yang berwenang mengubah data jemaat sudah diminta mengubah statusnya.',
+    applyStatus: 'Ubah status',
+    statusApplied: 'Status {name} sudah diubah',
+    newGuestNeedsPermission:
+      'Menambah orang baru ke data jemaat memerlukan izin menambah jemaat. Pilih orang yang sudah ada di data jemaat.',
     editFollowUp: 'Ubah tindak lanjut',
     editFollowUpDescription: 'Keterangan tentang tamu dan siapa yang menindaklanjuti.',
     followUpDetail: 'Tindak lanjut',

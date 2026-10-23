@@ -24,6 +24,7 @@ describe('visitor follow-up and tasks', () => {
     coordinator = await memberWithRole(t, s, 'Koordinator Penyambutan', [
       'care.view',
       'care.manage',
+      'people.create',
     ]);
     viewer = await memberWithRole(t, s, 'Pnt. Hana', ['care.view']);
     usher = await memberWithRole(t, s, 'Penerima Tamu', []);
@@ -146,7 +147,38 @@ describe('visitor follow-up and tasks', () => {
         body: { stage: 'joined' },
       });
       expect(joined.status).toBe(200);
-      expect(joined.json.followUp.person.membershipStatus).toBe('regular');
+      // The coordinator may not edit people: the status change waits for someone who may.
+      expect(joined.json.followUp.person.membershipStatus).toBe('visitor');
+      expect(joined.json.followUp.statusSuggestion).toBe('regular');
+      expect(joined.json.followUp.canChangeStatus).toBe(false);
+      const suggested = (await notificationsOf(t, s.admin.token)).find(
+        (item) => item.type === 'care.status_suggested',
+      );
+      expect(suggested?.title).toContain('Kevin Sihombing');
+      const refused = await t.request('POST', `${base}/follow-ups/${followUpId}/apply-status`, {
+        token: coordinator.token,
+      });
+      expect(refused.status).toBe(403);
+      const applied = await t.request('POST', `${base}/follow-ups/${followUpId}/apply-status`, {
+        token: s.admin.token,
+      });
+      expect(applied.status).toBe(200);
+      expect(applied.json.followUp.person.membershipStatus).toBe('regular');
+      expect(applied.json.followUp.statusSuggestion).toBeNull();
+      const twice = await t.request('POST', `${base}/follow-ups/${followUpId}/apply-status`, {
+        token: s.admin.token,
+      });
+      expect(twice.status).toBe(409);
+      const statusAudit = await t.request(
+        'GET',
+        `/api/churches/${s.church.id}/audit-logs?action=person.status_change&entityId=${visitorId}`,
+        { token: s.owner.token },
+      );
+      expect(statusAudit.json.items).toHaveLength(1);
+      expect(statusAudit.json.items[0].params).toMatchObject({
+        person: 'Kevin Sihombing',
+        status: 'regular',
+      });
       // With this one ended, a new follow-up for the same person is allowed.
       const again = await t.request('POST', `${base}/follow-ups`, {
         token: coordinator.token,
@@ -163,6 +195,46 @@ describe('visitor follow-up and tasks', () => {
         expect.arrayContaining(['visitor_follow_up.create', 'visitor_follow_up.stage']),
       );
       expect(JSON.stringify(audit)).not.toContain('persekutuan pemuda');
+    });
+  });
+
+  describe('directory permissions', () => {
+    it('adds new people and changes statuses only with the directory permissions', async () => {
+      const carer = await memberWithRole(t, s, 'Diaken Penyambutan', ['care.view', 'care.manage']);
+      const newGuest = await t.request('POST', `${base}/follow-ups`, {
+        token: carer.token,
+        body: { newVisitor: { firstName: 'Tamu', lastName: 'Baru' } },
+      });
+      expect(newGuest.status).toBe(403);
+      expect(newGuest.json.error.message).toContain('already in');
+      const people = await t.request('GET', `/api/churches/${s.church.id}/people?q=Tamu`, {
+        token: s.owner.token,
+      });
+      expect(people.json.items).toHaveLength(0);
+
+      // Someone already in the directory is fine, and an editor's move applies the status.
+      const guest = await t.createPerson(s.owner.token, s.church.id, {
+        firstName: 'Yohana',
+        lastName: 'Tamu',
+        membershipStatus: 'visitor',
+      });
+      const existing = await t.request('POST', `${base}/follow-ups`, {
+        token: carer.token,
+        body: { personId: guest.id },
+      });
+      expect(existing.status).toBe(201);
+      const editor = await memberWithRole(t, s, 'Sekretaris Penyambutan', [
+        'care.manage',
+        'people.edit',
+      ]);
+      const joined = await t.request(
+        'POST',
+        `${base}/follow-ups/${existing.json.followUp.id}/stage`,
+        { token: editor.token, body: { stage: 'joined' } },
+      );
+      expect(joined.status).toBe(200);
+      expect(joined.json.followUp.person.membershipStatus).toBe('regular');
+      expect(joined.json.followUp.statusSuggestion).toBeNull();
     });
   });
 

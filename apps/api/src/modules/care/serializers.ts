@@ -1,4 +1,6 @@
 import {
+  canApplyStatusSuggestion,
+  followUpStatusSuggestion,
   canAdministerCareCase,
   canChangeCareConfidentiality,
   canCompleteCareTask,
@@ -424,6 +426,8 @@ export function hydrateFollowUps(
         nextDueDate: tasks?.next ?? null,
         hasOverdueTask: tasks?.overdue ?? false,
         canManage: canManageFollowUp(access, row),
+        statusSuggestion: followUpStatusSuggestion(row.stage, person.membershipStatus),
+        canChangeStatus: canApplyStatusSuggestion(access),
         createdAt: row.createdAt,
       },
     ];

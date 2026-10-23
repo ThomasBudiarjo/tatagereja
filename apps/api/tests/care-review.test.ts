@@ -272,9 +272,14 @@ describe('care review', () => {
 
   describe('overview pipeline', () => {
     it('counts the same follow-ups as the board', async () => {
+      const guest = await t.createPerson(s.owner.token, s.church.id, {
+        firstName: 'Tamu',
+        lastName: 'Lama',
+        membershipStatus: 'visitor',
+      });
       const created = await t.request('POST', `${base}/follow-ups`, {
         token: elder.token,
-        body: { newVisitor: { firstName: 'Tamu', lastName: 'Lama' } },
+        body: { personId: guest.id },
       });
       const id = created.json.followUp.id;
       await t.request('POST', `${base}/follow-ups/${id}/stage`, {
