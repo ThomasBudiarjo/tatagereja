@@ -38,6 +38,7 @@ import {
   redactedChanges,
   todayIn,
 } from '../../services/care';
+import { permissionsByUser } from '../../services/access';
 import { notify } from '../../services/notifications';
 import { onVisibleContact } from '../../services/people';
 import { hydrateFollowUps } from './serializers';
@@ -171,9 +172,17 @@ export const followUpsRouter = (deps: Deps) => {
       applyStatus(tx, audit, person, status);
       return;
     }
+    // Those who may change the status and can open the follow-up to do it.
+    const userIds = [...permissionsByUser(tx, church.id)]
+      .filter(
+        ([userId, permissions]) =>
+          canApplyStatusSuggestion({ permissions }) &&
+          (isCareTeam({ permissions }) || userId === row.assignedUserId),
+      )
+      .map(([userId]) => userId);
     notify(tx, {
       churchId: church.id,
-      audience: { kind: 'permission', permission: 'people.edit' },
+      userIds,
       excludeUserIds: [access.userId],
       type: 'care.status_suggested',
       title: {
@@ -306,6 +315,8 @@ export const followUpsRouter = (deps: Deps) => {
             after: redact(auditable(row), SECRET_FIELDS),
           });
           notifyAssignee(tx, church, row, auth.user.id);
+          // A guest recorded as already joined gets the same status change as a move there.
+          suggestStatus(tx, church, access, audit, row);
           return row;
         });
         set.status = 201;

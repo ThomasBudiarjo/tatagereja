@@ -236,6 +236,37 @@ describe('visitor follow-up and tasks', () => {
       expect(joined.json.followUp.person.membershipStatus).toBe('regular');
       expect(joined.json.followUp.statusSuggestion).toBeNull();
     });
+
+    it('asks only editors who can open the follow-up, also when it starts as joined', async () => {
+      const carer = await memberWithRole(t, s, 'Diaken Tamu', ['care.view', 'care.manage']);
+      // A secretary may edit people but cannot open follow-ups, so they are not asked.
+      const secretary = await memberWithRole(t, s, 'Sekretaris Jemaat', ['people.edit']);
+      const careEditor = await memberWithRole(t, s, 'Penatua Penyambutan', [
+        'care.view',
+        'people.edit',
+      ]);
+      const guest = await t.createPerson(s.owner.token, s.church.id, {
+        firstName: 'Ruth',
+        lastName: 'Simatupang',
+        membershipStatus: 'visitor',
+      });
+      const created = await t.request('POST', `${base}/follow-ups`, {
+        token: carer.token,
+        body: { personId: guest.id, stage: 'joined' },
+      });
+      expect(created.status).toBe(201);
+      expect(created.json.followUp.statusSuggestion).toBe('regular');
+      const asked = async (token: string) =>
+        (await notificationsOf(t, token)).some(
+          (item) => item.type === 'care.status_suggested' && item.title.includes('Ruth'),
+        );
+      expect(await asked(careEditor.token)).toBe(true);
+      expect(await asked(secretary.token)).toBe(false);
+      const opened = await t.request('GET', `${base}/follow-ups/${created.json.followUp.id}`, {
+        token: careEditor.token,
+      });
+      expect(opened.status).toBe(200);
+    });
   });
 
   describe('tasks', () => {
