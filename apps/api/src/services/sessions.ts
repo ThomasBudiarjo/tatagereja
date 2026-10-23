@@ -1,10 +1,15 @@
 import type { AuthResponse, SessionTransport, User } from '@tatagereja/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
 import { createHmac } from 'node:crypto';
 import type { AppConfig } from '../config';
 import type { Queryable } from '../db/client';
 import type { SessionRow } from '../db/schema';
-import { sessionRefreshTokens, sessions } from '../db/schema';
+import {
+  passwordResetTokens,
+  sessionRefreshTokens,
+  sessions,
+  twoFactorChallenges,
+} from '../db/schema';
 import { isHttpsRequest, type RequestMeta } from '../lib/request';
 import { addDays } from '../lib/time';
 import { generateToken, hashToken, newId } from '../lib/tokens';
@@ -128,6 +133,27 @@ export function rotateSession(
   return { session, token, refreshToken };
 }
 
+/**
+ * Deletes sessions that ended (absolute lifetime or idle) but were never presented again, so
+ * they do not linger in session lists or keep their refresh-token history. One account, or all.
+ */
+export function purgeEndedSessions(
+  db: Queryable,
+  config: SessionConfig,
+  userId: string | null = null,
+): number {
+  const now = new Date();
+  const ended = or(
+    lte(sessions.expiresAt, now.toISOString()),
+    lte(sessions.lastUsedAt, addDays(now, -config.sessionIdleDays).toISOString()),
+  );
+  return db
+    .delete(sessions)
+    .where(userId ? and(eq(sessions.userId, userId), ended) : ended)
+    .returning({ id: sessions.id })
+    .all().length;
+}
+
 /** Ends every session of an account except `keepSessionId`. Returns how many ended. */
 export function revokeOtherSessions(
   db: Queryable,
@@ -138,6 +164,18 @@ export function revokeOtherSessions(
     ? and(eq(sessions.userId, userId), ne(sessions.id, keepSessionId))
     : eq(sessions.userId, userId);
   return db.delete(sessions).where(where).returning({ id: sessions.id }).all().length;
+}
+
+/**
+ * Voids what was issued on the strength of an earlier password: two-step sign-ins still
+ * waiting for their code, and reset links not used yet. Run with every password change or reset.
+ */
+export function voidPendingCredentials(db: Queryable, userId: string): void {
+  db.delete(twoFactorChallenges).where(eq(twoFactorChallenges.userId, userId)).run();
+  db.update(passwordResetTokens)
+    .set({ usedAt: new Date().toISOString() })
+    .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)))
+    .run();
 }
 
 /** The cookie name a request uses: `__Host-` over HTTPS. */

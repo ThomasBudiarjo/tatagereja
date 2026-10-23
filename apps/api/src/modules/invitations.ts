@@ -110,9 +110,9 @@ export const invitationsModule = (deps: Deps) => {
     .post(
       '/:id/regenerate',
       ({ church, access, audit, params }) => {
-        const row = loadInvitation(church.id, params.id);
         if (!can.createInvitations(access))
           throw forbidden('Only administrators can manage invitations');
+        const row = loadInvitation(church.id, params.id);
         if (!can.inviteWithRole(access, row.role)) {
           throw new HttpError(
             403,

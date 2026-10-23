@@ -24,7 +24,7 @@ import { authPlugin } from '../../plugins/auth';
 import { customRolesOf, loadAccess } from '../../services/access';
 import { recordAudit, type AuditContext } from '../../services/audit';
 import { notify } from '../../services/notifications';
-import { revokeOtherSessions } from '../../services/sessions';
+import { revokeOtherSessions, voidPendingCredentials } from '../../services/sessions';
 import {
   accountLocked,
   clearLoginFailures,
@@ -127,6 +127,7 @@ export const passwordResetRouter = (deps: Deps) => {
       .where(eq(users.id, user.id))
       .run();
     const revoked = revokeOtherSessions(tx, user.id, null);
+    voidPendingCredentials(tx, user.id);
     clearLoginFailures(tx, user.id);
     recordLoginEvent(tx, {
       userId: user.id,
@@ -334,14 +335,19 @@ export const passwordResetRouter = (deps: Deps) => {
         const emailWait = deps.limiters.login.check(`${meta.ip ?? 'unknown'}:${body.email}`);
         if (emailWait > 0) throw rateLimited(emailWait);
         const user = db.select().from(users).where(eq(users.email, body.email)).get();
-        assertStrongPassword(body.newPassword, 'newPassword', user ?? { email: body.email });
-        // One answer for an unknown address, an account without 2FA and a wrong code.
+        // Checked against the email only: refusing a password because it is the account's
+        // name would tell that the account exists.
+        assertStrongPassword(body.newPassword, 'newPassword', { email: body.email });
+        /*
+         * One answer for an unknown address, an account without 2FA, a wrong code and a
+         * locked account (a lock would tell that the account exists). Recovery codes are long
+         * random strings, so the per-address limit is enough against guessing, and a valid
+         * code lets its owner back in even while someone else keeps the account locked.
+         */
         const refused = () =>
           validationError('This email and recovery code do not match', [
             { path: 'recoveryCode', message: 'This email and recovery code do not match' },
           ]);
-        const lockedUntil = user ? lockedUntilOf(user) : null;
-        if (lockedUntil) throw accountLocked(lockedUntil);
         const twoFactor = user ? enabledTwoFactor(db, user.id) : null;
         const passwordHash = await hashPassword(body.newPassword, config.passwordHashing);
         if (!user || !twoFactor) {
@@ -364,14 +370,12 @@ export const passwordResetRouter = (deps: Deps) => {
               reason: 'wrong_recovery_code',
               meta,
             });
-            return (
-              registerLoginFailure(tx, user, 'two_factor_failure', meta, 'recovery_reset') ?? false
-            );
+            registerLoginFailure(tx, user, 'two_factor_failure', meta, 'recovery_reset');
+            return false;
           }
           applyNewPassword(tx, user, passwordHash, audit, 'recovery_code', meta);
           return true;
         });
-        if (result instanceof Date) throw accountLocked(result);
         if (!result) throw refused();
         return { ok: true as const };
       },

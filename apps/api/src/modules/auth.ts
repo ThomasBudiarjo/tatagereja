@@ -44,11 +44,13 @@ import {
   createSession,
   csrfTokenFor,
   idleExpiryOf,
+  purgeEndedSessions,
   readSessionCookie,
   revokeOtherSessions,
   rotateSession,
   sessionEnded,
   sessionResponse,
+  voidPendingCredentials,
 } from '../services/sessions';
 import {
   accountLocked,
@@ -108,9 +110,13 @@ export const authModule = (deps: Deps) => {
     }
   };
 
-  /** A new sign-in replaces the session the browser already presented (session fixation). */
-  const dropPresentedSession = (request: Request) => {
-    const token = readSessionCookie(request);
+  /**
+   * A new cookie sign-in replaces the session the browser already presented (session
+   * fixation). Only then: a bearer sign-in may come from any page, and a page on a sibling
+   * site (whose requests still carry the SameSite cookie) must not sign the browser out.
+   */
+  const dropPresentedSession = (request: Request, transport: SessionTransport) => {
+    const token = transport === 'cookie' ? readSessionCookie(request) : null;
     if (token)
       db.delete(sessions)
         .where(eq(sessions.tokenHash, hashToken(token)))
@@ -126,8 +132,9 @@ export const authModule = (deps: Deps) => {
     transport: SessionTransport,
     outcome: 'success' | 'two_factor_success' | 'recovery_code_used',
   ) => {
-    dropPresentedSession(request);
+    dropPresentedSession(request, transport);
     const issued = db.transaction((tx) => {
+      purgeEndedSessions(tx, config, user.id);
       clearLoginFailures(tx, user.id);
       recordLoginEvent(tx, { userId: user.id, email: user.email, outcome, meta });
       return createSession(tx, config, { userId: user.id, transport, meta });
@@ -208,7 +215,7 @@ export const authModule = (deps: Deps) => {
         if (body.invitationToken) {
           joinedChurchId = acceptInvitation(db, body.invitationToken, user.id, meta).churchId;
         }
-        dropPresentedSession(request);
+        dropPresentedSession(request, body.transport);
         // Sign-in history starts with the first login; registering is not one.
         const issued = createSession(db, config, {
           userId: user.id,
@@ -559,6 +566,8 @@ export const authModule = (deps: Deps) => {
           // credentials so a copy of the old ones stops working too.
           const revoked = revokeOtherSessions(tx, user.id, auth.sessionId);
           const issued = rotateSession(tx, config, auth.sessionId);
+          // Sign-ins half done with the old password and reset links made before stop working.
+          voidPendingCredentials(tx, user.id);
           recordAudit(tx, audit, {
             module: 'admin-security',
             action: 'account.password_change',
@@ -599,6 +608,8 @@ export const authModule = (deps: Deps) => {
     .get(
       '/sessions',
       ({ auth }) => {
+        // Sessions that ended without being used again are not listed as signed in.
+        purgeEndedSessions(db, config, auth.user.id);
         const rows = db
           .select()
           .from(sessions)

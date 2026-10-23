@@ -185,6 +185,20 @@ describe('cookie sessions and CSRF', () => {
     );
   });
 
+  it('does not let a bearer sign-in from a sibling page end the cookie session', async () => {
+    const login = await cookieLogin();
+    await t.register('Tetangga Situs', 'sibling@example.com', password);
+    // A page on another sub-domain is same-site: its form posts still carry the SameSite cookie.
+    const other = await browser(t, 'POST', '/api/auth/login', {
+      cookie: cookieOf(login),
+      origin: 'http://evil.localhost',
+      site: 'same-site',
+      body: { email: 'sibling@example.com', password, transport: 'bearer' },
+    });
+    expect(other.status).toBe(200);
+    expect((await browser(t, 'GET', '/api/auth/me', { cookie: cookieOf(login) })).status).toBe(200);
+  });
+
   it('clears the cookie on logout and the session stops working', async () => {
     const login = await cookieLogin();
     const cookie = cookieOf(login);
@@ -360,6 +374,24 @@ describe('bearer sessions: short access tokens and rotating refresh tokens', () 
     expect(refreshOld.status).toBe(401);
   });
 
+  it('never lists sessions that ended while nobody used them, and deletes them', async () => {
+    const forgotten = await login();
+    const forgottenId = t.db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.tokenHash, sessionHash(forgotten.token)))
+      .get()!.id;
+    t.db
+      .update(sessions)
+      .set({ lastUsedAt: new Date(Date.now() - 8 * 24 * 3600_000).toISOString() })
+      .where(eq(sessions.id, forgottenId))
+      .run();
+    const current = await login();
+    const list = await t.request('GET', '/api/auth/sessions', { token: current.token });
+    expect(list.json.items.some((item: { id: string }) => item.id === forgottenId)).toBe(false);
+    expect(t.db.select().from(sessions).where(eq(sessions.id, forgottenId)).get()).toBeUndefined();
+  });
+
   it('lists sessions with device details and signs out everywhere', async () => {
     const phone = await t.request('POST', '/api/auth/login', {
       body: { email, password },
@@ -520,6 +552,8 @@ describe('security headers', () => {
     expect(headers['cross-origin-resource-policy']).toBe('same-origin');
     expect(headers['permissions-policy']).toContain('geolocation=()');
     expect(headers['permissions-policy']).toContain('microphone=()');
+    // Browsers log every feature they do not know on every page; `bluetooth` is not one.
+    expect(headers['permissions-policy']).not.toContain('bluetooth');
     expect(headers['strict-transport-security']).toBeUndefined();
   });
 

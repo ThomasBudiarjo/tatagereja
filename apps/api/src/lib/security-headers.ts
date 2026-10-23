@@ -43,7 +43,6 @@ const PERMISSIONS_POLICY = [
   'usb=()',
   'serial=()',
   'hid=()',
-  'bluetooth=()',
   'midi=()',
   'magnetometer=()',
   'gyroscope=()',

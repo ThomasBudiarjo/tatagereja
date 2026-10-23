@@ -589,4 +589,84 @@ describe('password reset', () => {
     });
     expect(login.json.twoFactorRequired).toBe(true);
   });
+
+  it('answers a locked account like any other, and still lets its own recovery code in', async () => {
+    const account = await t.register('Terkunci Sekali', 'kunci@example.com', 'kidung-pujian-91');
+    const setup = await t.request('POST', '/api/auth/two-factor/setup', {
+      token: account.token,
+      body: { password: account.password },
+    });
+    const enable = await t.request('POST', '/api/auth/two-factor/enable', {
+      token: account.token,
+      body: { code: totpCode(setup.json.secret) },
+    });
+    const code = (enable.json.recoveryCodes as string[])[0];
+    // Someone else keeps the account locked by guessing passwords.
+    t.db
+      .update(users)
+      .set({ lockedUntil: new Date(Date.now() + 60 * 60_000).toISOString() })
+      .where(eq(users.id, account.user.id))
+      .run();
+    const wrong = await t.request('POST', '/api/auth/password-reset/recovery', {
+      body: {
+        email: 'kunci@example.com',
+        recoveryCode: 'AAAAA-AAAAA',
+        newPassword: 'terkunci-baru-2031',
+      },
+    });
+    expect(wrong.status).toBe(422);
+    expect(wrong.json.error.message).toBe('This email and recovery code do not match');
+    // The name is not checked here: refusing it would tell that the account exists.
+    const named = await t.request('POST', '/api/auth/password-reset/recovery', {
+      body: {
+        email: 'kunci@example.com',
+        recoveryCode: 'AAAAA-AAAAA',
+        newPassword: 'Terkunci Sekali',
+      },
+    });
+    expect(named.json.error.message).toBe('This email and recovery code do not match');
+    const ok = await t.request('POST', '/api/auth/password-reset/recovery', {
+      body: { email: 'kunci@example.com', recoveryCode: code, newPassword: 'terkunci-baru-2031' },
+    });
+    expect(ok.status).toBe(200);
+    expect(t.db.select().from(users).where(eq(users.id, account.user.id)).get()!.lockedUntil).toBe(
+      null,
+    );
+  });
+
+  it('voids reset links and half-done two-step sign-ins when the password changes', async () => {
+    const account = await t.register('Ganti Sandi', 'ganti@example.com', 'kidung-pujian-91');
+    await t.join(account.token, s.invitation.token);
+    const link = await resetFor(s.owner.token, await membershipOf(account.user.id));
+    expect(link.status).toBe(201);
+    const setup = await t.request('POST', '/api/auth/two-factor/setup', {
+      token: account.token,
+      body: { password: account.password },
+    });
+    const enable = await t.request('POST', '/api/auth/two-factor/enable', {
+      token: account.token,
+      body: { code: totpCode(setup.json.secret) },
+    });
+    const challenge = await t.request('POST', '/api/auth/login', {
+      body: { email: 'ganti@example.com', password: account.password },
+    });
+    expect(challenge.json.twoFactorRequired).toBe(true);
+
+    const changed = await t.request('POST', '/api/auth/change-password', {
+      token: enable.json.session.token,
+      body: { currentPassword: account.password, newPassword: 'ganti-baru-2031' },
+    });
+    expect(changed.status).toBe(200);
+    expect((await t.request('GET', `/api/auth/password-reset/${link.json.token}`)).status).toBe(
+      410,
+    );
+    const finish = await t.request('POST', '/api/auth/login/two-factor', {
+      body: {
+        challengeToken: challenge.json.challengeToken,
+        code: totpCode(setup.json.secret, Date.now() + 30_000),
+      },
+    });
+    expect(finish.status).toBe(401);
+    expect(finish.json.error.code).toBe('TWO_FACTOR_INVALID');
+  });
 });

@@ -42,7 +42,9 @@ POST /api/auth/login { email, password, transport: "cookie" }
   A failed check answers `403 CSRF_FAILED`; the app refetches the token once and retries.
 
 - Signing in with a cookie session is refused for cross-site requests too (no login CSRF), and a
-  new sign-in deletes the session the browser already presented (no session fixation).
+  new cookie sign-in deletes the session the browser already presented (no session fixation). A
+  bearer sign-in leaves the cookie alone: it may come from any page, including one on a sibling
+  sub-domain whose requests still carry the SameSite cookie, and must not sign the browser out.
 - A cookie token is never accepted as a bearer token and the other way round.
 
 ### Bearer sessions (another origin, scripts)
@@ -68,6 +70,7 @@ POST /api/auth/refresh { refreshToken }                 → a new token and a ne
 | ----------------------------------------- | ---------------------------------------------------------------------------- |
 | Sign-in, completing two-step verification | A new session; a cookie session the browser presented is deleted             |
 | Password change                           | Every other session ends; this one gets new credentials (`session` in reply) |
+| Password change or reset                  | Unused reset links and two-step sign-ins waiting for their code are voided   |
 | Turning two-step verification on or off   | Every other session ends; this one gets new credentials                      |
 | Password reset (admin link or recovery)   | Every session of the account ends                                            |
 | `POST /auth/logout`                       | This session ends; the cookie is cleared                                     |
@@ -75,7 +78,9 @@ POST /api/auth/refresh { refreshToken }                 → a new token and a ne
 | `DELETE /auth/sessions`, `/sessions/:id`  | Other sessions, or one of them, end                                          |
 
 `GET /auth/sessions` lists each device with its browser and system (from the user agent),
-address, transport, last use and when it ends if left unused.
+address, transport, last use and when it ends if left unused. Sessions that ended without being
+presented again are deleted at startup, at each sign-in of the account and before the list is
+read, so they never show as signed in.
 
 On sign-out the app forgets the stored session, the credentials in memory, the whole TanStack
 Query cache and the remembered church, in every open tab. When the server ends a session
@@ -115,7 +120,11 @@ account lockout; failures are in the sign-in history.
   code from it (or a recovery code); two-step verification stays on.
 - **Recovery code.** Someone with two-step verification resets the password with their email, an
   unused recovery code and a new password (`POST /auth/password-reset/recovery`). An unknown
-  address, an account without two-step verification and a wrong code all get the same answer.
+  address, an account without two-step verification, a wrong code and a locked account all get
+  the same answer, and the new password is checked against the email only (refusing the
+  account's name would reveal it exists). A valid code works while the account is locked, so
+  someone guessing its password cannot keep its owner out; wrong codes still count towards the
+  lockout and the per-address limit applies.
 
 Both ways end every session of the account and clear its lockout.
 
@@ -190,7 +199,8 @@ Every bearer-style token is random (CSPRNG, 192–256 bits) and stored only as a
 session tokens, refresh tokens, two-step challenges, recovery codes, password reset links, iCal
 feed tokens and invitation links. Invitation and reset links are therefore shown **once**, when
 made; an invitation can get a new link (_Make a new link_), which stops the old link and its QR
-code at once. Paths that carry a token are logged without it. Kids check-in security codes are
+code at once. Paths that carry a token are logged without it, both API routes and the app pages
+the links open (`/join/<token>`, `/reset-password/<token>`). Kids check-in security codes are
 short on purpose (read aloud at pick-up); check-out is limited per session and per operator.
 
 ## Headers

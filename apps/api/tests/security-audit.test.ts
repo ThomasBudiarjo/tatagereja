@@ -93,7 +93,14 @@ describe('sessions and validation', () => {
     expect(loggedPath('/api/invitations/secret-token/accept')).toBe(
       '/api/invitations/[token]/accept',
     );
+    expect(loggedPath('/api/auth/password-reset/secret-token')).toBe(
+      '/api/auth/password-reset/[token]',
+    );
+    // The app pages the links open carry the same tokens.
+    expect(loggedPath('/join/secret-token')).toBe('/join/[token]');
+    expect(loggedPath('/reset-password/secret-token')).toBe('/reset-password/[token]');
     expect(loggedPath('/api/churches/1/people')).toBe('/api/churches/1/people');
+    expect(loggedPath('/c/1/people')).toBe('/c/1/people');
   });
 
   it('marks API answers as not storable', async () => {
