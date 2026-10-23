@@ -188,7 +188,7 @@ export function MembersSettingsPage() {
           />
           <SummaryChip
             label={t('admin-security.summaryAdmins')}
-            value={summary.byRole.administrator + summary.byRole.owner}
+            value={summary.byRole.administrator}
             active={state.role === 'administrator'}
             onClick={() =>
               setState({ role: state.role === 'administrator' ? '' : 'administrator' })

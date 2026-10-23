@@ -52,7 +52,7 @@ import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import {
@@ -341,6 +341,13 @@ function RoleForm({
     success: (data) => t('admin-security.roleSaved', { name: data.role.name }),
     form,
     fields: ['name', 'description', 'permissions'],
+    error: (error) => {
+      // A clash with another role's name belongs next to the name field.
+      if (isApiClientError(error) && error.message === t('admin-security.errRoleNameTaken')) {
+        form.setError('name', { type: 'server', message: error.message }, { shouldFocus: true });
+      }
+      return getErrorMessage(error);
+    },
   });
   const remove = useMutationToast(useDeleteRole(churchId), {
     success: t('admin-security.roleDeleted', { name: role?.name ?? '' }),

@@ -250,10 +250,13 @@ function ConfirmFactorDialog({
   open,
   onOpenChange,
   kind,
+  requiring,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   kind: 'disable' | 'regenerate';
+  /** Churches whose policy requires 2FA from this account. */
+  requiring: string[];
 }) {
   const { t } = useI18n();
   const form = useSecondFactorForm();
@@ -310,7 +313,13 @@ function ConfirmFactorDialog({
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
             {kind === 'disable' ? (
-              <Alert variant="warning">{t('profile.disableWarning')}</Alert>
+              requiring.length > 0 ? (
+                <Alert variant="error">
+                  {t('profile.disableBlocksChurches', { churches: requiring.join(', ') })}
+                </Alert>
+              ) : (
+                <Alert variant="warning">{t('profile.disableWarning')}</Alert>
+              )
             ) : null}
             <SecondFactorFields form={form} idPrefix={kind} />
             <SecondFactorActions
@@ -444,7 +453,12 @@ export function TwoFactorCard({
         )}
       </CardContent>
       <SetupDialog open={setupOpen} onOpenChange={setSetupOpen} onDone={onSetupDone} />
-      <ConfirmFactorDialog open={confirmOpen} kind={confirm} onOpenChange={setConfirmOpen} />
+      <ConfirmFactorDialog
+        open={confirmOpen}
+        kind={confirm}
+        requiring={requiring}
+        onOpenChange={setConfirmOpen}
+      />
     </Card>
   );
 }

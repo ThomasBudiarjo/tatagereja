@@ -106,6 +106,8 @@ export const profileDictionary = defineDictionary('profile', {
     disableBody: 'Confirm with your password and a code.',
     disableWarning:
       'Your account will be protected by your password only. A church may require two-step verification for your role.',
+    disableBlocksChurches:
+      '{churches} requires two-step verification for your role. Turning it off blocks your access there until you turn it on again.',
     disableAction: 'Turn off',
     sessionsTitle: 'Devices',
     signOutOthers: 'Sign out other devices',
@@ -259,6 +261,8 @@ export const profileDictionary = defineDictionary('profile', {
     disableBody: 'Konfirmasi dengan kata sandi dan kode.',
     disableWarning:
       'Akun Anda hanya akan dilindungi kata sandi. Gereja dapat mewajibkan verifikasi dua langkah untuk peran Anda.',
+    disableBlocksChurches:
+      '{churches} mewajibkan verifikasi dua langkah untuk peran Anda. Jika dinonaktifkan, akses Anda ke sana terhenti sampai Anda mengaktifkannya lagi.',
     disableAction: 'Nonaktifkan',
     sessionsTitle: 'Perangkat',
     signOutOthers: 'Keluarkan perangkat lain',

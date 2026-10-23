@@ -24,11 +24,12 @@ import { Timeline, TimelineItem } from '@/components/ui/timeline';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { securityOverviewQuery, twoFactorStatusQuery } from './api';
+import { auditHeadline } from './components/audit-labels';
 import { RoleBadge } from './components/badges';
 
 /** The security centre: policy, two-step verification coverage, roles and recent changes. */
 export function SecurityHomePage() {
-  const { t, formatNumber, formatRelative, formatPercent } = useI18n();
+  const { t, locale, formatNumber, formatRelative, formatPercent } = useI18n();
   const { churchId, base, access } = useChurch();
   const overview = useQuery(securityOverviewQuery(churchId));
   const mine = useQuery(twoFactorStatusQuery());
@@ -284,7 +285,7 @@ export function SecurityHomePage() {
                             to={`${base}/settings/audit?entry=${entry.id}`}
                             className="rounded-sm underline-offset-4 hover:underline"
                           >
-                            {entry.summary}
+                            {auditHeadline(entry, locale, t)}
                           </Link>
                         }
                         time={formatRelative(entry.createdAt)}

@@ -21,9 +21,20 @@ export function OtpInput({
   onComplete?: (value: string) => void;
 }) {
   const totp = mode === 'totp';
+  const ref = React.useRef<HTMLInputElement>(null);
+  // Checking a complete code disables the field, which drops focus; give it back afterwards
+  // so a wrong code can be retyped straight away.
+  const refocus = React.useRef(false);
+  React.useEffect(() => {
+    if (!props.disabled && refocus.current) {
+      refocus.current = false;
+      ref.current?.focus();
+    }
+  }, [props.disabled]);
   return (
     <Input
       {...props}
+      ref={ref}
       value={value}
       inputMode={totp ? 'numeric' : 'text'}
       autoComplete={totp ? 'one-time-code' : 'off'}
@@ -46,7 +57,10 @@ export function OtpInput({
               .replace(/[^A-Z0-9-]/g, '')
               .slice(0, 11);
         onChange(next);
-        if (totp && next.length === 6 && next !== value) onComplete?.(next);
+        if (totp && next.length === 6 && next !== value && onComplete) {
+          refocus.current = true;
+          onComplete(next);
+        }
       }}
     />
   );

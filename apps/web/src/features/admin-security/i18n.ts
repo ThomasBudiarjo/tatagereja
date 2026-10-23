@@ -1,5 +1,7 @@
 import { defineDictionary } from '@/lib/i18n/define';
+import { auditMessages } from './i18n/audit';
 import { churchMessages } from './i18n/church';
+import { errorMessages } from './i18n/errors';
 import { membersMessages } from './i18n/members';
 import { rolesMessages } from './i18n/roles';
 import { settingsMessages } from './i18n/settings';
@@ -17,6 +19,8 @@ export const adminSecurityDictionary = defineDictionary('admin-security', {
     ...membersMessages.en,
     ...rolesMessages.en,
     ...churchMessages.en,
+    ...auditMessages.en,
+    ...errorMessages.en,
   },
   id: {
     nav: 'Keamanan & akses',
@@ -25,5 +29,7 @@ export const adminSecurityDictionary = defineDictionary('admin-security', {
     ...membersMessages.id,
     ...rolesMessages.id,
     ...churchMessages.id,
+    ...auditMessages.id,
+    ...errorMessages.id,
   },
 });

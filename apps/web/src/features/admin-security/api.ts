@@ -50,12 +50,13 @@ import {
 } from '@tanstack/react-query';
 import { z } from 'zod';
 import { churchKeys } from '@/features/churches/api';
-import { api, request } from '@/lib/api';
+import { api, request as rawRequest } from '@/lib/api';
 import { churchScope } from '@/lib/keys';
 import { queryClient as globalClient } from '@/lib/query-client';
 import { optimistic } from '@/lib/use-mutation-toast';
 import { useAuth, useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
+import { localizeSecurityError } from './errors';
 
 /** Query keys of the module, scoped per church so switching churches never reuses data. */
 export const securityKeys = {
@@ -98,6 +99,12 @@ export const refreshChurch = (client: QueryClient, churchId: string) =>
     client.invalidateQueries({ queryKey: churchScope(churchId) }),
     client.invalidateQueries({ queryKey: churchKeys.all }),
   ]);
+
+/** `request` with the module's server messages in the interface language. */
+const request: typeof rawRequest = (schema, config) =>
+  rawRequest(schema, config).catch((error: unknown) => {
+    throw localizeSecurityError(error);
+  });
 
 const clean = (params: Record<string, unknown>) =>
   Object.fromEntries(

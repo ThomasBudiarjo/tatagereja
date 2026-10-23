@@ -40,6 +40,7 @@ import {
   auditLogInfiniteQuery,
   useExportAuditLog,
 } from '../api';
+import { auditActionLabel, auditEntityLabel, auditHeadline } from '../components/audit-labels';
 import { describeDevice } from '../components/device';
 import { SettingsPage } from './layout';
 
@@ -78,7 +79,7 @@ function ModuleBadge({ module }: { module: string }) {
 }
 
 function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
-  const { t, formatDate } = useI18n();
+  const { t, locale, formatDate } = useI18n();
   const { churchId } = useChurch();
   const entry = useQuery({ ...auditEntryQuery(churchId, id), enabled: !!id });
   const [raw, setRaw] = useState(false);
@@ -89,7 +90,9 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
     <Sheet open={!!id} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>{data?.summary ?? t('admin-security.auditEntry')}</SheetTitle>
+          <SheetTitle>
+            {data ? auditHeadline(data, locale, t) : t('admin-security.auditEntry')}
+          </SheetTitle>
           <SheetDescription>
             {data ? formatDate(data.createdAt, 'dateTimeLong') : t('common.loading')}
           </SheetDescription>
@@ -116,6 +119,17 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
                 </div>
                 <ModuleBadge module={data.module} />
               </div>
+
+              {locale !== 'en' ? (
+                <section className="flex flex-col gap-1">
+                  <h3 className="text-sm font-semibold">
+                    {t('admin-security.auditStoredSummary')}
+                  </h3>
+                  <p lang="en" className="text-sm text-pretty text-muted-foreground">
+                    {data.summary}
+                  </p>
+                </section>
+              ) : null}
 
               <section className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
@@ -173,7 +187,7 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
                   <Hash className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <dt className="sr-only">{t('admin-security.auditEntity')}</dt>
                   <dd className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                    <span>{data.entityType}</span>
+                    <span>{auditEntityLabel(data.entityType, t)}</span>
                     {data.entityId ? (
                       <>
                         <span className="truncate font-mono text-xs text-muted-foreground">
@@ -276,14 +290,20 @@ export function AuditLogPage() {
       label: t('admin-security.auditAction'),
       value: state.action,
       onChange: (value) => setState({ action: value }),
-      options: (facets.data?.actions ?? []).map((action) => ({ value: action, label: action })),
+      options: (facets.data?.actions ?? []).map((action) => ({
+        value: action,
+        label: auditActionLabel(action, action.split('.')[0] ?? action, t),
+      })),
     },
     {
       id: 'entity',
       label: t('admin-security.auditEntity'),
       value: state.entity,
       onChange: (value) => setState({ entity: value }),
-      options: (facets.data?.entityTypes ?? []).map((type) => ({ value: type, label: type })),
+      options: (facets.data?.entityTypes ?? []).map((type) => ({
+        value: type,
+        label: auditEntityLabel(type, t),
+      })),
     },
   ];
 
@@ -386,7 +406,7 @@ export function AuditLogPage() {
                       <EntityAvatar name={entry.actorName ?? '?'} size="sm" className="mt-0.5" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium text-pretty">
-                          {entry.summary}
+                          {auditHeadline(entry, locale, t)}
                         </span>
                         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                           <span className="font-medium text-foreground/80">

@@ -115,7 +115,8 @@ export function PermissionMatrix({
         return (
           <fieldset
             key={group.module}
-            className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft"
+            // A fieldset is `min-width: min-content` by default; long labels would widen the page.
+            className="min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft"
             aria-describedby={`${groupId}-count`}
           >
             <legend className="sr-only">{localize(group.label, locale)}</legend>
@@ -162,7 +163,7 @@ export function PermissionMatrix({
                 ) : null}
               </button>
               {!readOnly && editable.length > 1 ? (
-                <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                <label className="flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground">
                   {t('admin-security.matrixSelectAll')}
                   <GroupCheckbox
                     checked={allState}

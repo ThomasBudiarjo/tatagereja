@@ -61,7 +61,10 @@ export function TwoFactorStep({
       if (isApiClientError(caught) && caught.code === 'ACCOUNT_LOCKED') {
         setEnded(true);
         setError(t('auth.accountLocked'));
-      } else if (isApiClientError(caught) && /expired/i.test(caught.message)) {
+      } else if (
+        isApiClientError(caught) &&
+        caught.message === t('admin-security.errChallengeExpired')
+      ) {
         setEnded(true);
       } else if (isApiClientError(caught) && caught.code === 'TWO_FACTOR_INVALID') {
         setError(mode === 'totp' ? t('auth.codeWrong') : t('auth.recoveryWrong'));
