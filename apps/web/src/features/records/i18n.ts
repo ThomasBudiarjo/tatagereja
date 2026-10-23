@@ -73,10 +73,11 @@ export const recordsDictionary = defineDictionary('records', {
     recordCount: { one: '{formatted} record', other: '{formatted} records' },
     noResults: 'No records match',
     registerEmpty: 'No records in this register yet',
+    noPersonRecords: 'No records for this person yet',
+    noPersonRecordsBody:
+      'Baptism, confirmation, marriage and other records that name them appear here.',
     registerEmptyBody: 'Records entered by the secretariat appear here.',
     registerEmptyManage: 'Enter the first record; it gets the next number automatically.',
-    filteredByPerson: 'Showing the records of one person.',
-    clearPerson: 'Show everyone',
 
     // Form
     sectionEvent: 'The service',
@@ -364,10 +365,11 @@ export const recordsDictionary = defineDictionary('records', {
     recordCount: '{formatted} catatan',
     noResults: 'Tidak ada catatan yang cocok',
     registerEmpty: 'Belum ada catatan di buku induk ini',
+    noPersonRecords: 'Belum ada catatan untuk orang ini',
+    noPersonRecordsBody:
+      'Catatan baptis, sidi, pemberkatan nikah, dan lainnya yang menyebut namanya muncul di sini.',
     registerEmptyBody: 'Catatan yang dicatat sekretariat akan tampil di sini.',
     registerEmptyManage: 'Catat yang pertama; nomornya diberikan otomatis.',
-    filteredByPerson: 'Menampilkan catatan satu orang.',
-    clearPerson: 'Tampilkan semua',
 
     sectionEvent: 'Pelayanan',
     sectionPeople: 'Orang yang tercatat',

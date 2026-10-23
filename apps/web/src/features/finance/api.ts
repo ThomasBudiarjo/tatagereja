@@ -142,7 +142,17 @@ export const offeringQuery = (churchId: string, id: string) =>
 export type ContributionListParams = Params<
   Pick<
     FinanceContributionListQuery,
-    'q' | 'page' | 'limit' | 'kind' | 'fundId' | 'method' | 'from' | 'to' | 'sort' | 'campaignId'
+    | 'q'
+    | 'page'
+    | 'limit'
+    | 'kind'
+    | 'fundId'
+    | 'method'
+    | 'from'
+    | 'to'
+    | 'sort'
+    | 'campaignId'
+    | 'personId'
   >
 > & { includeVoided?: 'true' | 'false' };
 export const contributionsQuery = (churchId: string, params: ContributionListParams) =>

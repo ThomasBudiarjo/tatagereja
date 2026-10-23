@@ -3,11 +3,13 @@ import {
   CONTRIBUTION_KIND_LABELS,
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
+  canViewGivingOf,
+  fullName,
   has,
   localize,
 } from '@tatagereja/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { HeartHandshake, Plus } from 'lucide-react';
+import { FileText, HeartHandshake, Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
@@ -16,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Alert } from '@/components/ui/misc';
-import { FilterBar } from '@/components/ui/filter-bar';
+import { FilterBar, PersonFilterNotice } from '@/components/ui/filter-bar';
 import { Pagination } from '@/components/ui/pagination';
 import { ResponsiveTable, formatSort, parseSort } from '@/components/ui/responsive-table';
 import { SkeletonTable } from '@/components/ui/skeleton';
@@ -44,6 +46,7 @@ export function ContributionsPage() {
     to: '',
     voided: '',
     campaignId: '',
+    personId: '',
     sort: '-receivedAt',
     page: 1,
   });
@@ -56,6 +59,7 @@ export function ContributionsPage() {
     to: state.to || undefined,
     includeVoided: state.voided === 'include' ? 'true' : undefined,
     campaignId: state.campaignId || undefined,
+    personId: state.personId || undefined,
     sort: state.sort as ContributionListParams['sort'],
     page: state.page,
     limit: PAGE_SIZE,
@@ -65,7 +69,7 @@ export function ContributionsPage() {
     placeholderData: keepPreviousData,
   });
   const canRecord = has(access, 'finance.record');
-  const filtered = !!(
+  const narrowed = !!(
     state.q ||
     state.kind ||
     state.method ||
@@ -73,6 +77,11 @@ export function ContributionsPage() {
     state.from ||
     state.campaignId
   );
+  const filtered = narrowed || !!state.personId;
+  // A profile links here with `?personId=`; the name comes from their gifts.
+  const giver = state.personId
+    ? query.data?.items.find((gift) => gift.person?.id === state.personId)?.person
+    : undefined;
   const anonymous = t('finance.anonymous');
 
   return (
@@ -162,6 +171,28 @@ export function ContributionsPage() {
         }}
         onReset={() => reset(['sort'])}
       />
+      {state.personId ? (
+        <PersonFilterNotice
+          name={giver ? fullName(giver) : null}
+          photoUrl={giver?.photoUrl}
+          onClear={() => setState({ personId: '' })}
+          actions={
+            canViewGivingOf(access, state.personId) ? (
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="shrink-0 max-sm:size-10 max-sm:px-0"
+              >
+                <Link to={`${base}/finance/statements/${state.personId}`}>
+                  <FileText />
+                  <span className="max-sm:sr-only">{t('finance.statement')}</span>
+                </Link>
+              </Button>
+            ) : null
+          }
+        />
+      ) : null}
 
       {query.isPending ? (
         <SkeletonTable rows={6} columns={5} />
@@ -176,10 +207,22 @@ export function ContributionsPage() {
         <EmptyState
           icon={HeartHandshake}
           tone="teal"
-          title={filtered ? t('common.noResults') : t('finance.noGiftsTitle')}
-          description={filtered ? t('common.noResultsHint') : t('finance.noGiftsDescription')}
+          title={
+            narrowed
+              ? t('common.noResults')
+              : filtered
+                ? t('finance.noPersonGiftsTitle')
+                : t('finance.noGiftsTitle')
+          }
+          description={
+            narrowed
+              ? t('common.noResultsHint')
+              : filtered
+                ? t('finance.noPersonGiftsDescription')
+                : t('finance.noGiftsDescription')
+          }
           action={
-            canRecord && !filtered ? (
+            canRecord && !narrowed ? (
               <Button asChild>
                 <Link to={`${base}/finance/giving/new`}>
                   <Plus />

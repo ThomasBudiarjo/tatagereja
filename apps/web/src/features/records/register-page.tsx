@@ -16,7 +16,7 @@ import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FilterBar, type FilterDefinition } from '@/components/ui/filter-bar';
+import { FilterBar, PersonFilterNotice, type FilterDefinition } from '@/components/ui/filter-bar';
 import { Pagination } from '@/components/ui/pagination';
 import { PrintButton, PrintHeader } from '@/components/ui/print';
 import { ResponsiveTable, type Column } from '@/components/ui/responsive-table';
@@ -73,6 +73,15 @@ export function RegisterPage() {
     }),
   );
   const filtered = !!(state.q || state.year || state.status || state.personId);
+  // Opened from a profile: only the person (and the default "active" status) narrows the list.
+  const onlyPerson =
+    !!state.personId && !state.q && !state.year && (!state.status || state.status === 'active');
+  // A profile links here with `?personId=`; the name comes from their records.
+  const subject = state.personId
+    ? query.data?.items
+        .flatMap((record) => record.people)
+        .find((person) => person.personId === state.personId)
+    : undefined;
   const typeLabel = type ? localize(REGISTRY_RECORD_TYPE_LABELS[type], locale) : null;
   const title = typeLabel
     ? t('records.registerOf', { type: typeLabel })
@@ -245,12 +254,11 @@ export function RegisterPage() {
           onReset={() => reset(['type', 'sort'])}
         />
         {state.personId ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            {t('records.filteredByPerson')}
-            <Button variant="outline" size="sm" onClick={() => setState({ personId: '' })}>
-              {t('records.clearPerson')}
-            </Button>
-          </div>
+          <PersonFilterNotice
+            name={subject?.name}
+            onClear={() => setState({ personId: '' })}
+            className="mt-3"
+          />
         ) : null}
       </div>
 
@@ -265,18 +273,28 @@ export function RegisterPage() {
         />
       ) : query.data.items.length === 0 ? (
         <EmptyState
-          icon={filtered ? SearchX : type ? RECORD_TYPE_META[type].icon : BookOpenText}
+          icon={
+            filtered && !onlyPerson ? SearchX : type ? RECORD_TYPE_META[type].icon : BookOpenText
+          }
           tone={type ? RECORD_TYPE_META[type].tone : RECORDS_TONE}
-          title={filtered ? t('records.noResults') : t('records.registerEmpty')}
+          title={
+            onlyPerson
+              ? t('records.noPersonRecords')
+              : filtered
+                ? t('records.noResults')
+                : t('records.registerEmpty')
+          }
           description={
-            filtered
-              ? t('common.noResultsHint')
-              : canManageRecords(access)
-                ? t('records.registerEmptyManage')
-                : t('records.registerEmptyBody')
+            onlyPerson
+              ? t('records.noPersonRecordsBody')
+              : filtered
+                ? t('common.noResultsHint')
+                : canManageRecords(access)
+                  ? t('records.registerEmptyManage')
+                  : t('records.registerEmptyBody')
           }
           action={
-            filtered ? (
+            filtered && !onlyPerson ? (
               <Button variant="outline" onClick={() => reset(['type', 'sort'])}>
                 {t('common.clearAll')}
               </Button>

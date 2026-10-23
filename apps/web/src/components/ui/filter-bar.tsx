@@ -1,9 +1,12 @@
-import { ArrowUpDown, Check, ChevronDown, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronDown, UserRound, X } from 'lucide-react';
 import * as React from 'react';
 import { useEffect, useEffectEvent, useState } from 'react';
+import { useLocation } from 'react-router';
 import { useI18n } from '@/lib/i18n';
 import { useDebounced } from '@/lib/use-debounced';
 import { cn } from '@/lib/utils';
+import { EntityAvatar } from './avatar';
+import { Button } from './button';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -253,5 +256,59 @@ function SortMenu({
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * A list narrowed to one person by a deep link (`?personId=`), usually from their profile: who
+ * it shows and a way back to everyone. Pass the name once the list has loaded a row for them;
+ * until then (or when they have no rows) it uses the `personName` the linking page put in the
+ * navigation state.
+ */
+export function PersonFilterNotice({
+  name,
+  photoUrl,
+  onClear,
+  actions,
+  className,
+}: {
+  name?: string | null;
+  photoUrl?: string | null;
+  onClear: () => void;
+  /** More about this person, such as their statement. */
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  const location = useLocation();
+  const linked = (location.state as { personName?: unknown } | null)?.personName;
+  const shown = name || (typeof linked === 'string' ? linked : null);
+  return (
+    <div
+      role="status"
+      className={cn(
+        'flex animate-in items-center gap-2.5 rounded-xl border border-border/70 bg-muted/40 py-1.5 pr-1.5 pl-2.5 text-sm fade-in-0',
+        className,
+      )}
+    >
+      {shown ? (
+        <EntityAvatar name={shown} src={photoUrl} size="xs" className="shrink-0" />
+      ) : (
+        <UserRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      )}
+      <span className="line-clamp-2 min-w-0 flex-1 leading-snug">
+        {shown ? t('common.filteredToPerson', { name: shown }) : t('common.filteredToOnePerson')}
+      </span>
+      {actions}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="shrink-0 max-sm:size-10 max-sm:px-0"
+        onClick={onClear}
+      >
+        <X />
+        <span className="max-sm:sr-only">{t('common.showEveryone')}</span>
+      </Button>
+    </div>
   );
 }

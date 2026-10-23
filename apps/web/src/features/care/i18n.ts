@@ -110,6 +110,8 @@ export const careDictionary = defineDictionary('care', {
     noCasesDescription:
       'Open a case for someone who needs accompaniment: an illness, grief, counseling or aid.',
     noAssignedCasesDescription: 'Cases you are assigned to as a caregiver will show up here.',
+    noPersonCasesTitle: 'No open cases for this person',
+    noPersonCasesDescription: 'Closed cases appear when you change the status filter.',
     newCase: 'New care case',
     newCaseDescription: 'Who needs accompaniment, why, and what happens next.',
     openCase: 'Open case',
@@ -546,6 +548,8 @@ export const careDictionary = defineDictionary('care', {
       'Buka pendampingan bagi jemaat yang membutuhkan: sakit, berduka, konseling, atau bantuan.',
     noAssignedCasesDescription:
       'Pendampingan yang ditugaskan kepada Anda sebagai pendamping akan muncul di sini.',
+    noPersonCasesTitle: 'Tidak ada pendampingan aktif untuk orang ini',
+    noPersonCasesDescription: 'Pendampingan yang sudah ditutup muncul bila filter status diubah.',
     newCase: 'Pendampingan baru',
     newCaseDescription: 'Siapa yang perlu didampingi, mengapa, dan apa langkah berikutnya.',
     openCase: 'Buka pendampingan',

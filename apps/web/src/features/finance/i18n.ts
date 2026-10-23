@@ -194,6 +194,8 @@ export const financeDictionary = defineDictionary('finance', {
     givingDescription: 'Tithes, thanksgiving offerings and donations from individuals.',
     searchGiving: 'Search giver, receipt or reference',
     noGiftsTitle: 'No giving recorded yet',
+    noPersonGiftsTitle: 'No giving recorded for this person',
+    noPersonGiftsDescription: 'Gifts recorded in their name appear here, newest first.',
     noGiftsDescription: 'Record tithes and offerings that arrive by transfer, QRIS or envelope.',
     giftsCount: { one: '{count} gift', other: '{count} gifts' },
     giftsCountLabel: 'Gifts',
@@ -685,6 +687,9 @@ export const financeDictionary = defineDictionary('finance', {
     givingDescription: 'Perpuluhan, persembahan syukur, dan donasi perorangan.',
     searchGiving: 'Cari pemberi, nomor kuitansi, atau referensi',
     noGiftsTitle: 'Belum ada persembahan perorangan',
+    noPersonGiftsTitle: 'Belum ada persembahan atas nama orang ini',
+    noPersonGiftsDescription:
+      'Persembahan yang dicatat atas namanya muncul di sini, terbaru di atas.',
     noGiftsDescription:
       'Catat perpuluhan dan persembahan yang masuk lewat transfer, QRIS, atau amplop.',
     giftsCount: '{count} pemberian',

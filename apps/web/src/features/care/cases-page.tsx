@@ -5,6 +5,7 @@ import {
   CARE_PRIORITY_LABELS,
   CARE_STATUSES,
   CARE_STATUS_LABELS,
+  fullName,
   has,
   isCareTeam,
   localize,
@@ -17,7 +18,7 @@ import { Page, PageHeader } from '@/components/layout/page';
 import { AvatarGroup } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FilterBar } from '@/components/ui/filter-bar';
+import { FilterBar, PersonFilterNotice } from '@/components/ui/filter-bar';
 import { Pagination } from '@/components/ui/pagination';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { SkeletonTable } from '@/components/ui/skeleton';
@@ -52,6 +53,7 @@ export function CasesPage() {
     priority: '',
     confidentiality: '',
     mine: false as boolean,
+    personId: '',
     sort: 'updated',
     page: 1,
   });
@@ -62,12 +64,13 @@ export function CasesPage() {
     priority: state.priority || undefined,
     confidentiality: state.confidentiality || undefined,
     mine: state.mine || !team ? 'true' : undefined,
+    personId: state.personId || undefined,
     sort: state.sort,
     page: state.page,
     limit: PAGE_SIZE,
   };
   const query = useQuery({ ...casesQuery(churchId, params), placeholderData: keepPreviousData });
-  const filtered = !!(
+  const narrowed = !!(
     state.q ||
     state.category ||
     state.priority ||
@@ -75,9 +78,14 @@ export function CasesPage() {
     state.mine ||
     state.status !== 'active'
   );
+  const filtered = narrowed || !!state.personId;
+  // A profile links here with `?personId=`; the name comes from the cases that are about them.
+  const subject = state.personId
+    ? query.data?.items.find((item) => item.person?.id === state.personId)?.person
+    : undefined;
   const newCase = canCreate ? (
     <Button asChild size="sm">
-      <Link to={`${base}/care/cases/new`}>
+      <Link to={`${base}/care/cases/new${state.personId ? `?personId=${state.personId}` : ''}`}>
         <Plus />
         <span className="hidden sm:inline">{t('care.newCase')}</span>
         <span className="sm:hidden">{t('common.add')}</span>
@@ -169,6 +177,13 @@ export function CasesPage() {
         }}
         onReset={() => reset(['sort'])}
       />
+      {state.personId ? (
+        <PersonFilterNotice
+          name={subject ? fullName(subject) : null}
+          photoUrl={subject?.photoUrl}
+          onClear={() => setState({ personId: '' })}
+        />
+      ) : null}
 
       {query.isPending ? (
         <SkeletonTable rows={6} columns={5} />
@@ -183,15 +198,23 @@ export function CasesPage() {
         <EmptyState
           icon={HandHeart}
           tone="rose"
-          title={filtered ? t('common.noResults') : t('care.noCasesTitle')}
-          description={
-            filtered
-              ? t('common.noResultsHint')
-              : team
-                ? t('care.noCasesDescription')
-                : t('care.noAssignedCasesDescription')
+          title={
+            narrowed
+              ? t('common.noResults')
+              : filtered
+                ? t('care.noPersonCasesTitle')
+                : t('care.noCasesTitle')
           }
-          action={!filtered ? newCase : null}
+          description={
+            narrowed
+              ? t('common.noResultsHint')
+              : filtered
+                ? t('care.noPersonCasesDescription')
+                : team
+                  ? t('care.noCasesDescription')
+                  : t('care.noAssignedCasesDescription')
+          }
+          action={!narrowed ? newCase : null}
         />
       ) : (
         <>

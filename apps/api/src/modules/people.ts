@@ -1,8 +1,10 @@
 import {
+  OWN_RECORD_ROLES,
   can,
   canEditPersonPrivacy,
   canEditPersonProfile,
   canSeeGroup,
+  canViewRegistry,
   churchIdParamsSchema,
   churchParamsSchema,
   directoryQuerySchema,
@@ -15,7 +17,7 @@ import {
   type AccessLike,
   type PersonProfile,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { ChurchRow, PersonRow } from '../db/schema';
 import {
@@ -187,12 +189,14 @@ export const peopleModule = (deps: Deps) => {
                 .get()?.value ?? 0,
           }
         : null;
+    // The register for its readers; otherwise the person's own records, as "my records" lists them.
+    const registry = canViewRegistry(access);
     const records =
-      moduleEnabled(church, 'records') && (has(access, 'records.view') || self)
+      moduleEnabled(church, 'records') && (registry || self)
         ? {
             count:
               db
-                .select({ value: count() })
+                .select({ value: countDistinct(registryRecordPeople.recordId) })
                 .from(registryRecordPeople)
                 .innerJoin(registryRecords, eq(registryRecords.id, registryRecordPeople.recordId))
                 .where(
@@ -200,6 +204,9 @@ export const peopleModule = (deps: Deps) => {
                     eq(registryRecordPeople.personId, person.id),
                     eq(registryRecords.churchId, church.id),
                     eq(registryRecords.status, 'active'),
+                    registry
+                      ? undefined
+                      : inArray(registryRecordPeople.role, [...OWN_RECORD_ROLES]),
                   ),
                 )
                 .get()?.value ?? 0,

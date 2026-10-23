@@ -2,7 +2,9 @@ import {
   GENDER_TEXT,
   MARITAL_STATUS_TEXT,
   ageOn,
+  canViewRegistry,
   fullName,
+  has,
   localize,
   type PersonPrivacy,
   type PersonProfile,
@@ -98,7 +100,7 @@ function PersonSkeleton() {
 
 export function PersonPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { churchId, base, church } = useChurch();
+  const { churchId, base, church, access } = useChurch();
   const { t } = useI18n();
   const navigate = useNavigate();
   const query = useQuery(personQuery(churchId, id));
@@ -156,10 +158,12 @@ export function PersonPage() {
   const showMenu = menu.length > 0 || profile.canDelete;
 
   const tabs = ['overview', 'family', 'groups', 'timeline'] as const;
+  // The API sends each count only when the caller may open it: the register views for the
+  // module's team, or the person's own pages when they look at themselves.
   const links = [
     profile.links.care
       ? {
-          to: `${base}/care?personId=${person.id}`,
+          to: `${base}/care/cases?personId=${person.id}`,
           icon: HandHeart,
           tone: 'rose' as const,
           label: t('people.linkCare'),
@@ -168,7 +172,9 @@ export function PersonPage() {
       : null,
     profile.links.giving
       ? {
-          to: `${base}/finance?personId=${person.id}`,
+          to: has(access, 'finance.view')
+            ? `${base}/finance/giving?personId=${person.id}`
+            : `${base}/finance/my-giving`,
           icon: HandCoins,
           tone: 'emerald' as const,
           label: t('people.linkGiving'),
@@ -177,7 +183,9 @@ export function PersonPage() {
       : null,
     profile.links.records
       ? {
-          to: `${base}/records?personId=${person.id}`,
+          to: canViewRegistry(access)
+            ? `${base}/records/register?personId=${person.id}&status=active`
+            : `${base}/records/mine`,
           icon: Milestone,
           tone: 'violet' as const,
           label: t('people.linkRecords'),
@@ -246,6 +254,7 @@ export function PersonPage() {
             <Link
               key={link.to}
               to={link.to}
+              state={{ personName: name }}
               className="pressable flex min-h-11 flex-col items-start gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft outline-none hover:border-border focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:flex-row sm:items-center sm:gap-3 sm:p-3.5"
             >
               <ToneIcon icon={link.icon} tone={link.tone} size="sm" />
