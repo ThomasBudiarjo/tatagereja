@@ -142,7 +142,9 @@ export const dashboardModule = (deps: Deps) => {
 
   const announcementsFor = (churchId: string, access: Access, groupIds: string[]) => {
     const readable = readableAnnouncements(churchId, access, groupIds);
-    const newest = desc(sql`coalesce(${announcements.publishAt}, ${announcements.publishedAt}, ${announcements.createdAt})`);
+    const newest = desc(
+      sql`coalesce(${announcements.publishAt}, ${announcements.publishedAt}, ${announcements.createdAt})`,
+    );
     return {
       pinned: hydrateAnnouncements(
         db,

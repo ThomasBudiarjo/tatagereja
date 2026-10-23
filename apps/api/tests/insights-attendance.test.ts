@@ -214,9 +214,9 @@ describe('insights attendance', () => {
         (item) => item.action === 'attendance_session.delete' && item.entityId === id,
       );
       expect(entry).toBeDefined();
-      expect((await t.request('GET', `${base}/sessions/${id}`, { token: s.owner.token })).status).toBe(
-        404,
-      );
+      expect(
+        (await t.request('GET', `${base}/sessions/${id}`, { token: s.owner.token })).status,
+      ).toBe(404);
     });
   });
 
@@ -361,9 +361,9 @@ describe('insights attendance', () => {
       const search = await t.request('GET', `${base}/absences?threshold=3&q=ali`, {
         token: viewer.token,
       });
-      expect(search.json.items.map((item: { person: { id: string } }) => item.person.id)).toEqual(
-        [s.alice.id],
-      );
+      expect(search.json.items.map((item: { person: { id: string } }) => item.person.id)).toEqual([
+        s.alice.id,
+      ]);
       const carerList = await t.request('GET', `${base}/absences`, { token: carer.token });
       expect(carerList.json.canFollowUp).toBe(true);
     });
@@ -373,9 +373,9 @@ describe('insights attendance', () => {
         token: s.leader.token,
       });
       expect(leader.status).toBe(200);
-      expect(leader.json.items.map((item: { person: { id: string } }) => item.person.id)).toEqual(
-        [s.alice.id],
-      );
+      expect(leader.json.items.map((item: { person: { id: string } }) => item.person.id)).toEqual([
+        s.alice.id,
+      ]);
       const notTheirs = await t.request('GET', `${base}/absences?groupId=${s.otherGroup.id}`, {
         token: s.leader.token,
       });
@@ -496,11 +496,9 @@ describe('insights attendance', () => {
       const taskId = created.json.alert.careTaskId as string;
       expect(taskId).toBeTruthy();
 
-      const tasks = await t.request(
-        'GET',
-        `/api/churches/${s.church.id}/care/tasks?scope=mine`,
-        { token: s.leader.token },
-      );
+      const tasks = await t.request('GET', `/api/churches/${s.church.id}/care/tasks?scope=mine`, {
+        token: s.leader.token,
+      });
       const task = tasks.json.items.find((item: { id: string }) => item.id === taskId);
       expect(task.person.id).toBe(s.alice.id);
       expect(task.dueDate).toBe('2026-12-01');

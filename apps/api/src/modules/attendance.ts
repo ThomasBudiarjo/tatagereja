@@ -513,7 +513,8 @@ export const attendanceModule = (deps: Deps) => {
           .from(absenceAlerts)
           .where(and(eq(absenceAlerts.churchId, church.id), eq(absenceAlerts.personId, person.id)))
           .get();
-        const lastPresentAt = lastPresentByPerson(db, church.id, [person.id]).get(person.id) ?? null;
+        const lastPresentAt =
+          lastPresentByPerson(db, church.id, [person.id]).get(person.id) ?? null;
         const name = fullName(person);
 
         if (body.action === 'reopen') {
@@ -596,7 +597,13 @@ export const attendanceModule = (deps: Deps) => {
           };
           const saved = tx
             .insert(absenceAlerts)
-            .values({ id: newId(), churchId: church.id, personId: person.id, createdAt: now, ...values })
+            .values({
+              id: newId(),
+              churchId: church.id,
+              personId: person.id,
+              createdAt: now,
+              ...values,
+            })
             .onConflictDoUpdate({
               target: [absenceAlerts.churchId, absenceAlerts.personId],
               set: values,

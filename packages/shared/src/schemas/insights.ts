@@ -117,7 +117,6 @@ export const dashboardPreferencesResponseSchema = z.object({
   preferences: dashboardPreferencesSchema,
 });
 
-
 // ---------------------------------------------------------------------------------------------
 // Attendance upgrade
 // ---------------------------------------------------------------------------------------------

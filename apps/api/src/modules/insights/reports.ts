@@ -361,7 +361,8 @@ export const insightsReportsRouter = (deps: Deps) => {
     const trackOf = (row: (typeof sessions)[number]['row']) => {
       const type = serviceTypeOf.get(row.id);
       if (type) return { key: `service:${type.id}`, label: type.name };
-      if (sundaySchool.has(row.id)) return { key: 'sunday_school', label: context.text('sundaySchool') };
+      if (sundaySchool.has(row.id))
+        return { key: 'sunday_school', label: context.text('sundaySchool') };
       if (row.groupId) {
         return { key: `group:${row.groupId}`, label: groupNames.get(row.groupId) ?? '' };
       }
@@ -540,7 +541,11 @@ export const insightsReportsRouter = (deps: Deps) => {
           context.text('stages'),
           FOLLOW_UP_STAGES.map(
             (stage) =>
-              [stage, context.label(FOLLOW_UP_STAGE_LABELS[stage]), stages.get(stage) ?? 0] as const,
+              [
+                stage,
+                context.label(FOLLOW_UP_STAGE_LABELS[stage]),
+                stages.get(stage) ?? 0,
+              ] as const,
           ),
         ),
         tally(
