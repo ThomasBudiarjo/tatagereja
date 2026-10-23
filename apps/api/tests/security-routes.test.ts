@@ -22,12 +22,16 @@ const PUBLIC_WRITES = new Set([
   'POST /api/auth/register',
   'POST /api/auth/login',
   'POST /api/auth/login/two-factor',
+  'POST /api/auth/refresh',
+  'POST /api/auth/password-reset',
+  'POST /api/auth/password-reset/recovery',
 ]);
 
 /** Reads without a session: server identity, an invitation preview, a private iCal feed. */
 const PUBLIC_READS = new Set([
   '/api/meta',
   '/api/invitations/:token',
+  '/api/auth/password-reset/:token',
   '/api/calendar/feeds/:token',
 ]);
 
@@ -58,8 +62,8 @@ const MEMBER_WRITES = new Map<string, string>([
 /** Bodies whose refinements the generator cannot satisfy on its own. */
 const BODY_OVERRIDES: Record<string, unknown> = {
   'POST /api/auth/login/two-factor': { challengeToken: 'x'.repeat(43), code: '123456' },
-  'POST /api/auth/two-factor/disable': { password: 'password123', code: '123456' },
-  'POST /api/auth/two-factor/recovery-codes': { password: 'password123', code: '123456' },
+  'POST /api/auth/two-factor/disable': { password: 'kidung-pujian-91', code: '123456' },
+  'POST /api/auth/two-factor/recovery-codes': { password: 'kidung-pujian-91', code: '123456' },
   'PATCH /api/churches/:churchId/modules': { modules: { finance: false } },
   'POST /api/churches/:churchId/care/follow-ups/': { personId: randomUUID() },
 };

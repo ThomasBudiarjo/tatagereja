@@ -24,6 +24,8 @@ async function enableTwoFactor(t: TestApp, account: Account) {
     body: { code: totpCode(setup.json.secret) },
   });
   expect(enable.status).toBe(200);
+  // Turning 2FA on rotates the session: the caller continues with the new token.
+  account.token = enable.json.session.token;
   return setup.json.secret as string;
 }
 

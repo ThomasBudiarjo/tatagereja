@@ -66,8 +66,6 @@ import {
   useSecondFactor,
 } from './admin-security/two-factor';
 
-/** Second-step attempts per account, on top of the per-address limit and the challenge's own. */
-const TWO_FACTOR_USER_LIMIT = { windowMs: 15 * 60_000, max: 10 };
 /** Failures on an unknown address are forgotten after a day, like an account's. */
 const UNKNOWN_FAILURE_MEMORY_MS = 24 * 60 * 60 * 1000;
 
@@ -332,12 +330,6 @@ export const authModule = (deps: Deps) => {
         if (!challenge || challenge.attempts >= ADMIN_SECURITY_LIMITS.challengeMaxAttempts) {
           throw challengeExpired();
         }
-        enforceRateLimit(
-          deps.limiters,
-          'auth.two_factor_user',
-          challenge.userId,
-          TWO_FACTOR_USER_LIMIT,
-        );
         const user = db.select().from(users).where(eq(users.id, challenge.userId)).get();
         const twoFactor = user ? enabledTwoFactor(db, user.id) : null;
         if (!user || !twoFactor) throw challengeExpired();

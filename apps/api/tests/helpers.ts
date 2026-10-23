@@ -59,7 +59,7 @@ export function createTestApp(
   };
 
   let counter = 0;
-  const register = async (name?: string, email?: string, password = 'password123') => {
+  const register = async (name?: string, email?: string, password = 'kidung-pujian-91') => {
     counter += 1;
     const response = await request('POST', '/api/auth/register', {
       body: {

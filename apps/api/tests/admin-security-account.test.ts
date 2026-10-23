@@ -33,6 +33,8 @@ async function enableTwoFactor(
     body: { code: totpCode(secret) },
   });
   expect(enable.status).toBe(200);
+  // Turning 2FA on rotates the session: the caller continues with the new token.
+  account.token = enable.json.session.token;
   return { secret, recoveryCodes: enable.json.recoveryCodes as string[] };
 }
 
@@ -94,13 +96,13 @@ describe('two-step verification', () => {
     expect(setup.json.otpauthUrl).toStartWith('otpauth://totp/');
     expect(setup.json.otpauthUrl).toContain(`secret=${secret}`);
 
-    const stored = t.db
-      .select()
-      .from(userTwoFactor)
-      .where(eq(userTwoFactor.userId, account.user.id))
-      .get();
-    expect(stored?.secretEncrypted).toStartWith('v1:');
-    expect(stored?.secretEncrypted).not.toContain(secret);
+    const stored = t.db.$client
+      .query<{ secret: string; enabledAt: string | null }, [string]>(
+        'select secret_encrypted as secret, enabled_at as enabledAt from user_two_factor where user_id = ?',
+      )
+      .get(account.user.id);
+    expect(stored?.secret).toStartWith('enc1:');
+    expect(stored?.secret).not.toContain(secret);
     expect(stored?.enabledAt).toBeNull();
 
     const badCode = await t.request('POST', '/api/auth/two-factor/enable', {
@@ -115,11 +117,19 @@ describe('two-step verification', () => {
     });
     expect(malformed.status).toBe(422);
 
+    const other = await t.request('POST', '/api/auth/login', {
+      body: { email: 'yohana@example.com', password: account.password },
+    });
     const enable = await t.request('POST', '/api/auth/two-factor/enable', {
       token: account.token,
       body: { code: totpCode(secret) },
     });
     expect(enable.status).toBe(200);
+    // The session rotates and every session that signed in without the code ends.
+    expect(enable.json.revokedSessions).toBe(1);
+    expect((await t.request('GET', '/api/auth/me', { token: account.token })).status).toBe(401);
+    expect((await t.request('GET', '/api/auth/me', { token: other.json.token })).status).toBe(401);
+    account.token = enable.json.session.token;
     recoveryCodes = enable.json.recoveryCodes;
     expect(recoveryCodes).toHaveLength(10);
     expect(new Set(recoveryCodes).size).toBe(10);
@@ -294,6 +304,8 @@ describe('two-step verification', () => {
       body: { password: account.password, recoveryCode: recoveryCodes[0] },
     });
     expect(off.status).toBe(200);
+    expect((await t.request('GET', '/api/auth/me', { token: account.token })).status).toBe(401);
+    account.token = off.json.session.token;
     const status = await t.request('GET', '/api/auth/two-factor', { token: account.token });
     expect(status.json).toMatchObject({ enabled: false, recoveryCodesRemaining: 0 });
 
@@ -476,7 +488,7 @@ describe('sessions and password changes', () => {
     expect((await t.request('GET', '/api/auth/me', { token: a.json.token })).status).toBe(200);
   });
 
-  it('keeps other sessions when asked and refuses reusing the password', async () => {
+  it('signs out every other session on a password change and rotates its own', async () => {
     const account = await t.register('Keeper', 'keeper@example.com', 'password-one-1');
     const other = await t.request('POST', '/api/auth/login', {
       body: { email: 'keeper@example.com', password: 'password-one-1' },
@@ -488,7 +500,8 @@ describe('sessions and password changes', () => {
     expect(same.status).toBe(422);
     expect(same.json.error.issues[0].path).toBe('newPassword');
 
-    const keep = await t.request('POST', '/api/auth/change-password', {
+    // Asking to keep the other sessions is no longer possible: the field is ignored.
+    const changed = await t.request('POST', '/api/auth/change-password', {
       token: account.token,
       body: {
         currentPassword: 'password-one-1',
@@ -496,20 +509,23 @@ describe('sessions and password changes', () => {
         revokeOtherSessions: false,
       },
     });
-    expect(keep.status).toBe(200);
-    expect(keep.json.revokedSessions).toBe(0);
-    expect((await t.request('GET', '/api/auth/me', { token: other.json.token })).status).toBe(200);
+    expect(changed.status).toBe(200);
+    expect(changed.json.revokedSessions).toBe(1);
+    expect((await t.request('GET', '/api/auth/me', { token: other.json.token })).status).toBe(401);
+    expect((await t.request('GET', '/api/auth/me', { token: account.token })).status).toBe(401);
+    const token = changed.json.session.token as string;
+    expect(changed.json.session.refreshToken).toBeString();
+    expect((await t.request('GET', '/api/auth/me', { token })).status).toBe(200);
 
-    const revoke = await t.request('POST', '/api/auth/change-password', {
-      token: account.token,
+    const again = await t.request('POST', '/api/auth/change-password', {
+      token,
       body: { currentPassword: 'password-two-2', newPassword: 'password-three-3' },
     });
-    expect(revoke.json.revokedSessions).toBe(1);
-    expect((await t.request('GET', '/api/auth/me', { token: other.json.token })).status).toBe(401);
+    expect(again.json.revokedSessions).toBe(0);
 
     const row = t.db.select().from(users).where(eq(users.id, account.user.id)).get();
     expect(row?.passwordChangedAt).not.toBeNull();
-    const notices = await notificationsOf(t, account.token);
+    const notices = await notificationsOf(t, again.json.session.token);
     expect(notices.filter((notice) => notice.type === 'account.password_changed')).toHaveLength(2);
     expect(notices.every((notice) => notice.churchId === null)).toBe(true);
   });

@@ -61,7 +61,7 @@ describe('client address', () => {
       const statuses: number[] = [];
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const response = await t.request('POST', '/api/auth/login', {
-          body: { email: 'nobody@example.com', password: 'password123' },
+          body: { email: 'nobody@example.com', password: 'kidung-pujian-91' },
           headers: { 'x-forwarded-for': `10.8.${attempt}.1` },
         });
         statuses.push(response.status);
@@ -156,7 +156,7 @@ describe('administrator invitations', () => {
       body: {
         name: 'Akun Lain',
         email: 'akun-lain@example.com',
-        password: 'password123',
+        password: 'kidung-pujian-91',
         invitationToken: adminInvite.token,
       },
     });

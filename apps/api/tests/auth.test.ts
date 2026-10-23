@@ -30,7 +30,7 @@ describe('auth', () => {
 
   it('registers, logs in and reads the profile', async () => {
     const registered = await t.request('POST', '/api/auth/register', {
-      body: { name: '  Jane Doe ', email: 'Jane@Example.com', password: 'password123' },
+      body: { name: '  Jane Doe ', email: 'Jane@Example.com', password: 'kidung-pujian-91' },
     });
     expect(registered.status).toBe(201);
     expect(registered.json.user.email).toBe('jane@example.com');
@@ -43,7 +43,7 @@ describe('auth', () => {
     expect(me.json.user.id).toBe(registered.json.user.id);
 
     const login = await t.request('POST', '/api/auth/login', {
-      body: { email: 'jane@example.com', password: 'password123' },
+      body: { email: 'jane@example.com', password: 'kidung-pujian-91' },
     });
     expect(login.status).toBe(200);
     expect(login.json.token).not.toBe(registered.json.token);
@@ -51,7 +51,7 @@ describe('auth', () => {
 
   it('rejects duplicate emails', async () => {
     const response = await t.request('POST', '/api/auth/register', {
-      body: { name: 'Again', email: 'jane@example.com', password: 'password123' },
+      body: { name: 'Again', email: 'jane@example.com', password: 'kidung-pujian-91' },
     });
     expect(response.status).toBe(409);
     expect(response.json.error.code).toBe('CONFLICT');
@@ -102,10 +102,10 @@ describe('auth', () => {
 
   it('updates the profile and changes the password, revoking other sessions', async () => {
     const a = await t.request('POST', '/api/auth/login', {
-      body: { email: 'jane@example.com', password: 'password123' },
+      body: { email: 'jane@example.com', password: 'kidung-pujian-91' },
     });
     const b = await t.request('POST', '/api/auth/login', {
-      body: { email: 'jane@example.com', password: 'password123' },
+      body: { email: 'jane@example.com', password: 'kidung-pujian-91' },
     });
 
     const updated = await t.request('PATCH', '/api/auth/me', {
@@ -129,10 +129,13 @@ describe('auth', () => {
 
     const ok = await t.request('POST', '/api/auth/change-password', {
       token: a.json.token,
-      body: { currentPassword: 'password123', newPassword: 'newpassword123' },
+      body: { currentPassword: 'kidung-pujian-91', newPassword: 'newpassword123' },
     });
     expect(ok.status).toBe(200);
-    expect((await t.request('GET', '/api/auth/me', { token: a.json.token })).status).toBe(200);
+    expect((await t.request('GET', '/api/auth/me', { token: a.json.token })).status).toBe(401);
+    expect(
+      (await t.request('GET', '/api/auth/me', { token: ok.json.session.token })).status,
+    ).toBe(200);
     expect((await t.request('GET', '/api/auth/me', { token: b.json.token })).status).toBe(401);
 
     const login = await t.request('POST', '/api/auth/login', {
@@ -156,21 +159,23 @@ describe('rate limiting', () => {
   afterAll(() => t.close());
 
   it('rate limits repeated failed logins per IP and email', async () => {
-    const statuses: number[] = [];
+    const codes: string[] = [];
     for (let i = 0; i < 12; i += 1) {
       const response = await t.request('POST', '/api/auth/login', {
         body: { email: 'limited@example.com', password: 'wrong' },
         headers: { 'x-forwarded-for': '10.0.0.9' },
       });
-      statuses.push(response.status);
+      codes.push(response.json.error.code);
     }
-    expect(statuses.slice(0, 10).every((status) => status === 401)).toBe(true);
-    expect(statuses[10]).toBe(429);
-    expect(statuses[11]).toBe(429);
-    // A different IP is unaffected.
+    // An unknown address locks after five failures exactly like an account would…
+    expect(codes.slice(0, 4).every((code) => code === 'UNAUTHORIZED')).toBe(true);
+    expect(codes.slice(4, 10).every((code) => code === 'ACCOUNT_LOCKED')).toBe(true);
+    // …and the per address and email limit stops the eleventh attempt.
+    expect(codes.slice(10)).toEqual(['RATE_LIMITED', 'RATE_LIMITED']);
+    // Another email from the same IP is unaffected.
     const other = await t.request('POST', '/api/auth/login', {
-      body: { email: 'limited@example.com', password: 'wrong' },
-      headers: { 'x-forwarded-for': '10.0.0.10' },
+      body: { email: 'other-limited@example.com', password: 'wrong' },
+      headers: { 'x-forwarded-for': '10.0.0.9' },
     });
     expect(other.status).toBe(401);
   });
@@ -179,7 +184,7 @@ describe('rate limiting', () => {
     let last = 0;
     for (let i = 0; i < 31; i += 1) {
       const response = await t.request('POST', '/api/auth/register', {
-        body: { name: 'Bulk', email: `bulk${i}@example.com`, password: 'password123' },
+        body: { name: 'Bulk', email: `bulk${i}@example.com`, password: 'kidung-pujian-91' },
         headers: { 'x-forwarded-for': '10.0.0.11' },
       });
       last = response.status;
@@ -192,7 +197,7 @@ describe('registration modes', () => {
   it('blocks registration when disabled', async () => {
     const t = createTestApp({ registrationMode: 'disabled' });
     const response = await t.request('POST', '/api/auth/register', {
-      body: { name: 'X', email: 'x@example.com', password: 'password123' },
+      body: { name: 'X', email: 'x@example.com', password: 'kidung-pujian-91' },
     });
     expect(response.status).toBe(403);
     expect(response.json.error.code).toBe('REGISTRATION_DISABLED');
@@ -207,7 +212,7 @@ describe('registration modes', () => {
 
     t.deps.config.registrationMode = 'invite_only';
     const denied = await t.request('POST', '/api/auth/register', {
-      body: { name: 'New', email: 'new@example.com', password: 'password123' },
+      body: { name: 'New', email: 'new@example.com', password: 'kidung-pujian-91' },
     });
     expect(denied.status).toBe(403);
     expect(denied.json.error.code).toBe('INVITATION_REQUIRED');
@@ -216,7 +221,7 @@ describe('registration modes', () => {
       body: {
         name: 'New',
         email: 'new@example.com',
-        password: 'password123',
+        password: 'kidung-pujian-91',
         invitationToken: 'nope',
       },
     });
@@ -227,7 +232,7 @@ describe('registration modes', () => {
       body: {
         name: 'New',
         email: 'new@example.com',
-        password: 'password123',
+        password: 'kidung-pujian-91',
         invitationToken: invitation.token,
       },
     });
@@ -255,19 +260,19 @@ describe('registration modes', () => {
     expect(meta.json.turnstileSiteKey).toBe('site');
 
     const missing = await t.request('POST', '/api/auth/register', {
-      body: { name: 'T', email: 't1@example.com', password: 'password123' },
+      body: { name: 'T', email: 't1@example.com', password: 'kidung-pujian-91' },
     });
     expect(missing.status).toBe(400);
     expect(missing.json.error.code).toBe('TURNSTILE_REQUIRED');
 
     const failed = await t.request('POST', '/api/auth/register', {
-      body: { name: 'T', email: 't1@example.com', password: 'password123', turnstileToken: 'bad' },
+      body: { name: 'T', email: 't1@example.com', password: 'kidung-pujian-91', turnstileToken: 'bad' },
     });
     expect(failed.status).toBe(400);
     expect(failed.json.error.code).toBe('TURNSTILE_FAILED');
 
     const ok = await t.request('POST', '/api/auth/register', {
-      body: { name: 'T', email: 't1@example.com', password: 'password123', turnstileToken: 'good' },
+      body: { name: 'T', email: 't1@example.com', password: 'kidung-pujian-91', turnstileToken: 'good' },
     });
     expect(ok.status).toBe(201);
     expect(seen).toEqual(['bad', 'good']);
