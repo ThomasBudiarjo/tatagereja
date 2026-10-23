@@ -1,29 +1,34 @@
 import {
   ADMIN_SECURITY_LIMITS,
   idParamsSchema,
+  lockoutDelayMinutes,
   loginBodySchema,
   loginTwoFactorBodySchema,
+  refreshBodySchema,
   registerBodySchema,
   securePasswordChangeBodySchema,
   updateProfileBodySchema,
+  type SessionTransport,
 } from '@tatagereja/shared';
-import { and, desc, eq, gt, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { UserRow } from '../db/schema';
-import { sessions, twoFactorChallenges, users } from '../db/schema';
+import { sessionRefreshTokens, sessions, twoFactorChallenges, users } from '../db/schema';
 import type { Deps } from '../deps';
 import {
   HttpError,
   conflict,
+  forbidden,
   notFound,
   rateLimited,
   unauthorized,
   validationError,
 } from '../lib/errors';
-import { hashPassword, verifyPassword } from '../lib/password';
+import { crossSiteReason } from '../lib/origin';
+import { assertStrongPassword, hashPassword, needsRehash, verifyPassword } from '../lib/password';
 import { enforceRateLimit } from '../lib/rate-limit';
 import { clientIp, requestMeta, type RequestMeta } from '../lib/request';
-import { addDays, nowIso } from '../lib/time';
+import { nowIso } from '../lib/time';
 import { generateToken, hashToken, newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toUser } from '../serializers';
@@ -35,6 +40,19 @@ import {
 } from '../services/invitations';
 import { notify } from '../services/notifications';
 import {
+  clearedSessionCookie,
+  createSession,
+  csrfTokenFor,
+  idleExpiryOf,
+  purgeEndedSessions,
+  readSessionCookie,
+  revokeOtherSessions,
+  rotateSession,
+  sessionEnded,
+  sessionResponse,
+  voidPendingCredentials,
+} from '../services/sessions';
+import {
   accountLocked,
   clearLoginFailures,
   enabledTwoFactor,
@@ -45,48 +63,83 @@ import {
   useSecondFactor,
 } from './admin-security/two-factor';
 
-/** Constant-time-ish fallback so login timing does not reveal whether an email exists. */
-const DUMMY_HASH_PROMISE = hashPassword('dummy-password-for-timing');
+/** Failures on an unknown address are forgotten after a day, like an account's. */
+const UNKNOWN_FAILURE_MEMORY_MS = 24 * 60 * 60 * 1000;
 
 export const authModule = (deps: Deps) => {
   const { db, config } = deps;
 
-  const createSession = (userId: string, meta: RequestMeta) => {
-    const token = generateToken(32);
-    const now = new Date();
-    const expiresAt = addDays(now, config.sessionTtlDays).toISOString();
-    db.insert(sessions)
-      .values({
-        id: newId(),
-        userId,
-        tokenHash: hashToken(token),
-        userAgent: meta.userAgent,
-        ip: meta.ip,
-        createdAt: now.toISOString(),
-        lastUsedAt: now.toISOString(),
-        expiresAt,
-      })
-      .run();
-    return { token, expiresAt };
+  /*
+   * Every sign-in spends the same work whether or not the account exists, is locked or the
+   * password is right: one argon2id verification with this server's parameters.
+   */
+  const dummyHash = hashPassword('dummy-password-for-timing', config.passwordHashing);
+  const spendPasswordCheck = async (password: string) => {
+    await verifyPassword(password, await dummyHash);
+  };
+
+  /*
+   * Unknown email addresses lock exactly like accounts do, so a lock does not reveal that an
+   * account exists. Kept in memory: it only has to look the same while someone is guessing.
+   */
+  const unknownFailures = new Map<string, { count: number; last: number; lockedUntil: number }>();
+  const unknownAccountFailure = (email: string): Date | null => {
+    const now = Date.now();
+    if (unknownFailures.size > 10_000) unknownFailures.clear();
+    const previous = unknownFailures.get(email);
+    const recent = previous && now - previous.last < UNKNOWN_FAILURE_MEMORY_MS;
+    const count = (recent ? previous.count : 0) + 1;
+    const delay = lockoutDelayMinutes(count);
+    const lockedUntil = delay > 0 ? now + delay * 60_000 : 0;
+    unknownFailures.set(email, { count, last: now, lockedUntil });
+    return lockedUntil ? new Date(lockedUntil) : null;
+  };
+  const unknownAccountLock = (email: string): Date | null => {
+    const entry = unknownFailures.get(email);
+    return entry && entry.lockedUntil > Date.now() ? new Date(entry.lockedUntil) : null;
+  };
+
+  /** Cookie sessions are only handed to this app's own pages (no login CSRF). */
+  const assertTransportAllowed = (request: Request, transport: SessionTransport) => {
+    if (transport === 'cookie' && crossSiteReason(request, config)) {
+      throw new HttpError(
+        403,
+        'CSRF_FAILED',
+        'Cookie sessions are only available to the app served by this server',
+      );
+    }
+  };
+
+  /**
+   * A new cookie sign-in replaces the session the browser already presented (session
+   * fixation). Only then: a bearer sign-in may come from any page, and a page on a sibling
+   * site (whose requests still carry the SameSite cookie) must not sign the browser out.
+   */
+  const dropPresentedSession = (request: Request, transport: SessionTransport) => {
+    const token = transport === 'cookie' ? readSessionCookie(request) : null;
+    if (token)
+      db.delete(sessions)
+        .where(eq(sessions.tokenHash, hashToken(token)))
+        .run();
   };
 
   /** The password (and second factor, when on) checked out: start a session. */
   const completeSignIn = (
+    set: { headers: Record<string, string | number> },
+    request: Request,
     user: UserRow,
     meta: RequestMeta,
+    transport: SessionTransport,
     outcome: 'success' | 'two_factor_success' | 'recovery_code_used',
   ) => {
-    const session = db.transaction(() => {
-      clearLoginFailures(db, user.id);
-      recordLoginEvent(db, { userId: user.id, email: user.email, outcome, meta });
-      return createSession(user.id, meta);
+    dropPresentedSession(request, transport);
+    const issued = db.transaction((tx) => {
+      purgeEndedSessions(tx, config, user.id);
+      clearLoginFailures(tx, user.id);
+      recordLoginEvent(tx, { userId: user.id, email: user.email, outcome, meta });
+      return createSession(tx, config, { userId: user.id, transport, meta });
     });
-    return {
-      user: toUser(user),
-      token: session.token,
-      expiresAt: session.expiresAt,
-      joinedChurchId: null,
-    };
+    return sessionResponse(set, request, issued, toUser(user));
   };
 
   const challengeExpired = () =>
@@ -100,6 +153,7 @@ export const authModule = (deps: Deps) => {
         const ip = clientIp(request, server ?? undefined, config.trustProxy);
         const wait = deps.limiters.register.check(ip);
         if (wait > 0) throw rateLimited(wait);
+        assertTransportAllowed(request, body.transport);
 
         if (config.registrationMode === 'disabled') {
           throw new HttpError(
@@ -125,16 +179,24 @@ export const authModule = (deps: Deps) => {
           if (!ok)
             throw new HttpError(400, 'TURNSTILE_FAILED', 'Bot check failed, please try again');
         }
+        assertStrongPassword(body.password, 'password', body);
 
         const existing = db
           .select({ id: users.id })
           .from(users)
           .where(eq(users.email, body.email))
           .get();
-        if (existing) throw conflict('An account with this email already exists');
+        // Without email there is no way to answer the same in both cases; the message points to
+        // signing in without spelling out that the account exists, and registration is limited.
+        if (existing) {
+          throw conflict(
+            'An account could not be created with these details. If you already have one, sign in instead',
+          );
+        }
 
-        const passwordHash = await hashPassword(body.password);
+        const passwordHash = await hashPassword(body.password, config.passwordHashing);
         const now = nowIso();
+        const meta = requestMeta(request, server ?? undefined, config.trustProxy);
         const user = db
           .insert(users)
           .values({
@@ -151,51 +213,55 @@ export const authModule = (deps: Deps) => {
 
         let joinedChurchId: string | null = null;
         if (body.invitationToken) {
-          joinedChurchId = acceptInvitation(
-            db,
-            body.invitationToken,
-            user.id,
-            requestMeta(request, server ?? undefined, config.trustProxy),
-          ).churchId;
+          joinedChurchId = acceptInvitation(db, body.invitationToken, user.id, meta).churchId;
         }
+        dropPresentedSession(request, body.transport);
         // Sign-in history starts with the first login; registering is not one.
-        const session = createSession(
-          user.id,
-          requestMeta(request, server ?? undefined, config.trustProxy),
-        );
+        const issued = createSession(db, config, {
+          userId: user.id,
+          transport: body.transport,
+          meta,
+        });
         set.status = 201;
-        return {
-          user: toUser(user),
-          token: session.token,
-          expiresAt: session.expiresAt,
-          joinedChurchId,
-        };
+        return sessionResponse(set, request, issued, toUser(user), joinedChurchId);
       },
       { body: registerBodySchema },
     )
     .post(
       '/login',
-      async ({ body, request, server }) => {
+      async ({ body, request, server, set }) => {
         const ip = clientIp(request, server ?? undefined, config.trustProxy);
+        const ipWait = deps.limiters.loginIp.check(ip);
+        if (ipWait > 0) throw rateLimited(ipWait);
         const wait = deps.limiters.login.check(`${ip}:${body.email}`);
         if (wait > 0) throw rateLimited(wait);
+        assertTransportAllowed(request, body.transport);
         const meta = requestMeta(request, server ?? undefined, config.trustProxy);
 
         const user = db.select().from(users).where(eq(users.email, body.email)).get();
-        const lockedUntil = user ? lockedUntilOf(user) : null;
-        if (user && lockedUntil) {
-          // Refused before the password is checked, so a lock cannot be used to test guesses.
-          recordLoginEvent(db, { userId: user.id, email: user.email, outcome: 'locked', meta });
+        const lockedUntil = user ? lockedUntilOf(user) : unknownAccountLock(body.email);
+        if (lockedUntil) {
+          // Refused before the password is checked, so a lock cannot be used to test guesses;
+          // the same work is still spent, so the answer takes as long as any other.
+          await spendPasswordCheck(body.password);
+          recordLoginEvent(db, {
+            userId: user?.id ?? null,
+            email: body.email,
+            outcome: 'locked',
+            reason: user ? null : 'unknown_account',
+            meta,
+          });
           throw accountLocked(lockedUntil);
         }
         const valid = user
           ? await verifyPassword(body.password, user.passwordHash)
-          : await verifyPassword(body.password, await DUMMY_HASH_PROMISE).then(() => false);
+          : await spendPasswordCheck(body.password).then(() => false);
         if (!user || !valid) {
           if (user) {
             const locked = db.transaction((tx) => registerLoginFailure(tx, user, 'failure', meta));
             if (locked) throw accountLocked(locked);
           } else {
+            const locked = unknownAccountFailure(body.email);
             recordLoginEvent(db, {
               userId: null,
               email: body.email,
@@ -203,11 +269,17 @@ export const authModule = (deps: Deps) => {
               reason: 'unknown_account',
               meta,
             });
+            if (locked) throw accountLocked(locked);
           }
           throw unauthorized('Invalid email or password');
         }
 
         deps.limiters.login.reset(`${ip}:${body.email}`);
+        // Hashes made with older (weaker) parameters are upgraded while the password is known.
+        if (needsRehash(user.passwordHash, config.passwordHashing)) {
+          const passwordHash = await hashPassword(body.password, config.passwordHashing);
+          db.update(users).set({ passwordHash }).where(eq(users.id, user.id)).run();
+        }
         if (enabledTwoFactor(db, user.id)) {
           const challengeToken = generateToken(32);
           const now = new Date();
@@ -236,18 +308,19 @@ export const authModule = (deps: Deps) => {
           });
           return { twoFactorRequired: true as const, challengeToken, expiresAt };
         }
-        return completeSignIn(user, meta, 'success');
+        return completeSignIn(set, request, user, meta, body.transport, 'success');
       },
       { body: loginBodySchema },
     )
     .post(
       '/login/two-factor',
-      ({ body, request, server }) => {
+      ({ body, request, server, set }) => {
         const meta = requestMeta(request, server ?? undefined, config.trustProxy);
         enforceRateLimit(deps.limiters, 'auth.two_factor', meta.ip ?? 'unknown', {
           windowMs: 15 * 60_000,
           max: 30,
         });
+        assertTransportAllowed(request, body.transport);
         const challenge = db
           .select()
           .from(twoFactorChallenges)
@@ -268,7 +341,7 @@ export const authModule = (deps: Deps) => {
         const lockedUntil = lockedUntilOf(user);
         if (lockedUntil) throw accountLocked(lockedUntil);
 
-        const result = db.transaction((tx) => useSecondFactor(tx, config, twoFactor, body));
+        const result = db.transaction((tx) => useSecondFactor(tx, twoFactor, body));
         if (!result) {
           const attempts = challenge.attempts + 1;
           const locked = db.transaction((tx) => {
@@ -280,7 +353,13 @@ export const authModule = (deps: Deps) => {
               })
               .where(eq(twoFactorChallenges.id, challenge.id))
               .run();
-            return registerLoginFailure(tx, user, 'two_factor_failure', meta);
+            return registerLoginFailure(
+              tx,
+              user,
+              'two_factor_failure',
+              meta,
+              body.recoveryCode ? 'recovery_code' : 'totp',
+            );
           });
           if (locked) throw accountLocked(locked);
           if (attempts >= ADMIN_SECURITY_LIMITS.challengeMaxAttempts) throw challengeExpired();
@@ -315,22 +394,140 @@ export const authModule = (deps: Deps) => {
           });
         }
         return completeSignIn(
+          set,
+          request,
           user,
           meta,
+          body.transport,
           result.method === 'recovery' ? 'recovery_code_used' : 'two_factor_success',
         );
       },
       { body: loginTwoFactorBodySchema },
     )
     .post(
+      '/refresh',
+      ({ body, request, server, set }) => {
+        const meta = requestMeta(request, server ?? undefined, config.trustProxy);
+        const wait = deps.limiters.sessionRefresh.check(meta.ip ?? 'unknown');
+        if (wait > 0) throw rateLimited(wait);
+        const tokenHash = hashToken(body.refreshToken);
+        const row = db
+          .select({ session: sessions, user: users })
+          .from(sessions)
+          .innerJoin(users, eq(users.id, sessions.userId))
+          .where(and(eq(sessions.refreshTokenHash, tokenHash), eq(sessions.transport, 'bearer')))
+          .get();
+        if (row) {
+          if (sessionEnded(row.session, config)) {
+            db.delete(sessions).where(eq(sessions.id, row.session.id)).run();
+            throw unauthorized('Session has expired');
+          }
+          const issued = db.transaction((tx) => rotateSession(tx, config, row.session.id));
+          return sessionResponse(set, request, issued, toUser(row.user));
+        }
+        // A refresh token that was already exchanged: whoever holds the newer one and whoever
+        // presents this one cannot be told apart, so the whole session (the family) ends.
+        const reused = db
+          .select({ session: sessions, user: users })
+          .from(sessionRefreshTokens)
+          .innerJoin(sessions, eq(sessions.id, sessionRefreshTokens.sessionId))
+          .innerJoin(users, eq(users.id, sessions.userId))
+          .where(eq(sessionRefreshTokens.tokenHash, tokenHash))
+          .get();
+        if (reused) {
+          const { session, user } = reused;
+          db.transaction((tx) => {
+            tx.delete(sessions).where(eq(sessions.id, session.id)).run();
+            recordLoginEvent(tx, {
+              userId: user.id,
+              email: user.email,
+              outcome: 'refresh_reuse',
+              meta,
+            });
+            recordAudit(
+              tx,
+              { ...meta, churchId: null, actorUserId: user.id },
+              {
+                module: 'admin-security',
+                action: 'account.session_reuse_revoke',
+                entityType: 'user',
+                entityId: user.id,
+                summary: `A session of ${user.name} was ended because its refresh token was used twice`,
+                before: { sessionId: session.id, userAgent: session.userAgent, ip: session.ip },
+              },
+            );
+            notify(tx, {
+              churchId: null,
+              userIds: [user.id],
+              type: 'account.session_revoked',
+              title: {
+                id: 'Satu sesi masuk Anda diakhiri',
+                en: 'One of your sign-ins was ended',
+              },
+              body: {
+                id: 'Sesi itu dipakai dari dua tempat sekaligus. Masuk lagi di perangkat itu; jika ini bukan Anda, ganti kata sandi.',
+                en: 'It was used from two places at once. Sign in again on that device; if this was not you, change your password.',
+              },
+              link: '/profile?tab=activity',
+              entityType: 'user',
+              entityId: user.id,
+            });
+          });
+          throw new HttpError(
+            401,
+            'SESSION_REVOKED',
+            'This session was ended for your safety. Sign in again',
+          );
+        }
+        throw unauthorized('Session is invalid or has expired');
+      },
+      { body: refreshBodySchema },
+    )
+    .post(
       '/logout',
-      ({ auth }) => {
+      ({ auth, request, set }) => {
         db.delete(sessions).where(eq(sessions.id, auth.sessionId)).run();
+        if (auth.transport === 'cookie') set.headers['set-cookie'] = clearedSessionCookie(request);
         return { ok: true as const };
       },
       { auth: true },
     )
+    .post(
+      '/logout/everywhere',
+      ({ auth, audit, request, set }) => {
+        const revoked = db.transaction((tx) => {
+          const count = revokeOtherSessions(tx, auth.user.id, null);
+          recordAudit(tx, audit, {
+            module: 'admin-security',
+            action: 'account.sessions_revoke_all',
+            entityType: 'user',
+            entityId: auth.user.id,
+            summary: `${auth.user.name} signed out everywhere`,
+            after: { revokedSessions: count },
+          });
+          return count;
+        });
+        if (auth.transport === 'cookie') set.headers['set-cookie'] = clearedSessionCookie(request);
+        return { ok: true as const, revokedSessions: revoked };
+      },
+      { auth: true },
+    )
     .get('/me', ({ auth }) => ({ user: auth.user }), { auth: true })
+    .get(
+      '/session',
+      ({ auth, request }) => {
+        const session = db.select().from(sessions).where(eq(sessions.id, auth.sessionId)).get();
+        if (!session) throw unauthorized('Session is invalid or has expired');
+        const cookie = auth.transport === 'cookie' ? readSessionCookie(request) : null;
+        return {
+          user: auth.user,
+          transport: auth.transport,
+          csrfToken: cookie ? csrfTokenFor(cookie) : null,
+          sessionExpiresAt: session.expiresAt,
+        };
+      },
+      { auth: true },
+    )
     .patch(
       '/me',
       ({ auth, body }) => {
@@ -347,7 +544,7 @@ export const authModule = (deps: Deps) => {
     )
     .post(
       '/change-password',
-      async ({ auth, audit, body }) => {
+      async ({ auth, audit, body, request, set }) => {
         enforceRateLimit(deps.limiters, 'auth.password_check', auth.user.id, PASSWORD_CHECK_LIMIT);
         const user = db.select().from(users).where(eq(users.id, auth.user.id)).get();
         if (!user) throw notFound('User');
@@ -357,20 +554,20 @@ export const authModule = (deps: Deps) => {
           const message = 'Choose a password different from the current one';
           throw validationError(message, [{ path: 'newPassword', message }]);
         }
-        const passwordHash = await hashPassword(body.newPassword);
-        const revokedSessions = db.transaction((tx) => {
+        assertStrongPassword(body.newPassword, 'newPassword', user);
+        const passwordHash = await hashPassword(body.newPassword, config.passwordHashing);
+        const result = db.transaction((tx) => {
           const now = nowIso();
           tx.update(users)
             .set({ passwordHash, passwordChangedAt: now, updatedAt: now })
             .where(eq(users.id, user.id))
             .run();
-          const revoked = body.revokeOtherSessions
-            ? tx
-                .delete(sessions)
-                .where(and(eq(sessions.userId, user.id), ne(sessions.id, auth.sessionId)))
-                .returning({ id: sessions.id })
-                .all().length
-            : 0;
+          // Whoever knew the old password is signed out everywhere, and this device gets new
+          // credentials so a copy of the old ones stops working too.
+          const revoked = revokeOtherSessions(tx, user.id, auth.sessionId);
+          const issued = rotateSession(tx, config, auth.sessionId);
+          // Sign-ins half done with the old password and reset links made before stop working.
+          voidPendingCredentials(tx, user.id);
           recordAudit(tx, audit, {
             module: 'admin-security',
             action: 'account.password_change',
@@ -398,15 +595,21 @@ export const authModule = (deps: Deps) => {
             entityType: 'user',
             entityId: user.id,
           });
-          return revoked;
+          return { revoked, issued };
         });
-        return { ok: true as const, revokedSessions };
+        return {
+          ok: true as const,
+          revokedSessions: result.revoked,
+          session: sessionResponse(set, request, result.issued, auth.user),
+        };
       },
       { auth: true, body: securePasswordChangeBodySchema },
     )
     .get(
       '/sessions',
       ({ auth }) => {
+        // Sessions that ended without being used again are not listed as signed in.
+        purgeEndedSessions(db, config, auth.user.id);
         const rows = db
           .select()
           .from(sessions)
@@ -419,8 +622,10 @@ export const authModule = (deps: Deps) => {
             createdAt: row.createdAt,
             lastUsedAt: row.lastUsedAt,
             expiresAt: row.expiresAt,
+            idleExpiresAt: idleExpiryOf(row, config).toISOString(),
             userAgent: row.userAgent,
             ip: row.ip,
+            transport: row.transport,
             current: row.id === auth.sessionId,
           })),
         };
@@ -430,6 +635,7 @@ export const authModule = (deps: Deps) => {
     .delete(
       '/sessions/:id',
       ({ auth, audit, params }) => {
+        if (params.id === auth.sessionId) throw forbidden('Sign out to end this session');
         db.transaction((tx) => {
           const deleted = tx
             .delete(sessions)

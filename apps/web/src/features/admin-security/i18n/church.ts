@@ -34,6 +34,17 @@ export const churchMessages = messages(
     inviteShowBody: 'Scan the QR code or share the link. Created {date}.',
     inviteNotActive: 'This invitation is {status} and can no longer be used.',
     copyLink: 'Copy link',
+    inviteShownOnce:
+      'Copy, share or download the QR code now: for safety the link is shown only this once.',
+    inviteHiddenTitle: 'The link is hidden',
+    inviteHiddenBody:
+      'Links are stored in a protected form and shown only when made. To share this invitation again, make a new link.',
+    inviteRegenerate: 'Make a new link',
+    inviteRegenerateShort: 'New link',
+    inviteRegenerateTitle: 'Make a new link?',
+    inviteRegenerateBody:
+      'The current link and its QR code stop working at once, including printed copies. People who already joined stay members.',
+    inviteRegenerated: 'New link ready',
     shareTitle: 'Join {church} on TataGereja',
     revokeInvitation: 'Revoke',
     revokeTitle: 'Revoke this invitation?',
@@ -203,6 +214,17 @@ export const churchMessages = messages(
     inviteShowBody: 'Pindai kode QR atau bagikan tautannya. Dibuat {date}.',
     inviteNotActive: 'Undangan ini berstatus {status} dan tidak dapat dipakai lagi.',
     copyLink: 'Salin tautan',
+    inviteShownOnce:
+      'Salin, bagikan, atau unduh kode QR sekarang: demi keamanan tautan hanya ditampilkan kali ini.',
+    inviteHiddenTitle: 'Tautan disembunyikan',
+    inviteHiddenBody:
+      'Tautan disimpan dalam bentuk terlindungi dan hanya ditampilkan saat dibuat. Untuk membagikan undangan ini lagi, buat tautan baru.',
+    inviteRegenerate: 'Buat tautan baru',
+    inviteRegenerateShort: 'Tautan baru',
+    inviteRegenerateTitle: 'Buat tautan baru?',
+    inviteRegenerateBody:
+      'Tautan dan kode QR yang sekarang langsung tidak berlaku, termasuk yang sudah dicetak. Yang sudah bergabung tetap menjadi anggota.',
+    inviteRegenerated: 'Tautan baru siap',
     shareTitle: 'Bergabung dengan {church} di TataGereja',
     revokeInvitation: 'Cabut',
     revokeTitle: 'Cabut undangan ini?',

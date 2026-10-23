@@ -4,7 +4,28 @@ import { OPTIMIZE_INTERVAL_MS, openDatabase } from './db/client';
 
 const config = loadConfig();
 const database = openDatabase(config.databasePath);
-const app = createApp(createDeps(database.db, config));
+let deps: ReturnType<typeof createDeps>;
+try {
+  deps = createDeps(database.db, config);
+} catch (error) {
+  console.error(`Cannot start: ${(error as Error).message}`);
+  database.close();
+  process.exit(1);
+}
+const app = createApp(deps);
+const { security } = deps;
+if (security.keyring.source === 'file') {
+  console.warn(
+    'ENCRYPTION_KEY is not set: confidential fields are encrypted with the key file next to the ' +
+      'database. Keep that file with your backups, or set ENCRYPTION_KEY (see .env.example).',
+  );
+}
+for (const [column, count] of Object.entries(security.encrypted)) {
+  console.log(`Encrypted ${count} stored value${count === 1 ? '' : 's'} of ${column}`);
+}
+if (security.hashedInvitations > 0) {
+  console.log(`Hashed the tokens of ${security.hashedInvitations} invitation links`);
+}
 
 try {
   // `reusePort: false` makes a second instance fail loudly instead of silently

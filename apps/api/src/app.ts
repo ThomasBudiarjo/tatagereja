@@ -32,6 +32,7 @@ import { peopleExtensionsModule } from './modules/people/index';
 import { recordsModule } from './modules/records';
 import { rolesModule } from './modules/roles';
 import { worshipModule } from './modules/worship';
+import { prepareDatabaseSecurity } from './services/security-startup';
 
 type ValidationIssueLike = { path?: unknown; summary?: unknown; message?: unknown };
 
@@ -53,23 +54,33 @@ function normaliseIssues(all: unknown): { path: string; message: string }[] {
   });
 }
 
-/** Paths that carry a credential (private calendar feeds, invitation links) are logged without it. */
-const TOKEN_PATH = /^(\/api\/(?:calendar\/feeds|invitations)\/)[^/]+/;
+/**
+ * Paths that carry a credential are logged without it: calendar feeds, invitation and reset
+ * links, both the API routes and the app pages they open (`/join/<token>`, `/reset-password/<token>`).
+ */
+const TOKEN_PATH =
+  /^(\/api\/(?:calendar\/feeds|invitations|auth\/password-reset)\/|\/(?:join|reset-password)\/)[^/]+/;
 export const loggedPath = (pathname: string): string => pathname.replace(TOKEN_PATH, '$1[token]');
 
 /** Production rate limits. Registration is generous because many members share one IP (carrier NAT, church wifi). */
 export function defaultLimiters(): Limiters {
   return {
     login: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }),
+    // Generous: a church wifi or a carrier NAT puts a whole congregation behind one address.
+    loginIp: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }),
     register: createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 }),
     invitation: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 60 }),
+    sessionRefresh: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 120 }),
+    passwordReset: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }),
   };
 }
 
 export function createDeps(db: Db, config: AppConfig, overrides: Partial<Deps> = {}): Deps {
+  const security = prepareDatabaseSecurity(db, config);
   return {
     db,
     config,
+    security,
     limiters: defaultLimiters(),
     verifyTurnstile: config.turnstile ? createTurnstileVerifier(config.turnstile.secretKey) : null,
     cache: createResultCache(),
@@ -123,7 +134,7 @@ export function createApp(deps: Deps) {
           `${new Date().toISOString()} ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
         );
       }
-      Object.assign(set.headers, securityHeaders(request));
+      Object.assign(set.headers, securityHeaders(request, { trustedTypes: !config.turnstile }));
       // Bun also enforces `maxRequestBodySize`; this answers with a clear JSON error first.
       const length = Number(request.headers.get('content-length') ?? 0);
       if (length > config.maxBodyBytes) {

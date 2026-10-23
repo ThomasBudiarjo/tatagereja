@@ -9,7 +9,7 @@ import {
   type PersonalDataExport,
   type LocalizedText,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import {
@@ -30,9 +30,9 @@ import { enforceRateLimit } from '../../lib/rate-limit';
 import { nowIso } from '../../lib/time';
 import { authPlugin } from '../../plugins/auth';
 import { recordAudit, type AuditContext } from '../../services/audit';
+import { revokeOtherSessions, rotateSession, sessionResponse } from '../../services/sessions';
 import { notify } from '../../services/notifications';
 import { churchTables, withoutCredentials } from './introspection';
-import { decryptSecret, encryptSecret } from './secrets';
 import { toLoginEvent } from './serializers';
 import { generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
 import {
@@ -152,7 +152,7 @@ export const accountSecurityRouter = (deps: Deps) => {
         db.insert(userTwoFactor)
           .values({
             userId: auth.user.id,
-            secretEncrypted: encryptSecret(config, secret),
+            secretEncrypted: secret,
             enabledAt: null,
             lastUsedStep: null,
             createdAt: now,
@@ -161,7 +161,7 @@ export const accountSecurityRouter = (deps: Deps) => {
           .onConflictDoUpdate({
             target: userTwoFactor.userId,
             set: {
-              secretEncrypted: encryptSecret(config, secret),
+              secretEncrypted: secret,
               enabledAt: null,
               lastUsedStep: null,
               updatedAt: now,
@@ -177,7 +177,7 @@ export const accountSecurityRouter = (deps: Deps) => {
     )
     .post(
       '/two-factor/enable',
-      ({ auth, audit, body }) => {
+      ({ auth, audit, body, request, set }) => {
         enforceRateLimit(deps.limiters, 'auth.two_factor_manage', auth.user.id, MANAGE_LIMIT);
         const row = db
           .select()
@@ -186,16 +186,18 @@ export const accountSecurityRouter = (deps: Deps) => {
           .get();
         if (!row) throw conflict('Start the setup first');
         if (row.enabledAt) throw conflict('Two-step verification is already on');
-        const secret = decryptSecret(config, row.secretEncrypted);
-        const step = secret ? verifyTotp(secret, body.code) : null;
+        const step = verifyTotp(row.secretEncrypted, body.code);
         if (step === null) throw invalidSecondFactor({ code: body.code });
-        const recoveryCodes = db.transaction((tx) => {
+        const result = db.transaction((tx) => {
           const now = nowIso();
           tx.update(userTwoFactor)
             .set({ enabledAt: now, lastUsedStep: step, updatedAt: now })
             .where(eq(userTwoFactor.userId, auth.user.id))
             .run();
           const codes = issueRecoveryCodes(tx, auth.user.id);
+          // Sessions that signed in without the second factor end; this one gets new credentials.
+          const revoked = revokeOtherSessions(tx, auth.user.id, auth.sessionId);
+          const issued = rotateSession(tx, config, auth.sessionId);
           accountAudit(
             tx,
             audit,
@@ -212,23 +214,29 @@ export const accountSecurityRouter = (deps: Deps) => {
               en: 'Signing in now also asks for a code from your authenticator app.',
             },
           );
-          return codes;
+          return { codes, revoked, issued };
         });
-        return { recoveryCodes };
+        return {
+          recoveryCodes: result.codes,
+          revokedSessions: result.revoked,
+          session: sessionResponse(set, request, result.issued, auth.user),
+        };
       },
       { auth: true, body: twoFactorEnableBodySchema },
     )
     .post(
       '/two-factor/disable',
-      async ({ auth, audit, body }) => {
+      async ({ auth, audit, body, request, set }) => {
         enforceRateLimit(deps.limiters, 'auth.two_factor_manage', auth.user.id, MANAGE_LIMIT);
         await confirmPassword(auth.user.id, body.password);
         const row = enabledTwoFactor(db, auth.user.id);
         if (!row) throw conflict('Two-step verification is not on');
-        db.transaction((tx) => {
-          if (!useSecondFactor(tx, config, row, body)) throw invalidSecondFactor(body);
+        const result = db.transaction((tx) => {
+          if (!useSecondFactor(tx, row, body)) throw invalidSecondFactor(body);
           tx.delete(userTwoFactor).where(eq(userTwoFactor.userId, auth.user.id)).run();
           tx.delete(userRecoveryCodes).where(eq(userRecoveryCodes.userId, auth.user.id)).run();
+          const revoked = revokeOtherSessions(tx, auth.user.id, auth.sessionId);
+          const issued = rotateSession(tx, config, auth.sessionId);
           accountAudit(
             tx,
             audit,
@@ -245,8 +253,13 @@ export const accountSecurityRouter = (deps: Deps) => {
               en: 'Your account is protected by your password only. If this was not you, change your password now.',
             },
           );
+          return { revoked, issued };
         });
-        return { ok: true as const };
+        return {
+          ok: true as const,
+          revokedSessions: result.revoked,
+          session: sessionResponse(set, request, result.issued, auth.user),
+        };
       },
       { auth: true, body: twoFactorConfirmBodySchema },
     )
@@ -258,7 +271,7 @@ export const accountSecurityRouter = (deps: Deps) => {
         const row = enabledTwoFactor(db, auth.user.id);
         if (!row) throw conflict('Two-step verification is not on');
         const recoveryCodes = db.transaction((tx) => {
-          if (!useSecondFactor(tx, config, row, body)) throw invalidSecondFactor(body);
+          if (!useSecondFactor(tx, row, body)) throw invalidSecondFactor(body);
           const codes = issueRecoveryCodes(tx, auth.user.id);
           accountAudit(
             tx,
@@ -308,21 +321,17 @@ export const accountSecurityRouter = (deps: Deps) => {
       '/sessions',
       ({ auth, audit }) => {
         const revoked = db.transaction((tx) => {
-          const rows = tx
-            .delete(sessions)
-            .where(and(eq(sessions.userId, auth.user.id), ne(sessions.id, auth.sessionId)))
-            .returning({ id: sessions.id })
-            .all();
-          if (rows.length > 0) {
+          const count = revokeOtherSessions(tx, auth.user.id, auth.sessionId);
+          if (count > 0) {
             accountAudit(
               tx,
               audit,
               'account.sessions_revoke',
               auth.user.id,
-              `${auth.user.name} signed out ${rows.length} other session${rows.length === 1 ? '' : 's'}`,
+              `${auth.user.name} signed out ${count} other session${count === 1 ? '' : 's'}`,
             );
           }
-          return rows.length;
+          return count;
         });
         return { ok: true as const, revokedSessions: revoked };
       },
@@ -455,7 +464,7 @@ export const accountSecurityRouter = (deps: Deps) => {
           .where(eq(churchMemberships.userId, user.id))
           .all();
         db.transaction((tx) => {
-          if (twoFactor && !useSecondFactor(tx, config, twoFactor, body)) {
+          if (twoFactor && !useSecondFactor(tx, twoFactor, body)) {
             throw invalidSecondFactor(body);
           }
           // Rows the user created that do not cascade (events, announcements, invitations…)

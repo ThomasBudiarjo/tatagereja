@@ -6,6 +6,7 @@ import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqli
 import { attendanceSessions, churches, people, users } from './core';
 import { facilityResources } from './facilities';
 import { worshipServices } from './worship';
+import { encryptedText } from '../encrypted';
 
 /** Sekolah Minggu classes by age (Balita, Kelas Kecil, Tengah, Besar, Tunas Remaja). */
 export const checkinClasses = sqliteTable(
@@ -118,7 +119,7 @@ export const checkinChildAlerts = sqliteTable(
     severity: text('severity', { enum: ['info', 'warning', 'critical'] })
       .notNull()
       .default('warning'),
-    description: text('description').notNull(),
+    description: encryptedText('checkin_child_alerts', 'description').notNull(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
@@ -146,7 +147,7 @@ export const checkinAuthorizedPickups = sqliteTable(
     name: text('name').notNull(),
     relationship: text('relationship'),
     phone: text('phone'),
-    notes: text('notes'),
+    notes: encryptedText('checkin_authorized_pickups', 'notes'),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

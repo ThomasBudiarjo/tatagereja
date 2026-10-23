@@ -59,6 +59,28 @@ export const authDictionary = defineDictionary('auth', {
     challengeExpiredHint: 'For your safety, enter your password again.',
     loginAgain: 'Log in again',
     useOtherAccount: 'Back',
+    forgotPassword: 'Forgot password?',
+    forgotTitle: 'Forgot your password?',
+    forgotDescription: 'There is no email, so there are two ways back into your account.',
+    forgotAskTitle: 'Ask your church',
+    forgotAskBody:
+      'The owner or an administrator of your church can make a one-time reset link for you after checking that it is really you. The link works for 30 minutes.',
+    forgotRecoveryTitle: 'Use a recovery code',
+    forgotRecoveryBody:
+      'If you turned on two-step verification, one of the recovery codes you saved resets your password.',
+    newPassword: 'New password',
+    resetSubmit: 'Set new password',
+    resetDone: 'Password changed. Every device was signed out, so log in with the new password.',
+    backToLogin: 'Back to log in',
+    resetTitle: 'Choose a new password',
+    resetDescription: 'For {name} ({email}). The link works once, until {time}.',
+    resetTwoFactorHint: 'Your account uses two-step verification: also enter a code.',
+    resetInvalidTitle: 'This link does not work any more',
+    resetInvalidBody:
+      'Reset links work once and for 30 minutes. Ask your church administrator for a new one.',
+    resetDoneTitle: 'Your password was changed',
+    resetDoneBody: 'Every device was signed out. Log in with your new password.',
+    recoveryMismatch: 'This email and recovery code do not match.',
   },
   id: {
     server: 'Server',
@@ -120,5 +142,28 @@ export const authDictionary = defineDictionary('auth', {
     challengeExpiredHint: 'Demi keamanan, masukkan kata sandi Anda lagi.',
     loginAgain: 'Masuk lagi',
     useOtherAccount: 'Kembali',
+    forgotPassword: 'Lupa kata sandi?',
+    forgotTitle: 'Lupa kata sandi?',
+    forgotDescription: 'Tidak ada email, jadi ada dua cara untuk kembali ke akun Anda.',
+    forgotAskTitle: 'Minta bantuan gereja',
+    forgotAskBody:
+      'Pemilik atau pengurus gereja Anda dapat membuat tautan atur ulang sekali pakai setelah memastikan bahwa itu benar Anda. Tautan berlaku 30 menit.',
+    forgotRecoveryTitle: 'Pakai kode pemulihan',
+    forgotRecoveryBody:
+      'Jika Anda mengaktifkan verifikasi dua langkah, salah satu kode pemulihan yang Anda simpan dapat mengatur ulang kata sandi.',
+    newPassword: 'Kata sandi baru',
+    resetSubmit: 'Simpan kata sandi baru',
+    resetDone:
+      'Kata sandi diganti. Semua perangkat sudah dikeluarkan, silakan masuk dengan kata sandi baru.',
+    backToLogin: 'Kembali ke halaman masuk',
+    resetTitle: 'Buat kata sandi baru',
+    resetDescription: 'Untuk {name} ({email}). Tautan berlaku satu kali, sampai {time}.',
+    resetTwoFactorHint: 'Akun Anda memakai verifikasi dua langkah: masukkan juga kodenya.',
+    resetInvalidTitle: 'Tautan ini sudah tidak berlaku',
+    resetInvalidBody:
+      'Tautan atur ulang hanya berlaku satu kali selama 30 menit. Minta tautan baru kepada pengurus gereja.',
+    resetDoneTitle: 'Kata sandi Anda sudah diganti',
+    resetDoneBody: 'Semua perangkat sudah dikeluarkan. Masuk dengan kata sandi baru Anda.',
+    recoveryMismatch: 'Email dan kode pemulihan ini tidak cocok.',
   },
 });

@@ -4,6 +4,7 @@ import type { Deps } from '../../deps';
 import { authPlugin } from '../../plugins/auth';
 import { moduleStatus } from '../../services/modules';
 import { accountSecurityRouter } from './account';
+import { passwordResetRouter } from './password-reset';
 import { churchSecurityRouter } from './security';
 
 /** Wiring check: 200 with the caller's admin-security permissions, or 403 MODULE_DISABLED. */
@@ -27,4 +28,5 @@ export const adminSecurityModule = (deps: Deps) =>
   new Elysia()
     .use(adminSecurityStatusRouter(deps))
     .use(churchSecurityRouter(deps))
-    .use(accountSecurityRouter(deps));
+    .use(accountSecurityRouter(deps))
+    .use(passwordResetRouter(deps));

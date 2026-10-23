@@ -129,6 +129,14 @@ export function LoginPage() {
             aria-invalid={!!form.formState.errors.password}
           />
         </Field>
+        <div className="-mt-3 flex justify-end">
+          <Link
+            to="/forgot-password"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {t('auth.forgotPassword')}
+          </Link>
+        </div>
         <FormActions className="sm:flex-col">
           <Button type="submit" size="lg" loading={form.formState.isSubmitting}>
             {t('auth.login')}

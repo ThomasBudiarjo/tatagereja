@@ -3,6 +3,7 @@ import type { Db } from './db/client';
 import type { ResultCache } from './lib/cache';
 import type { Limiters } from './lib/rate-limit';
 import type { TurnstileVerifier } from './lib/turnstile';
+import type { SecurityStartup } from './services/security-startup';
 
 export type Deps = {
   db: Db;
@@ -12,4 +13,6 @@ export type Deps = {
   verifyTurnstile: TurnstileVerifier | null;
   /** Expensive read results (reports, absence lists), dropped on every write to their church. */
   cache: ResultCache;
+  /** The encryption keyring and what the startup migration rewrote. */
+  security: SecurityStartup;
 };

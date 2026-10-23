@@ -99,6 +99,12 @@ export const can = {
     canActOnMembership(access, target),
   suspendMember: (access: AccessLike, target: MembershipTarget): boolean =>
     canActOnMembership(access, target),
+  /**
+   * Make a one-time password reset link for a member who lost their password. The API also
+   * requires the caller to be able to do this in every other church the account belongs to.
+   */
+  resetMemberPassword: (access: AccessLike, target: MembershipTarget): boolean =>
+    canActOnMembership(access, target),
   leaveChurch: (access: AccessLike): boolean => access.role !== 'owner',
 
   manageRoles: (access: AccessLike): boolean => has(access, 'roles.manage'),

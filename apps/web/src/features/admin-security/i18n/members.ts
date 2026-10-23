@@ -85,6 +85,19 @@ export const membersMessages = messages(
     noPermissions: 'No permissions.',
     sensitive: 'Sensitive',
     permissionCount: { one: '{count} permission', other: '{count} permissions' },
+    // Password reset links (there is no email)
+    resetPassword: 'Password reset link',
+    resetTitle: 'Reset the password of {name}?',
+    resetBody:
+      'There is no email: you make a one-time link and give it to {name} yourself. It works for 30 minutes, once, and signs them out on every device.',
+    resetConfirm: 'I checked in person or by phone that {name} is the one asking',
+    resetConfirmRequired: 'Confirm that you checked who is asking',
+    resetCreate: 'Make link',
+    resetCreated: 'Reset link made',
+    resetReadyTitle: 'Reset link for {name}',
+    resetReadyBody: 'Valid until {time}, once. Give it only to {name}: it is shown only this once.',
+    resetTwoFactor:
+      '{name} uses two-step verification and will also need a code from their authenticator app or a recovery code.',
   },
   {
     membersDescription: 'Semua yang memiliki akun di gereja ini, beserta peran dan aksesnya.',
@@ -166,5 +179,20 @@ export const membersMessages = messages(
     noPermissions: 'Tidak ada hak akses.',
     sensitive: 'Sensitif',
     permissionCount: '{count} hak akses',
+    // Tautan atur ulang kata sandi (tanpa email)
+    resetPassword: 'Tautan atur ulang kata sandi',
+    resetTitle: 'Atur ulang kata sandi {name}?',
+    resetBody:
+      'Tidak ada email: Anda membuat tautan sekali pakai dan memberikannya sendiri kepada {name}. Berlaku 30 menit, satu kali, dan mengeluarkan {name} dari semua perangkat.',
+    resetConfirm:
+      'Saya sudah memastikan langsung atau lewat telepon bahwa {name} sendiri yang meminta',
+    resetConfirmRequired: 'Pastikan dulu siapa yang meminta',
+    resetCreate: 'Buat tautan',
+    resetCreated: 'Tautan atur ulang dibuat',
+    resetReadyTitle: 'Tautan atur ulang untuk {name}',
+    resetReadyBody:
+      'Berlaku sampai {time}, satu kali. Berikan hanya kepada {name}: tautan ini hanya ditampilkan sekarang.',
+    resetTwoFactor:
+      '{name} memakai verifikasi dua langkah dan juga perlu kode dari aplikasi autentikator atau kode pemulihan.',
   },
 );

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createResultCache, invalidateForRequest } from '../src/lib/cache';
 import { createRateLimiter } from '../src/lib/rate-limit';
-import { createTestApp, seedChurch } from './helpers';
+import { createTestApp, permissiveLimiters, seedChurch } from './helpers';
 
 /*
  * The result cache behind reports, absence lists and directory counts: it must never show a
@@ -274,9 +274,7 @@ describe('report rate limit', () => {
     {},
     {
       limiters: {
-        login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+        ...permissiveLimiters(),
         'insights.report': createRateLimiter({ windowMs: 60_000, max: 2 }),
       },
     },

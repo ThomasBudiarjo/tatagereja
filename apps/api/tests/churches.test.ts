@@ -209,7 +209,7 @@ describe('churches, memberships and invitations', () => {
       (
         await t.request('POST', `/api/churches/${church.id}/transfer-ownership`, {
           token: admin.token,
-          body: { userId: member.user.id, password: 'password123' },
+          body: { userId: member.user.id, password: 'kidung-pujian-91' },
         })
       ).status,
     ).toBe(403);

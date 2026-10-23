@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { loggedPath } from '../src/app';
 import { createRateLimiter } from '../src/lib/rate-limit';
 import { clientIp } from '../src/lib/request';
-import { createTestApp, seedChurch } from './helpers';
+import { createTestApp, seedChurch, permissiveLimiters } from './helpers';
 
 /*
  * Regression tests for the cross-module security review: forwarded addresses, sessions checked
@@ -11,6 +11,7 @@ import { createTestApp, seedChurch } from './helpers';
  */
 
 const strictLimiters = (max: number) => ({
+  ...permissiveLimiters(),
   login: createRateLimiter({ windowMs: 60_000, max }),
   register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
   invitation: createRateLimiter({ windowMs: 60_000, max }),
@@ -60,7 +61,7 @@ describe('client address', () => {
       const statuses: number[] = [];
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const response = await t.request('POST', '/api/auth/login', {
-          body: { email: 'nobody@example.com', password: 'password123' },
+          body: { email: 'nobody@example.com', password: 'kidung-pujian-91' },
           headers: { 'x-forwarded-for': `10.8.${attempt}.1` },
         });
         statuses.push(response.status);
@@ -92,7 +93,14 @@ describe('sessions and validation', () => {
     expect(loggedPath('/api/invitations/secret-token/accept')).toBe(
       '/api/invitations/[token]/accept',
     );
+    expect(loggedPath('/api/auth/password-reset/secret-token')).toBe(
+      '/api/auth/password-reset/[token]',
+    );
+    // The app pages the links open carry the same tokens.
+    expect(loggedPath('/join/secret-token')).toBe('/join/[token]');
+    expect(loggedPath('/reset-password/secret-token')).toBe('/reset-password/[token]');
     expect(loggedPath('/api/churches/1/people')).toBe('/api/churches/1/people');
+    expect(loggedPath('/c/1/people')).toBe('/c/1/people');
   });
 
   it('marks API answers as not storable', async () => {
@@ -155,7 +163,7 @@ describe('administrator invitations', () => {
       body: {
         name: 'Akun Lain',
         email: 'akun-lain@example.com',
-        password: 'password123',
+        password: 'kidung-pujian-91',
         invitationToken: adminInvite.token,
       },
     });

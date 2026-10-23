@@ -34,6 +34,24 @@ export const ADMIN_SECURITY_NOTIFICATION_TYPES = defineNotificationTypes('admin-
     mandatory: true,
   },
   {
+    type: 'account.session_revoked',
+    label: { en: 'Sessions ended for safety', id: 'Sesi diakhiri demi keamanan' },
+    description: {
+      en: 'When a sign-in is ended because it was used from two places at once.',
+      id: 'Saat sesi masuk diakhiri karena dipakai dari dua tempat sekaligus.',
+    },
+    mandatory: true,
+  },
+  {
+    type: 'account.password_reset',
+    label: { en: 'Password reset', id: 'Atur ulang kata sandi' },
+    description: {
+      en: 'When a reset link is made for your account or your password is reset.',
+      id: 'Saat tautan atur ulang dibuat untuk akun Anda atau kata sandi Anda diatur ulang.',
+    },
+    mandatory: true,
+  },
+  {
     type: 'security.policy_changed',
     label: { en: 'Church security policy', id: 'Kebijakan keamanan gereja' },
     description: {

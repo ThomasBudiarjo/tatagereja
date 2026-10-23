@@ -2,7 +2,8 @@
 // `onDelete: 'cascade'`; see docs/ARCHITECTURE-MODULES.md. Export row types next to the tables.
 // These tables belong to accounts, not churches: they cascade from `users` instead.
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { users } from './core';
+import { churches, users } from './core';
+import { encryptedText } from '../encrypted';
 
 /**
  * TOTP (RFC 6238) second factor. `enabled_at` stays null while setup waits for the first valid
@@ -13,7 +14,7 @@ export const userTwoFactor = sqliteTable('user_two_factor', {
   userId: text('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  secretEncrypted: text('secret_encrypted').notNull(),
+  secretEncrypted: encryptedText('user_two_factor', 'secret_encrypted').notNull(),
   enabledAt: text('enabled_at'),
   lastUsedStep: integer('last_used_step'),
   createdAt: text('created_at').notNull(),
@@ -82,6 +83,9 @@ export const loginEvents = sqliteTable(
         'two_factor_success',
         'two_factor_failure',
         'recovery_code_used',
+        'refresh_reuse',
+        'password_reset',
+        'password_reset_failure',
       ],
     }).notNull(),
     reason: text('reason'),
@@ -95,7 +99,36 @@ export const loginEvents = sqliteTable(
   ],
 );
 
+/**
+ * One-time password reset links an owner or administrator made for a member (there is no
+ * email). Valid for 30 minutes and once; only the hash is stored. A link for an account with
+ * two-step verification also asks for a code from it.
+ */
+export const passwordResetTokens = sqliteTable(
+  'password_reset_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    issuedBy: text('issued_by').references(() => users.id, { onDelete: 'set null' }),
+    /** The church whose administrator made the link; deleting the church voids it. */
+    issuedInChurchId: text('issued_in_church_id').references(() => churches.id, {
+      onDelete: 'cascade',
+    }),
+    expiresAt: text('expires_at').notNull(),
+    usedAt: text('used_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('password_reset_tokens_token_hash_unique').on(table.tokenHash),
+    index('password_reset_tokens_user_idx').on(table.userId),
+  ],
+);
+
 export type UserTwoFactorRow = typeof userTwoFactor.$inferSelect;
 export type UserRecoveryCodeRow = typeof userRecoveryCodes.$inferSelect;
 export type TwoFactorChallengeRow = typeof twoFactorChallenges.$inferSelect;
 export type LoginEventRow = typeof loginEvents.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;

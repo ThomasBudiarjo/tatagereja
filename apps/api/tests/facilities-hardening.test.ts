@@ -8,7 +8,7 @@ import {
   seedFacilities,
   type FacilitiesSeed,
 } from './facilities-fixtures';
-import { createTestApp } from './helpers';
+import { createTestApp, permissiveLimiters } from './helpers';
 
 /**
  * Review findings: request flooding, the person picker, what deleting a room does to other
@@ -19,9 +19,7 @@ describe('facilities hardening', () => {
     {},
     {
       limiters: {
-        login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+        ...permissiveLimiters(),
         'facilities.booking_request': createRateLimiter({ windowMs: 60_000, max: 3 }),
       },
     },

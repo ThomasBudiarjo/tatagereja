@@ -20,6 +20,14 @@ export const errorMessages = messages(
     errEscalation: 'This involves permissions you do not hold yourself, so you cannot change it',
     errLockout: 'This change would remove your own permission to manage roles',
     errSetupRequired: 'Turn on two-step verification for your own account first',
+    errPasswordCommon: 'This password is too common. Choose one that is harder to guess',
+    errPasswordPersonal: 'Do not use your email address or name as your password',
+    errPasswordLong: 'This password is too long',
+    errResetElsewhere:
+      'This account also belongs to another church where you cannot reset it. Ask the server administrator',
+    errInviteInactive: 'Only an active invitation can get a new link',
+    errRegisterConflict:
+      'An account could not be created with these details. If you already have one, log in instead',
   },
   {
     errPasswordIncorrect: 'Kata sandi salah',
@@ -40,5 +48,13 @@ export const errorMessages = messages(
       'Perubahan ini menyangkut hak akses yang tidak Anda miliki, jadi tidak dapat Anda ubah',
     errLockout: 'Perubahan ini akan mencabut hak Anda sendiri untuk mengelola peran',
     errSetupRequired: 'Aktifkan verifikasi dua langkah untuk akun Anda sendiri terlebih dahulu',
+    errPasswordCommon: 'Kata sandi ini terlalu umum. Pilih yang lebih sulit ditebak',
+    errPasswordPersonal: 'Jangan memakai alamat email atau nama Anda sebagai kata sandi',
+    errPasswordLong: 'Kata sandi ini terlalu panjang',
+    errResetElsewhere:
+      'Akun ini juga terdaftar di gereja lain yang tidak dapat Anda atur ulang. Hubungi pengelola server',
+    errInviteInactive: 'Hanya undangan yang masih aktif yang dapat dibuatkan tautan baru',
+    errRegisterConflict:
+      'Akun tidak dapat dibuat dengan data ini. Jika Anda sudah punya akun, silakan masuk',
   },
 );

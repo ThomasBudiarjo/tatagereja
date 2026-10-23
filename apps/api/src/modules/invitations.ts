@@ -10,10 +10,10 @@ import { and, desc, eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import { churches, invitations, users } from '../db/schema';
 import type { Deps } from '../deps';
-import { HttpError, forbidden, notFound, rateLimited } from '../lib/errors';
+import { HttpError, conflict, forbidden, notFound, rateLimited } from '../lib/errors';
 import { clientIp, requestMeta } from '../lib/request';
 import { addDays, nowIso } from '../lib/time';
-import { generateToken, newId } from '../lib/tokens';
+import { generateToken, hashToken, newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toInvitation } from '../serializers';
 import { recordAudit } from '../services/audit';
@@ -25,6 +25,16 @@ import {
 
 export const invitationsModule = (deps: Deps) => {
   const { db, config } = deps;
+
+  const loadInvitation = (churchId: string, id: string) => {
+    const row = db
+      .select()
+      .from(invitations)
+      .where(and(eq(invitations.id, id), eq(invitations.churchId, churchId)))
+      .get();
+    if (!row) throw notFound('Invitation');
+    return row;
+  };
 
   const churchScoped = new Elysia({ prefix: '/churches/:churchId/invitations' })
     .use(authPlugin(deps))
@@ -60,13 +70,14 @@ export const invitationsModule = (deps: Deps) => {
           );
         }
         const now = new Date();
+        const token = generateToken(24);
         const row = db.transaction((tx) => {
           const created = tx
             .insert(invitations)
             .values({
               id: newId(),
               churchId: church.id,
-              token: generateToken(24),
+              tokenHash: hashToken(token),
               role: body.role,
               label: body.label,
               expiresAt: body.expiresInDays ? addDays(now, body.expiresInDays).toISOString() : null,
@@ -94,21 +105,62 @@ export const invitationsModule = (deps: Deps) => {
           return created;
         });
         set.status = 201;
-        return { invitation: toInvitation(row, auth.user.name, config.appUrl) };
+        return { invitation: toInvitation(row, auth.user.name, config.appUrl, token) };
       },
       { church: true, params: churchParamsSchema, body: createInvitationBodySchema },
+    )
+    .post(
+      '/:id/regenerate',
+      ({ church, access, audit, params }) => {
+        if (!can.createInvitations(access))
+          throw forbidden('Only administrators can manage invitations');
+        const row = loadInvitation(church.id, params.id);
+        if (!can.inviteWithRole(access, row.role)) {
+          throw new HttpError(
+            403,
+            'ESCALATION_DENIED',
+            'Only someone with every administrator permission can manage administrator invitations',
+          );
+        }
+        if (effectiveInvitationStatus(db, row) !== 'active') {
+          throw conflict('Only an active invitation can get a new link');
+        }
+        // The old link stops working at once: only the new token's hash is kept.
+        const token = generateToken(24);
+        const updated = db.transaction((tx) => {
+          const next = tx
+            .update(invitations)
+            .set({ tokenHash: hashToken(token) })
+            .where(eq(invitations.id, row.id))
+            .returning()
+            .get();
+          if (!next) throw notFound('Invitation');
+          recordAudit(tx, audit, {
+            module: 'core',
+            action: 'invitation.regenerate',
+            entityType: 'invitation',
+            entityId: row.id,
+            summary: `Made a new link for the ${row.role} invitation${row.label ? ` "${row.label}"` : ''}`,
+          });
+          return next;
+        });
+        const creator = db
+          .select({ name: users.name })
+          .from(users)
+          .where(eq(users.id, updated.createdBy))
+          .get();
+        return {
+          invitation: toInvitation(updated, creator?.name ?? '', config.appUrl, token),
+        };
+      },
+      { church: true, params: churchIdParamsSchema },
     )
     .delete(
       '/:id',
       ({ church, access, audit, params }) => {
         if (!can.createInvitations(access))
           throw forbidden('Only administrators can revoke invitations');
-        const row = db
-          .select()
-          .from(invitations)
-          .where(and(eq(invitations.id, params.id), eq(invitations.churchId, church.id)))
-          .get();
-        if (!row) throw notFound('Invitation');
+        const row = loadInvitation(church.id, params.id);
         if (!row.revokedAt) {
           const revokedAt = nowIso();
           db.transaction((tx) => {
@@ -142,7 +194,7 @@ export const invitationsModule = (deps: Deps) => {
           .select({ invitation: invitations, church: churches })
           .from(invitations)
           .innerJoin(churches, eq(churches.id, invitations.churchId))
-          .where(eq(invitations.token, params.token))
+          .where(eq(invitations.tokenHash, hashToken(params.token)))
           .get();
         if (!row) throw notFound('Invitation');
         return {

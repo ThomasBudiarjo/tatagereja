@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createRateLimiter } from '../src/lib/rate-limit';
-import { createTestApp } from './helpers';
+import { createTestApp, permissiveLimiters } from './helpers';
 import { seedPeople, type Account, type PeopleSeed } from './people-fixtures';
 
 describe('people: filters, imports, links and group tools do not leak or escalate', () => {
@@ -222,9 +222,7 @@ describe('people: join requests are rate limited', () => {
     {},
     {
       limiters: {
-        login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+        ...permissiveLimiters(),
         'groups.join_request': createRateLimiter({ windowMs: 60_000, max: 2 }),
       },
     },

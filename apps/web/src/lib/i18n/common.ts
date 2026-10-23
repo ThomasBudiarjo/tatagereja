@@ -199,6 +199,8 @@ export const commonDictionary = defineDictionary('common', {
     errorInternal: 'The server hit a problem. Try again in a moment.',
     errorInvalidResponse: 'The server returned an unexpected response.',
     errorUnauthorized: 'Your session has ended. Log in again.',
+    errorCsrf: 'This request did not come from the app. Reload the page and try again.',
+    errorSessionRevoked: 'For your safety this session was ended. Log in again.',
     errorUnknown: 'Something went wrong.',
   },
   id: {
@@ -382,6 +384,8 @@ export const commonDictionary = defineDictionary('common', {
     errorInternal: 'Server mengalami masalah. Coba lagi sebentar lagi.',
     errorInvalidResponse: 'Server mengirim tanggapan yang tidak terduga.',
     errorUnauthorized: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+    errorCsrf: 'Permintaan ini tidak berasal dari aplikasi. Muat ulang halaman lalu coba lagi.',
+    errorSessionRevoked: 'Demi keamanan, sesi ini diakhiri. Silakan masuk kembali.',
     errorUnknown: 'Terjadi kesalahan.',
   },
 });

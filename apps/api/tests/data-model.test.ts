@@ -2,6 +2,7 @@ import { OPTIONAL_MODULE_IDS } from '@tatagereja/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq, getTableName, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import { ENCRYPTED_COLUMNS } from '../src/db/encrypted';
 import * as schema from '../src/db/schema';
 import { nowIso } from '../src/lib/time';
 import { generateCode, generateToken, hashToken, newId } from '../src/lib/tokens';
@@ -84,6 +85,7 @@ const USER_TABLES: SQLiteTable[] = [
   schema.userRecoveryCodes,
   schema.twoFactorChallenges,
   schema.loginEvents,
+  schema.passwordResetTokens,
 ];
 
 const MODULE_PATHS: Record<string, string> = {
@@ -855,6 +857,16 @@ describe('modules data model', () => {
     );
     expect(empty).toEqual([]);
 
+    // Confidential columns hold ciphertext only; reads through Drizzle see the plain text.
+    for (const { table, column } of ENCRYPTED_COLUMNS) {
+      const values = db.all<{ value: string | null }>(
+        sql`select ${sql.identifier(column)} as value from ${sql.identifier(table)}`,
+      );
+      for (const { value } of values) {
+        if (value !== null) expect(value).toStartWith('enc1:');
+      }
+    }
+
     db.delete(schema.churches).where(eq(schema.churches.id, churchId)).run();
 
     const remaining = CHURCH_TABLES.filter((table) => countForChurch(table, churchId) > 0).map(
@@ -994,6 +1006,15 @@ describe('modules data model', () => {
         userId,
         email: account.user.email,
         outcome: 'success',
+        createdAt: now,
+      })
+      .run();
+    db.insert(schema.passwordResetTokens)
+      .values({
+        id: newId(),
+        userId,
+        tokenHash: hashToken(generateToken()),
+        expiresAt: now,
         createdAt: now,
       })
       .run();

@@ -5,7 +5,7 @@ import { createRateLimiter } from '../src/lib/rate-limit';
 import { nowIso } from '../src/lib/time';
 import { newId } from '../src/lib/tokens';
 import { todayIn } from '../src/services/finance';
-import { createTestApp, seedChurch } from './helpers';
+import { createTestApp, seedChurch, permissiveLimiters } from './helpers';
 import {
   financeAudit,
   memberWithRole,
@@ -26,9 +26,7 @@ describe('finance controls', () => {
     {},
     {
       limiters: {
-        login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-        invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+        ...permissiveLimiters(),
         'finance.export': createRateLimiter({ windowMs: 60_000, max: 3 }),
       },
     },

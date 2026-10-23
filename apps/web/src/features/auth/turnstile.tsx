@@ -21,6 +21,31 @@ declare global {
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
+type ScriptUrlPolicy = { createScriptURL: (url: string) => string };
+type TrustedTypesFactory = {
+  createPolicy: (name: string, rules: { createScriptURL: (url: string) => string }) => unknown;
+};
+
+/*
+ * The server's Content Security Policy requires Trusted Types: `script.src` only takes a value
+ * made by a policy. This one lets exactly the Turnstile script through, nothing else.
+ */
+let scriptPolicy: ScriptUrlPolicy | null | undefined;
+function turnstileScriptUrl(): string {
+  if (scriptPolicy === undefined) {
+    const factory = (window as { trustedTypes?: TrustedTypesFactory }).trustedTypes;
+    scriptPolicy = factory
+      ? (factory.createPolicy('tatagereja-turnstile', {
+          createScriptURL: (url) => {
+            if (url !== SCRIPT_SRC) throw new TypeError('Only the Turnstile script may load');
+            return url;
+          },
+        }) as ScriptUrlPolicy)
+      : null;
+  }
+  return scriptPolicy ? scriptPolicy.createScriptURL(SCRIPT_SRC) : SCRIPT_SRC;
+}
+
 function loadScript(): Promise<void> {
   if (window.turnstile) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -31,7 +56,7 @@ function loadScript(): Promise<void> {
       return;
     }
     const script = document.createElement('script');
-    script.src = SCRIPT_SRC;
+    script.src = turnstileScriptUrl();
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load Turnstile'));

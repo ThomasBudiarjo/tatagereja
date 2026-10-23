@@ -32,12 +32,23 @@ export const router = createBrowserRouter([
       { path: '/', element: <RootRedirect /> },
       { path: '/join/:token', element: <JoinPage /> },
       {
+        path: '/reset-password/:token',
+        lazy: lazyPage(() => import('@/features/auth/reset-password-page'), 'ResetPasswordPage'),
+      },
+      {
         element: <RedirectIfAuthenticated />,
         children: [
           { path: '/welcome', element: <WelcomePage /> },
           { path: '/server', element: <ServerPage /> },
           { path: '/login', element: <LoginPage /> },
           { path: '/register', element: <RegisterPage /> },
+          {
+            path: '/forgot-password',
+            lazy: lazyPage(
+              () => import('@/features/auth/forgot-password-page'),
+              'ForgotPasswordPage',
+            ),
+          },
         ],
       },
       {

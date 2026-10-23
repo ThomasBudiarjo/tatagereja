@@ -5,6 +5,7 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { churches, people, users } from './core';
 import { households } from './people';
+import { encryptedText } from '../encrypted';
 
 /**
  * A pastoral care case. `confidential` cases are readable only by their assigned caregivers and
@@ -33,7 +34,7 @@ export const careCases = sqliteTable(
       .default('normal'),
     /** Short, non-sensitive label shown in lists ("Kunjungan RS", "Pendampingan duka"). */
     title: text('title').notNull(),
-    description: text('description'),
+    description: encryptedText('care_cases', 'description'),
     nextActionDate: text('next_action_date'),
     nextActionNote: text('next_action_note'),
     /** Set when the reminder for `next_action_date` was sent. */
@@ -86,7 +87,7 @@ export const careNotes = sqliteTable(
     kind: text('kind', { enum: ['note', 'call', 'visit', 'meeting', 'status_change'] })
       .notNull()
       .default('note'),
-    body: text('body').notNull(),
+    body: encryptedText('care_notes', 'body').notNull(),
     authorUserId: text('author_user_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
@@ -107,7 +108,7 @@ export const careVisits = sqliteTable(
     householdId: text('household_id').references(() => households.id, { onDelete: 'set null' }),
     visitDate: text('visit_date').notNull(),
     location: text('location'),
-    summary: text('summary'),
+    summary: encryptedText('care_visits', 'summary'),
     confidentiality: text('confidentiality', { enum: ['normal', 'confidential'] })
       .notNull()
       .default('normal'),

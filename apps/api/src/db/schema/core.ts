@@ -1,5 +1,6 @@
 import { DEFAULT_CURRENCY, DEFAULT_ENABLED_MODULES, DEFAULT_TIMEZONE } from '@tatagereja/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { encryptedText } from '../encrypted';
 
 export const users = sqliteTable(
   'users',
@@ -28,17 +29,49 @@ export const sessions = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Hash of the credential the client presents on each request: the httpOnly cookie of a
+     * `cookie` session, or the short-lived access token of a `bearer` session. Rotated on
+     * refresh, password change and two-step changes.
+     */
     tokenHash: text('token_hash').notNull(),
+    /** `cookie` for the web app on the server's own origin, `bearer` for other clients. */
+    transport: text('transport', { enum: ['cookie', 'bearer'] })
+      .notNull()
+      .default('bearer'),
+    /** Bearer sessions: when the current access token stops working (renewed by refreshing). */
+    accessExpiresAt: text('access_expires_at'),
+    /** Bearer sessions: hash of the current refresh token; earlier ones are in session_refresh_tokens. */
+    refreshTokenHash: text('refresh_token_hash'),
     userAgent: text('user_agent'),
     ip: text('ip'),
     createdAt: text('created_at').notNull(),
+    /** Touched at most every few minutes; a session idle for SESSION_IDLE_DAYS ends. */
     lastUsedAt: text('last_used_at').notNull(),
+    /** Absolute end of the session (SESSION_TTL_DAYS after sign-in). */
     expiresAt: text('expires_at').notNull(),
   },
   (table) => [
     uniqueIndex('sessions_token_hash_unique').on(table.tokenHash),
+    uniqueIndex('sessions_refresh_token_hash_unique').on(table.refreshTokenHash),
     index('sessions_user_idx').on(table.userId),
   ],
+);
+
+/**
+ * Refresh tokens a bearer session already rotated away from. Presenting one again means it was
+ * copied: the whole session (the token family) is revoked.
+ */
+export const sessionRefreshTokens = sqliteTable(
+  'session_refresh_tokens',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    rotatedAt: text('rotated_at').notNull(),
+  },
+  (table) => [index('session_refresh_tokens_session_idx').on(table.sessionId)],
 );
 
 export const churches = sqliteTable('churches', {
@@ -105,7 +138,12 @@ export const invitations = sqliteTable(
     churchId: text('church_id')
       .notNull()
       .references(() => churches.id, { onDelete: 'cascade' }),
-    token: text('token').notNull(),
+    /**
+     * SHA-256 (hex) of the link token; the link itself is shown once, when made or regenerated.
+     * The column kept its old name: rows from before hashing held the plain token, which the
+     * startup migration replaces with its hash.
+     */
+    tokenHash: text('token').notNull(),
     role: text('role', { enum: ['member', 'administrator'] }).notNull(),
     label: text('label'),
     expiresAt: text('expires_at'),
@@ -118,7 +156,7 @@ export const invitations = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [
-    uniqueIndex('invitations_token_unique').on(table.token),
+    uniqueIndex('invitations_token_unique').on(table.tokenHash),
     index('invitations_church_idx').on(table.churchId),
   ],
 );
@@ -168,7 +206,7 @@ export const personPrivateDetails = sqliteTable('person_private_details', {
   churchId: text('church_id')
     .notNull()
     .references(() => churches.id, { onDelete: 'cascade' }),
-  nationalId: text('national_id'),
+  nationalId: encryptedText('person_private_details', 'national_id'),
   maritalStatus: text('marital_status', {
     enum: ['single', 'married', 'widowed', 'divorced', 'unspecified'],
   })
@@ -177,8 +215,8 @@ export const personPrivateDetails = sqliteTable('person_private_details', {
   baptismDate: text('baptism_date'),
   emergencyContactName: text('emergency_contact_name'),
   emergencyContactPhone: text('emergency_contact_phone'),
-  medicalNotes: text('medical_notes'),
-  privateNotes: text('private_notes'),
+  medicalNotes: encryptedText('person_private_details', 'medical_notes'),
+  privateNotes: encryptedText('person_private_details', 'private_notes'),
   updatedAt: text('updated_at').notNull(),
 });
 
