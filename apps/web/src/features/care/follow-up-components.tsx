@@ -136,12 +136,17 @@ export function NewFollowUpSheet({
   onCreated?: (followUp: VisitorFollowUp) => void;
 }) {
   const { t } = useI18n();
+  const { access } = useChurch();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t('care.newFollowUp')}</SheetTitle>
-          <SheetDescription>{t('care.newFollowUpDescription')}</SheetDescription>
+          <SheetDescription>
+            {canAddVisitorPerson(access)
+              ? t('care.newFollowUpDescription')
+              : t('care.newFollowUpExistingDescription')}
+          </SheetDescription>
         </SheetHeader>
         {open ? (
           <NewFollowUpForm
