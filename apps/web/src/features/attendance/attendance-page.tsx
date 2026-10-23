@@ -1,12 +1,20 @@
-import { can } from '@tatagereja/shared';
+import {
+  ATTENDANCE_MODES,
+  ATTENDANCE_MODE_LABELS,
+  attendanceSessionInputSchema,
+  can,
+  localize,
+  type AttendanceMode,
+  type AttendanceSessionView,
+} from '@tatagereja/shared';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, Plus } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
-import { toast } from 'sonner';
+import { BellRing, ClipboardCheck, ClipboardList, Plus, UserRoundCheck, Users } from 'lucide-react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { Link, useNavigate } from 'react-router';
+import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import {
@@ -18,291 +26,438 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { Input, Textarea } from '@/components/ui/input';
 import { ListGroup, ListRow } from '@/components/ui/list';
-import { Alert, EmptyState, ErrorState, SearchInput, Skeleton } from '@/components/ui/misc';
+import { Segmented } from '@/components/ui/misc';
+import { Pagination } from '@/components/ui/pagination';
 import { Select } from '@/components/ui/select';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/states';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { groupsQuery } from '@/features/groups/api';
 import { getErrorMessage } from '@/lib/api';
-import { formatDateTime } from '@/lib/format';
-import { useDebounced } from '@/lib/use-debounced';
-import { attendanceSessionsQuery, myAttendanceQuery, useCreateAttendanceSession } from './api';
+import { useI18n } from '@/lib/i18n';
+import { useMutationToast } from '@/lib/use-mutation-toast';
+import { useUrlState } from '@/lib/use-url-state';
+import { attendanceSessionsQuery, useCreateAttendanceSession } from './api';
+import {
+  ATTENDANCE_TONE,
+  DateChip,
+  MarkBar,
+  canStartSession,
+  seesAbsences,
+  seesSessions,
+} from './components';
+import { MyAttendancePage } from './history-page';
 
-function NewSessionDialog({
+const PAGE_SIZE = 25;
+
+/** Sessions the caller oversees; members without attendance access see their own history. */
+export function AttendancePage() {
+  const { access } = useChurch();
+  return seesSessions(access) ? <SessionsPage /> : <MyAttendancePage />;
+}
+
+function SessionsPage() {
+  const { churchId, base, access } = useChurch();
+  const { t, locale } = useI18n();
+  const [state, setState, reset] = useUrlState({
+    q: '',
+    groupId: '',
+    mode: '',
+    sort: 'recent',
+    page: 1,
+    new: false as boolean,
+  });
+  const groups = useQuery(groupsQuery(churchId, { includeInactive: true }));
+  const query = useQuery({
+    ...attendanceSessionsQuery(churchId, {
+      q: state.q || undefined,
+      groupId: state.groupId || undefined,
+      mode: (state.mode || undefined) as AttendanceMode | undefined,
+      sort: state.sort as 'recent' | 'oldest' | 'title',
+      page: state.page,
+      limit: PAGE_SIZE,
+    }),
+    placeholderData: keepPreviousData,
+  });
+  const canCreate = canStartSession(access);
+  const filtered = !!(state.q || state.groupId || state.mode);
+  const groupOptions = (groups.data?.items ?? [])
+    .filter((group) => can.viewAllAttendance(access) || access.leaderGroupIds.includes(group.id))
+    .map((group) => ({ value: group.id, label: group.name }));
+
+  return (
+    <Page size="wide">
+      <PageHeader
+        icon={ClipboardCheck}
+        tone={ATTENDANCE_TONE}
+        title={t('attendance.title')}
+        description={t('attendance.description')}
+        actions={
+          <>
+            {seesAbsences(access) ? (
+              <Button asChild variant="outline" size="sm">
+                <Link to={`${base}/attendance/absences`}>
+                  <BellRing />
+                  <span className="hidden sm:inline">{t('attendance.absences')}</span>
+                  <span className="sm:hidden">{t('attendance.absencesShort')}</span>
+                </Link>
+              </Button>
+            ) : null}
+            {canCreate ? (
+              <Button size="sm" onClick={() => setState({ new: true }, { push: true })}>
+                <Plus />
+                {t('attendance.newSession')}
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+
+      <FilterBar
+        search={{
+          value: state.q,
+          onChange: (q) => setState({ q }),
+          placeholder: t('attendance.searchSessions'),
+        }}
+        filters={[
+          {
+            id: 'group',
+            label: t('attendance.filterGroup'),
+            value: state.groupId,
+            onChange: (groupId) => setState({ groupId }),
+            options: groupOptions,
+          },
+          {
+            id: 'mode',
+            label: t('attendance.filterMode'),
+            value: state.mode,
+            onChange: (mode) => setState({ mode }),
+            options: ATTENDANCE_MODES.map((mode) => ({
+              value: mode,
+              label: localize(ATTENDANCE_MODE_LABELS[mode], locale),
+            })),
+          },
+        ]}
+        sort={{
+          value: state.sort,
+          onChange: (sort) => setState({ sort }),
+          options: [
+            { value: 'recent', label: t('attendance.sortRecent') },
+            { value: 'oldest', label: t('attendance.sortOldest') },
+            { value: 'title', label: t('attendance.sortTitle') },
+          ],
+        }}
+        onReset={() => reset(['sort'])}
+        actions={
+          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Link to={`${base}/attendance/me`}>
+              <UserRoundCheck />
+              {t('attendance.myAttendance')}
+            </Link>
+          </Button>
+        }
+      />
+
+      {query.isPending ? (
+        <SkeletonList rows={6} />
+      ) : query.isError ? (
+        <ErrorState
+          error={query.error}
+          message={getErrorMessage(query.error)}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
+      ) : query.data.items.length === 0 ? (
+        filtered ? (
+          <EmptyState
+            icon={ClipboardList}
+            tone="slate"
+            title={t('attendance.emptyFilteredTitle')}
+            description={t('common.noResultsHint')}
+            action={
+              <Button variant="outline" onClick={() => reset(['sort'])}>
+                {t('common.clearAll')}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={ClipboardCheck}
+            tone={ATTENDANCE_TONE}
+            title={t('attendance.emptyTitle')}
+            description={t('attendance.emptyBody')}
+            action={
+              canCreate ? (
+                <Button onClick={() => setState({ new: true }, { push: true })}>
+                  <Plus />
+                  {t('attendance.newSession')}
+                </Button>
+              ) : undefined
+            }
+          />
+        )
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            {t('attendance.sessionsCount', { count: query.data.total })}
+          </p>
+          <ListGroup>
+            {query.data.items.map((session) => (
+              <SessionRow key={session.id} session={session} />
+            ))}
+          </ListGroup>
+          <Pagination
+            page={query.data.page}
+            pageSize={query.data.limit}
+            total={query.data.total}
+            onPageChange={(page) => {
+              setState({ page });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
+      )}
+
+      {canCreate ? (
+        <NewSessionDialog
+          open={state.new}
+          onOpenChange={(open) => (open ? setState({ new: true }) : setState({ new: false }))}
+        />
+      ) : null}
+    </Page>
+  );
+}
+
+function SessionRow({ session }: { session: AttendanceSessionView }) {
+  const { base } = useChurch();
+  const { t, formatDateTime, formatNumber } = useI18n();
+  const headcount = session.mode === 'headcount';
+  return (
+    <ListRow
+      to={`${base}/attendance/${session.id}`}
+      leading={<DateChip value={session.sessionAt} />}
+      title={
+        <span className="flex items-center gap-2">
+          <span className="truncate">{session.title}</span>
+          {headcount ? (
+            <StatusBadge tone="sky" size="sm" icon={Users}>
+              {t('attendance.headcountTitle')}
+            </StatusBadge>
+          ) : null}
+        </span>
+      }
+      subtitle={`${formatDateTime(session.sessionAt)} · ${session.groupName ?? t('attendance.churchWide')}`}
+      trailing={
+        <span className="flex w-24 flex-col items-end gap-1.5 sm:w-32">
+          <span className="font-semibold text-foreground tabular">
+            {headcount
+              ? t('attendance.counted', { count: formatNumber(session.attendeeCount) })
+              : t('attendance.attendees', { count: formatNumber(session.presentCount) })}
+          </span>
+          {!headcount && session.totalCount > 0 ? (
+            <MarkBar
+              present={session.presentCount}
+              absent={session.absentCount}
+              excused={session.excusedCount}
+              total={session.totalCount}
+            />
+          ) : null}
+        </span>
+      }
+    />
+  );
+}
+
+type SessionForm = z.input<typeof attendanceSessionInputSchema>;
+
+/** Creates a session and opens it. Leaders pick one of their groups; recorders any scope. */
+export function NewSessionDialog({
   open,
   onOpenChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { churchId, base, access } = useChurch();
-  const navigate = useNavigate();
-  const groups = useQuery({ ...groupsQuery(churchId, { includeInactive: true }), enabled: open });
-  const create = useCreateAttendanceSession(churchId);
-  // Church-wide recorders may pick any group or none; leaders pick one of their groups.
-  const admin = can.recordAttendance(access, { groupId: null });
-  const [title, setTitle] = useState('');
-  const [groupId, setGroupId] = useState('');
-  const [sessionAt, setSessionAt] = useState(() => new Date().toISOString());
-  const [error, setError] = useState<string | null>(null);
-
-  const selectable = (groups.data?.items ?? []).filter(
-    (group) => admin || access.leaderGroupIds.includes(group.id),
-  );
-
-  const submit = async () => {
-    if (title.trim().length < 2) {
-      setError('Enter a title with at least 2 characters');
-      return;
-    }
-    if (!admin && !groupId) {
-      setError('Select one of your groups');
-      return;
-    }
-    try {
-      const result = await create.mutateAsync({
-        title: title.trim(),
-        eventId: null,
-        groupId: groupId || null,
-        sessionAt,
-        notes: null,
-      });
-      onOpenChange(false);
-      navigate(`${base}/attendance/${result.session.id}`);
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New attendance session</DialogTitle>
-          <DialogDescription>
-            Sessions for a group start with that group's members. Church-wide sessions list everyone
-            who is not inactive.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="flex flex-col gap-4">
-          {error ? <Alert variant="error">{error}</Alert> : null}
-          <Field label="Title" htmlFor="session-title" required>
-            <Input
-              id="session-title"
-              value={title}
-              onChange={(event) => {
-                setTitle(event.target.value);
-                setError(null);
-              }}
-              placeholder="Sunday service"
-            />
-          </Field>
-          <Field label="Scope" htmlFor="session-group">
-            <Select
-              id="session-group"
-              value={groupId}
-              onChange={(event) => setGroupId(event.target.value)}
-            >
-              {admin ? (
-                <option value="">Church-wide</option>
-              ) : (
-                <option value="">Select a group…</option>
-              )}
-              {selectable.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Date and time" htmlFor="session-at" required>
-            <DateTimeInput id="session-at" value={sessionAt} onChange={setSessionAt} />
-          </Field>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => void submit()} loading={create.isPending}>
-            Create
-          </Button>
-        </DialogFooter>
+      <DialogContent className="sm:max-w-lg">
+        {/* The content unmounts when closed, so every opening starts with a fresh form. */}
+        <NewSessionForm onDone={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function MyAttendance() {
-  const { churchId } = useChurch();
-  const query = useQuery(myAttendanceQuery(churchId));
-  if (query.isPending) return <Skeleton className="h-24" />;
-  if (query.isError)
-    return (
-      <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
-    );
-  if (query.data.items.length === 0) {
-    return (
-      <EmptyState
-        icon={ClipboardList}
-        title="No attendance recorded"
-        description="Your attendance appears here once a leader records it."
-      />
-    );
-  }
-  return (
-    <ListGroup>
-      {query.data.items.map((item) => (
-        <ListRow
-          key={item.sessionId}
-          title={item.title}
-          subtitle={`${formatDateTime(item.sessionAt)}${item.groupName ? ` · ${item.groupName}` : ''}`}
-          trailing={
-            <Badge
-              variant={
-                item.status === 'present'
-                  ? 'success'
-                  : item.status === 'excused'
-                    ? 'warning'
-                    : 'destructive'
-              }
-              className="capitalize"
-            >
-              {item.status}
-            </Badge>
-          }
-        />
-      ))}
-    </ListGroup>
-  );
-}
-
-export function AttendancePage() {
+function NewSessionForm({ onDone }: { onDone: () => void }) {
   const { churchId, base, access } = useChurch();
-  const [params, setParams] = useSearchParams();
-  const [search, setSearch] = useState(params.get('q') ?? '');
-  const [createOpen, setCreateOpen] = useState(false);
-  const debounced = useDebounced(search);
-  const canRecord = can.viewAttendanceOverview(access);
-  const page = Number(params.get('page') ?? '1');
-
-  const query = useQuery({
-    ...attendanceSessionsQuery(churchId, {
-      q: debounced || undefined,
-      page: Number.isFinite(page) && page > 0 ? page : 1,
-      limit: 50,
-    }),
-    enabled: canRecord,
-    placeholderData: keepPreviousData,
+  const { t, locale } = useI18n();
+  const navigate = useNavigate();
+  const groups = useQuery(groupsQuery(churchId));
+  const churchWide = can.recordAttendance(access, { groupId: null });
+  const selectable = (groups.data?.items ?? []).filter((group) =>
+    can.recordAttendance(access, { groupId: group.id }),
+  );
+  const form = useForm<SessionForm, unknown, z.output<typeof attendanceSessionInputSchema>>({
+    resolver: zodResolver(attendanceSessionInputSchema),
+    defaultValues: {
+      title: '',
+      groupId: churchWide ? null : (access.leaderGroupIds[0] ?? null),
+      eventId: null,
+      sessionAt: new Date().toISOString(),
+      notes: '',
+      mode: 'roster',
+      headcount: null,
+    },
+  });
+  const errors = form.formState.errors;
+  const mode = useWatch({ control: form.control, name: 'mode' });
+  const create = useMutationToast(useCreateAttendanceSession(churchId), {
+    success: t('attendance.created'),
+    form,
   });
 
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    if (key !== 'page') next.delete('page');
-    setParams(next, { replace: true });
-  };
-
-  if (!canRecord) {
-    return (
-      <Page>
-        <PageHeader
-          backTo={`${base}/more`}
-          title="My attendance"
-          description="Your own attendance history."
-        />
-        <MyAttendance />
-      </Page>
-    );
-  }
-
-  const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / query.data.limit)) : 1;
+  const submit = form.handleSubmit(async (values) => {
+    if (!churchWide && !values.groupId) {
+      form.setError('groupId', { message: t('attendance.chooseGroup') });
+      return;
+    }
+    const result = await create.run({
+      ...values,
+      headcount:
+        values.mode === 'headcount' ? { men: 0, women: 0, children: 0, visitors: 0 } : null,
+    });
+    if (result) {
+      onDone();
+      navigate(`${base}/attendance/${result.session.id}`);
+    }
+  });
 
   return (
-    <Page>
-      <PageHeader
-        backTo={`${base}/more`}
-        title="Attendance"
-        description="Sessions you can record and review."
-        actions={
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus /> New
-          </Button>
-        }
-      />
-      <SearchInput
-        value={search}
-        onChange={(value) => {
-          setSearch(value);
-          setParam('q', value);
-        }}
-        placeholder="Search sessions"
-      />
-
-      {query.isPending ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-16" />
-          ))}
+    <form
+      onSubmit={(event) => void submit(event)}
+      noValidate
+      className="flex min-h-0 flex-col gap-4"
+    >
+      <DialogHeader>
+        <DialogTitle>{t('attendance.newTitle')}</DialogTitle>
+        <DialogDescription>{t('attendance.newDescription')}</DialogDescription>
+      </DialogHeader>
+      <DialogBody className="flex flex-col gap-4">
+        <Field
+          label={t('attendance.fieldTitle')}
+          htmlFor="session-title"
+          error={errors.title?.message}
+          required
+        >
+          <Input
+            id="session-title"
+            autoFocus
+            placeholder={t('attendance.fieldTitlePlaceholder')}
+            aria-invalid={!!errors.title}
+            {...form.register('title')}
+          />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={t('attendance.fieldScope')}
+            htmlFor="session-group"
+            error={errors.groupId?.message}
+          >
+            <Controller
+              control={form.control}
+              name="groupId"
+              render={({ field }) => (
+                <Select
+                  id="session-group"
+                  value={field.value ?? ''}
+                  aria-invalid={!!errors.groupId}
+                  onChange={(event) => field.onChange(event.target.value || null)}
+                >
+                  {churchWide ? (
+                    <option value="">{t('attendance.churchWide')}</option>
+                  ) : (
+                    <option value="">{t('attendance.fieldScopeChoose')}</option>
+                  )}
+                  {selectable.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            />
+          </Field>
+          <Field
+            label={t('attendance.fieldWhen')}
+            htmlFor="session-at"
+            error={errors.sessionAt?.message}
+            required
+          >
+            <Controller
+              control={form.control}
+              name="sessionAt"
+              render={({ field }) => (
+                <DateTimeInput
+                  id="session-at"
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-invalid={!!errors.sessionAt}
+                />
+              )}
+            />
+          </Field>
         </div>
-      ) : query.isError ? (
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
-      ) : query.data.items.length === 0 ? (
-        <EmptyState
-          icon={ClipboardCheck}
-          title="No attendance sessions yet"
-          description="Create a session from an event or start a standalone one."
-          action={
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus /> New session
-            </Button>
+        <Field
+          label={t('attendance.fieldMode')}
+          description={
+            mode === 'headcount'
+              ? t('attendance.modeHeadcountHint')
+              : t('attendance.modeRosterHint')
           }
-        />
-      ) : (
-        <>
-          <ListGroup>
-            {query.data.items.map((session) => (
-              <ListRow
-                key={session.id}
-                to={`${base}/attendance/${session.id}`}
-                title={session.title}
-                subtitle={`${formatDateTime(session.sessionAt)}${session.groupName ? ` · ${session.groupName}` : ' · Church-wide'}`}
-                trailing={
-                  <span className="tabular">
-                    {session.presentCount}/{session.totalCount || 0}
-                  </span>
-                }
+        >
+          <Controller
+            control={form.control}
+            name="mode"
+            render={({ field }) => (
+              <Segmented<AttendanceMode>
+                aria-label={t('attendance.fieldMode')}
+                value={field.value ?? 'roster'}
+                onChange={field.onChange}
+                options={ATTENDANCE_MODES.map((value) => ({
+                  value,
+                  label: localize(ATTENDANCE_MODE_LABELS[value], locale),
+                  icon: value === 'headcount' ? Users : UserRoundCheck,
+                }))}
               />
-            ))}
-          </ListGroup>
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={query.data.page <= 1}
-                onClick={() => setParam('page', String(query.data.page - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground tabular">
-                Page {query.data.page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={query.data.page >= totalPages}
-                onClick={() => setParam('page', String(query.data.page + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          ) : null}
-        </>
-      )}
-
-      <NewSessionDialog open={createOpen} onOpenChange={setCreateOpen} />
-    </Page>
+            )}
+          />
+        </Field>
+        <Field
+          label={t('attendance.fieldNotes')}
+          htmlFor="session-notes"
+          error={errors.notes?.message}
+        >
+          <Textarea
+            id="session-notes"
+            rows={2}
+            placeholder={t('attendance.fieldNotesPlaceholder')}
+            {...form.register('notes')}
+          />
+        </Field>
+      </DialogBody>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit" loading={create.isPending}>
+          {t('attendance.create')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
