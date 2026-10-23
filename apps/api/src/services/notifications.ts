@@ -6,7 +6,7 @@ import {
   type NotificationType,
   type Permission,
 } from '@tatagereja/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
 import {
   churchMemberships,
@@ -135,9 +135,47 @@ const mutedUserIds = (db: Queryable, type: NotificationType, userIds: string[]):
 };
 
 /**
+ * An identical unread notice (same type, item, title and body) within this many minutes is not sent
+ * again: toggling something back and forth (join and cancel, RSVP, "I prayed") cannot flood an
+ * inbox. Mandatory security notices are always sent.
+ */
+export const NOTIFY_REPEAT_MINUTES = 10;
+
+/** Recipients who already hold an identical unread notice from the last few minutes. */
+const repeatedUserIds = (
+  db: Queryable,
+  input: NotifyInput,
+  text: { title: string; body: string | null },
+  userIds: string[],
+): Set<string> => {
+  if (!input.entityId || userIds.length === 0) return new Set();
+  if (notificationTypeDefinition(input.type).mandatory) return new Set();
+  const since = new Date(Date.now() - NOTIFY_REPEAT_MINUTES * 60_000).toISOString();
+  return new Set(
+    db
+      .select({ userId: notifications.userId })
+      .from(notifications)
+      .where(
+        and(
+          inArray(notifications.userId, userIds),
+          eq(notifications.type, input.type),
+          eq(notifications.entityId, input.entityId),
+          eq(notifications.title, text.title),
+          text.body === null ? isNull(notifications.body) : eq(notifications.body, text.body),
+          isNull(notifications.readAt),
+          gte(notifications.createdAt, since),
+        ),
+      )
+      .all()
+      .map((row) => row.userId),
+  );
+};
+
+/**
  * Creates one in-app notification per recipient, respecting each person's preferences.
  * Pass the transaction handle when it belongs to a change, so both commit together.
- * Never put confidential text (care notes, amounts) into the title or body.
+ * Never put confidential text (care notes, amounts) into the title or body. An identical
+ * unread notice sent minutes ago is not repeated (`NOTIFY_REPEAT_MINUTES`).
  * Returns the number of notifications created.
  */
 export function notify(db: Queryable, input: NotifyInput): number {
@@ -151,13 +189,15 @@ export function notify(db: Queryable, input: NotifyInput): number {
   const excluded = new Set(input.excludeUserIds ?? []);
   const recipients = [...new Set(candidates)].filter((userId) => !excluded.has(userId));
   const muted = mutedUserIds(db, input.type, recipients);
-  const deliver = recipients.filter((userId) => !muted.has(userId));
+  const title = textOf(input.title, LIMITS.notificationTitleMax);
+  const body = input.body ? textOf(input.body, LIMITS.notificationBodyMax) : null;
+  const unmuted = recipients.filter((userId) => !muted.has(userId));
+  const repeated = repeatedUserIds(db, input, { title: title.id, body: body?.id ?? null }, unmuted);
+  const deliver = unmuted.filter((userId) => !repeated.has(userId));
   if (deliver.length === 0) return 0;
   const now = nowIso();
   const link =
     input.link && input.link.startsWith('/') && !input.link.startsWith('//') ? input.link : null;
-  const title = textOf(input.title, LIMITS.notificationTitleMax);
-  const body = input.body ? textOf(input.body, LIMITS.notificationBodyMax) : null;
   const rows = deliver.map((userId) => ({
     id: newId(),
     churchId: input.churchId,

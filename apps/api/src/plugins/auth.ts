@@ -12,6 +12,7 @@ import { Elysia } from 'elysia';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import { churches, sessions, users } from '../db/schema';
 import type { Deps } from '../deps';
+import { enforceAccountLimits } from '../lib/abuse';
 import { HttpError, forbidden, notFound, unauthorized } from '../lib/errors';
 import { crossSiteReason } from '../lib/origin';
 import { requestMeta } from '../lib/request';
@@ -185,6 +186,8 @@ export function authPlugin(deps: Deps) {
     if (known) return known;
     const auth = service.authenticate(request, headers);
     verified.set(request, auth);
+    // Once per request: writes, exports and searches count towards the account's limits.
+    enforceAccountLimits(deps.limiters, auth.user.id, request.method, new URL(request.url));
     return auth;
   };
   const admitted = new WeakMap<Request, ChurchContext>();

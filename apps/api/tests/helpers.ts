@@ -25,6 +25,9 @@ export const permissiveLimiters = (): Limiters => ({
   invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
   sessionRefresh: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
   passwordReset: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  'account.writes': createRateLimiter({ windowMs: 60_000, max: 100_000 }),
+  'account.exports': createRateLimiter({ windowMs: 60_000, max: 100_000 }),
+  'account.searches': createRateLimiter({ windowMs: 60_000, max: 100_000 }),
 });
 
 export function createTestApp(
@@ -46,14 +49,15 @@ export function createTestApp(
     options: { body?: unknown; token?: string; headers?: Record<string, string> } = {},
   ): Promise<TestResponse<T>> => {
     const headers: Record<string, string> = { ...(options.headers ?? {}) };
-    if (options.body !== undefined) headers['content-type'] = 'application/json';
+    const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+    if (body !== undefined) {
+      headers['content-type'] = 'application/json';
+      // As an HTTP client would: the body limits read it.
+      headers['content-length'] = String(Buffer.byteLength(body));
+    }
     if (options.token) headers.authorization = `Bearer ${options.token}`;
     const response = await app.handle(
-      new Request(`http://localhost${path}`, {
-        method,
-        headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      }),
+      new Request(`http://localhost${path}`, { method, headers, body }),
     );
     return { status: response.status, json: parseBody(await response.text()) };
   };

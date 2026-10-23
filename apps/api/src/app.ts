@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import type { AppConfig } from './config';
 import type { Db } from './db/client';
 import type { Deps } from './deps';
+import { bodyLimitFor } from './lib/abuse';
 import { createResultCache, invalidateForRequest } from './lib/cache';
 import { HttpError, badRequest } from './lib/errors';
 import { createStaticHandler, finalizeResponse } from './lib/http';
@@ -136,13 +137,15 @@ export function createApp(deps: Deps) {
       }
       Object.assign(set.headers, securityHeaders(request, { trustedTypes: !config.turnstile }));
       // Bun also enforces `maxRequestBodySize`; this answers with a clear JSON error first.
+      // Each kind of route has its own limit (`bodyLimitFor`): only imports take the largest.
       const length = Number(request.headers.get('content-length') ?? 0);
-      if (length > config.maxBodyBytes) {
+      const limit = bodyLimitFor(new URL(request.url).pathname, config.maxBodyBytes);
+      if (length > limit) {
         set.status = 413;
         return {
           error: {
             code: 'PAYLOAD_TOO_LARGE',
-            message: `Request body is larger than ${Math.max(1, Math.floor(config.maxBodyBytes / 1024))} KB`,
+            message: `Request body is larger than ${Math.max(1, Math.floor(limit / 1024))} KB`,
           },
         };
       }
