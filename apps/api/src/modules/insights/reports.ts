@@ -688,7 +688,7 @@ export const insightsReportsRouter = (deps: Deps) => {
     const lengthDays = Math.round((Date.parse(query.to) - Date.parse(query.from)) / 86_400_000);
     const previousTo = dayBefore(query.from);
     const previousFrom = shiftDays(previousTo, -lengthDays);
-    // Sums per day, fund and category in SQL; JS only folds the days into periods.
+    // Sums per day, source, fund and category in SQL; JS only folds them into periods.
     const giving = and(
       eq(financeEntries.churchId, church.id),
       isNull(financeEntries.voidedAt),
@@ -716,39 +716,34 @@ export const insightsReportsRouter = (deps: Deps) => {
     const offerings = emptyBuckets(periods);
     const contributions = emptyBuckets(periods);
     const total = emptyBuckets(periods);
+    const byFund = new Map<string, number>();
+    const byCategory = new Map<string, number>();
+    // One pass over the covering ledger index; the breakdowns fold the same daily sums.
     for (const row of db
       .select({
         entryDate: financeEntries.entryDate,
         sourceType: financeEntries.sourceType,
+        fundId: financeEntries.fundId,
+        categoryId: financeEntries.categoryId,
         amount,
       })
       .from(financeEntries)
       .where(current)
-      .groupBy(financeEntries.entryDate, financeEntries.sourceType)
+      .groupBy(
+        financeEntries.entryDate,
+        financeEntries.sourceType,
+        financeEntries.fundId,
+        financeEntries.categoryId,
+      )
       .all()) {
       const period = periodStartOf(row.entryDate, query.interval);
       const target = row.sourceType === 'offering' ? offerings : contributions;
       target.set(period, (target.get(period) ?? 0) + row.amount);
       total.set(period, (total.get(period) ?? 0) + row.amount);
+      byFund.set(row.fundId, (byFund.get(row.fundId) ?? 0) + row.amount);
+      const category = row.categoryId ?? '';
+      byCategory.set(category, (byCategory.get(category) ?? 0) + row.amount);
     }
-    const byFund = new Map(
-      db
-        .select({ fundId: financeEntries.fundId, amount })
-        .from(financeEntries)
-        .where(current)
-        .groupBy(financeEntries.fundId)
-        .all()
-        .map((row) => [row.fundId, row.amount]),
-    );
-    const byCategory = new Map(
-      db
-        .select({ categoryId: financeEntries.categoryId, amount })
-        .from(financeEntries)
-        .where(current)
-        .groupBy(financeEntries.categoryId)
-        .all()
-        .map((row) => [row.categoryId ?? '', row.amount]),
-    );
     const fundNames = new Map(
       db
         .select({ id: financeFunds.id, name: financeFunds.name })

@@ -8,8 +8,9 @@
  *
  * Each endpoint is called sequentially (one connection, like one busy phone): a few warm-up
  * calls, then --runs measured calls. Prints p50, p95 and max in milliseconds and the response
- * size as a Markdown table (the format of docs/PERFORMANCE.md); --json <file> also writes the
- * raw numbers. Requests send `Accept-Encoding: gzip, br` like a browser, so compression counts.
+ * size on the wire as a Markdown table (the format of docs/PERFORMANCE.md); --json <file> also
+ * writes the raw numbers. Requests send `Accept-Encoding: gzip, br` like a browser, so
+ * compression counts.
  * Report endpoints are measured cold: each call moves the start date by a day, so a report
  * cache never answers them.
  *
@@ -51,6 +52,9 @@ const login = async (email: string) =>
 
 const owner = await login('owner@large.test');
 const member = await login('member@large.test');
+// Cold report calls alternate between two staff accounts: report computations are rate-limited
+// per person (300 in five minutes), and one run makes about 270 of them.
+const admin = await login('admin@large.test');
 const churchId = (await api<{ items: { church: { id: string } }[] }>('/churches', owner)).items[0]!
   .church.id;
 const c = `/churches/${churchId}`;
@@ -72,7 +76,12 @@ const yearRange = `from=${day(-365)}&to=${day(0)}`;
 const monthFrom = `${day(-15)}T00:00:00.000Z`;
 const monthTo = `${day(16)}T00:00:00.000Z`;
 
-type Endpoint = { name: string; path: string; token?: string; bust?: boolean };
+/**
+ * `bust`: each call asks for another date range, so the report cache never answers.
+ * `cold`: a cheap write to the church before each call drops its result cache, so the call
+ * computes from the database like the first one after any change.
+ */
+type Endpoint = { name: string; path: string; token?: string; bust?: boolean; cold?: boolean };
 const endpoints: Endpoint[] = [
   { name: 'Session: me', path: '/auth/me' },
   { name: 'Churches of the account', path: '/churches' },
@@ -80,8 +89,10 @@ const endpoints: Endpoint[] = [
   { name: 'Notifications unread count', path: '/notifications/unread-count' },
   { name: 'Notifications list', path: '/notifications?limit=20' },
   { name: 'Home dashboard (owner)', path: `${c}/dashboard` },
+  { name: 'Home dashboard (owner), after a write', path: `${c}/dashboard`, cold: true },
   { name: 'Home dashboard (member)', path: `${c}/dashboard`, token: member },
   { name: 'Directory summary', path: `${c}/directory/summary` },
+  { name: 'Directory summary, after a write', path: `${c}/directory/summary`, cold: true },
   { name: 'People list', path: `${c}/people?limit=25` },
   { name: 'People search + filter', path: `${c}/people?q=sim&status=member&limit=25` },
   { name: 'People list, page 200', path: `${c}/people?limit=25&page=200` },
@@ -101,6 +112,7 @@ const endpoints: Endpoint[] = [
   { name: 'Attendance sessions', path: `${c}/attendance/sessions?limit=25` },
   { name: 'Attendance session detail', path: `${c}/attendance/sessions/${session.id}` },
   { name: 'Absence alerts', path: `${c}/attendance/absences` },
+  { name: 'Absence alerts, after a write', path: `${c}/attendance/absences`, cold: true },
   { name: 'Worship overview', path: `${c}/worship/overview` },
   { name: 'Worship services', path: `${c}/worship/services?limit=25` },
   { name: 'Worship service detail', path: `${c}/worship/services/${service.id}` },
@@ -170,12 +182,22 @@ async function measure(endpoint: Endpoint, index: number) {
   const url = (call: number) =>
     `${base}${endpoint.bust ? endpoint.path.replace(yearRange, `from=${day(-365 - (call % 300) - 1)}&to=${day(0)}`) : endpoint.path}`;
   const call = async (n: number) => {
+    if (endpoint.cold) {
+      // Saving the same home layout again is a write to the church: its cache is dropped.
+      await fetch(`${base}${c}/dashboard/preferences`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${owner}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ hiddenWidgets: [], widgetOrder: [] }),
+      });
+    }
     const started = performance.now();
     const response = await fetch(url(n), {
       headers: {
-        authorization: `Bearer ${endpoint.token ?? owner}`,
+        authorization: `Bearer ${endpoint.token ?? (endpoint.bust && n % 2 === 1 ? admin : owner)}`,
         'accept-encoding': 'gzip, br',
       },
+      // Bytes as sent: compressed when the server compresses.
+      decompress: false,
     });
     const body = await response.arrayBuffer();
     const elapsed = performance.now() - started;

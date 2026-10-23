@@ -12,7 +12,7 @@ import {
   type AttendanceStatus,
   type Headcount,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, gte, inArray, like, max, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, like, max, ne, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db, Queryable } from '../db/client';
 import type { AbsenceAlertRow, AttendanceSessionRow, PersonRow } from '../db/schema';
@@ -198,6 +198,7 @@ export function absenceStreaksOf(
   if (scope.groupIds && scope.groupIds.length === 0) return [];
   if (scope.personIds && scope.personIds.length === 0) return [];
   const present = alias(attendanceRecords, 'present');
+  const counted = alias(attendanceRecords, 'counted');
   const scopedSessions = scope.groupIds
     ? db
         .select({ id: attendanceSessions.id })
@@ -209,6 +210,8 @@ export function absenceStreaksOf(
           ),
         )
     : null;
+  // Per person with an absent mark: the newest absence and the newest presence. Both are one
+  // seek in the covering (church, status, person, session_at) index.
   const lastPresent = db
     .select({ at: max(present.sessionAt) })
     .from(present)
@@ -220,13 +223,11 @@ export function absenceStreaksOf(
         scopedSessions ? inArray(present.sessionId, scopedSessions) : undefined,
       ),
     );
-  const lastPresentAt = sql<string | null>`(${lastPresent})`;
-  return db
+  const perPerson = db
     .select({
       personId: attendanceRecords.personId,
-      streak: count(),
-      lastPresentAt,
-      lastAbsentAt: sql<string>`max(${attendanceRecords.sessionAt})`,
+      lastAbsentAt: sql<string>`max(${attendanceRecords.sessionAt})`.as('last_absent_at'),
+      lastPresentAt: sql<string | null>`(${lastPresent})`.as('last_present_at'),
     })
     .from(attendanceRecords)
     .where(
@@ -235,12 +236,35 @@ export function absenceStreaksOf(
         eq(attendanceRecords.status, 'absent'),
         scopedSessions ? inArray(attendanceRecords.sessionId, scopedSessions) : undefined,
         scope.personIds ? inArray(attendanceRecords.personId, [...scope.personIds]) : undefined,
-        sql`${attendanceRecords.sessionAt} > coalesce(${lastPresentAt}, '')`,
       ),
     )
     .groupBy(attendanceRecords.personId)
-    .having(gte(count(), Math.max(1, threshold)))
-    .all();
+    .as('per_person');
+  // Then, only for people absent since they were last present, the absences since then.
+  const streak = db
+    .select({ value: count() })
+    .from(counted)
+    .where(
+      and(
+        eq(counted.churchId, churchId),
+        eq(counted.status, 'absent'),
+        eq(counted.personId, perPerson.personId),
+        scopedSessions ? inArray(counted.sessionId, scopedSessions) : undefined,
+        sql`${counted.sessionAt} > coalesce(${perPerson.lastPresentAt}, '')`,
+      ),
+    );
+  const minimum = Math.max(1, threshold);
+  return db
+    .select({
+      personId: perPerson.personId,
+      streak: sql<number>`(${streak})`.mapWith(Number),
+      lastPresentAt: perPerson.lastPresentAt,
+      lastAbsentAt: perPerson.lastAbsentAt,
+    })
+    .from(perPerson)
+    .where(sql`${perPerson.lastAbsentAt} > coalesce(${perPerson.lastPresentAt}, '')`)
+    .all()
+    .filter((row) => row.streak >= minimum);
 }
 
 /**
