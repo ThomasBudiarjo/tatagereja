@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { LIMITS } from '../constants';
 import { NOTIFICATION_TYPES, type NotificationType } from '../notifications';
-import { idSchema, isoDateTimeSchema, paginatedSchema } from './common';
+import {
+  cursorQuerySchema,
+  idSchema,
+  isoDateTimeSchema,
+  keysetPageSchema,
+  paginatedSchema,
+} from './common';
 
 export const notificationSchema = z.object({
   id: idSchema,
@@ -26,11 +32,13 @@ export const notificationListQuerySchema = z.object({
     .transform((value) => value === 'true'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(LIMITS.pageSizeMax).default(LIMITS.pageSizeDefault),
+  ...cursorQuerySchema.shape,
 });
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
 
 export const notificationListSchema = paginatedSchema(notificationSchema).extend({
   unreadCount: z.number().int().nonnegative(),
+  ...keysetPageSchema.shape,
 });
 export type NotificationList = z.infer<typeof notificationListSchema>;
 

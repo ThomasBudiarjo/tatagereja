@@ -14,6 +14,8 @@ import {
   moneySchema,
   optionalDate,
   optionalText,
+  cursorQuerySchema,
+  keysetPageSchema,
   paginatedSchema,
   paginationQuerySchema,
   requiredText,
@@ -514,10 +516,13 @@ export const financeEntryListQuerySchema = paginationQuerySchema.extend({
   direction: z.enum(['in', 'out']).optional(),
   includeVoided: booleanQuery,
   format: z.enum(['json', 'csv']).default('json'),
+  ...cursorQuerySchema.shape,
 });
 export type FinanceEntryListQuery = z.infer<typeof financeEntryListQuerySchema>;
 
-export const financeEntryListSchema = paginatedSchema(financeEntrySchema);
+export const financeEntryListSchema = paginatedSchema(financeEntrySchema).extend(
+  keysetPageSchema.shape,
+);
 export type FinanceEntryList = z.infer<typeof financeEntryListSchema>;
 
 export const financeEntryResponseSchema = z.object({ entry: financeEntrySchema });

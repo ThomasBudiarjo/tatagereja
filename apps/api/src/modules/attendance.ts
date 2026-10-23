@@ -35,7 +35,8 @@ import {
   people,
 } from '../db/schema';
 import type { Deps } from '../deps';
-import { conflict, forbidden, notFound } from '../lib/errors';
+import { afterCursor, decodeCursor, keysetPage } from '../lib/cursor';
+import { conflict, forbidden, notFound, validationError } from '../lib/errors';
 import { likePattern, offsetOf } from '../lib/query';
 import { nowIso, toUtcIso } from '../lib/time';
 import { newId } from '../lib/tokens';
@@ -60,8 +61,8 @@ import { notify } from '../services/notifications';
 import { groupIdsOfPerson, todayIn } from '../services/people';
 
 const SORTS = {
-  recent: [desc(attendanceSessions.sessionAt)],
-  oldest: [asc(attendanceSessions.sessionAt)],
+  recent: [desc(attendanceSessions.sessionAt), desc(attendanceSessions.id)],
+  oldest: [asc(attendanceSessions.sessionAt), asc(attendanceSessions.id)],
   title: [asc(attendanceSessions.title), desc(attendanceSessions.sessionAt)],
 } as const;
 
@@ -244,7 +245,7 @@ export const attendanceModule = (deps: Deps) => {
         const conditions: SQL[] = [eq(attendanceSessions.churchId, church.id)];
         if (!can.viewAllAttendance(access)) {
           if (access.leaderGroupIds.length === 0) {
-            return { items: [], total: 0, page: query.page, limit: query.limit };
+            return { items: [], total: 0, page: query.page, limit: query.limit, nextCursor: null };
           }
           conditions.push(inArray(attendanceSessions.groupId, access.leaderGroupIds));
         }
@@ -255,15 +256,43 @@ export const attendanceModule = (deps: Deps) => {
         const where = and(...conditions);
         const total =
           db.select({ value: count() }).from(attendanceSessions).where(where).get()?.value ?? 0;
-        const rows = db
-          .select()
-          .from(attendanceSessions)
-          .where(where)
-          .orderBy(...SORTS[query.sort])
-          .limit(query.limit)
-          .offset(offsetOf(query))
-          .all();
-        return { items: hydrateSessions(db, rows), total, page: query.page, limit: query.limit };
+        if (query.cursor && query.sort === 'title') {
+          throw validationError('Invalid request query', [
+            { path: 'cursor', message: 'Cursor paging needs the recent or oldest order' },
+          ]);
+        }
+        const after = query.cursor ? decodeCursor(query.cursor, 2) : null;
+        const { rows, nextCursor } = keysetPage(
+          db
+            .select()
+            .from(attendanceSessions)
+            .where(
+              after
+                ? and(
+                    where,
+                    afterCursor(
+                      [attendanceSessions.sessionAt, attendanceSessions.id],
+                      after,
+                      query.sort === 'oldest' ? 'asc' : 'desc',
+                    ),
+                  )
+                : where,
+            )
+            .orderBy(...SORTS[query.sort])
+            .limit(query.limit + 1)
+            .offset(after ? 0 : offsetOf(query))
+            .all(),
+          query.limit,
+          (row) => [row.sessionAt, row.id],
+        );
+        return {
+          items: hydrateSessions(db, rows),
+          total,
+          page: query.page,
+          limit: query.limit,
+          // Title order has no keyset; its pages use `page`.
+          nextCursor: query.sort === 'title' ? null : nextCursor,
+        };
       },
       { church: true, params: churchParamsSchema, query: attendanceListQuerySchema },
     )

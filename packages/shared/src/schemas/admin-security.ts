@@ -550,7 +550,11 @@ export const auditLogFilterSchema = auditLogQuerySchema.extend({
 export type AuditLogFilter = z.infer<typeof auditLogFilterSchema>;
 
 /** The CSV export takes the same filters without paging. */
-export const auditLogExportQuerySchema = auditLogFilterSchema.omit({ page: true, limit: true });
+export const auditLogExportQuerySchema = auditLogFilterSchema.omit({
+  page: true,
+  limit: true,
+  cursor: true,
+});
 export type AuditLogExportQuery = z.infer<typeof auditLogExportQuerySchema>;
 
 export const auditLogFacetsSchema = z.object({

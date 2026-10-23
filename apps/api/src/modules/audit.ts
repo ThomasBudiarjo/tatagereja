@@ -12,6 +12,7 @@ import { Elysia } from 'elysia';
 import type { ChurchRow } from '../db/schema';
 import { auditLogs, users } from '../db/schema';
 import type { Deps } from '../deps';
+import { afterCursor, decodeCursor, keysetPage } from '../lib/cursor';
 import { notFound } from '../lib/errors';
 import { likePattern, offsetOf } from '../lib/query';
 import { enforceRateLimit } from '../lib/rate-limit';
@@ -61,27 +62,36 @@ export const auditModule = (deps: Deps) => {
       '/',
       ({ church, query }) => {
         const where = and(...conditionsFor(church, query));
+        // Actors are joined for the count only when the search reads their names.
+        const counted = db.select({ value: count() }).from(auditLogs).$dynamic();
         const total =
-          db
-            .select({ value: count() })
-            .from(auditLogs)
-            .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+          (query.q ? counted.leftJoin(users, eq(users.id, auditLogs.actorUserId)) : counted)
             .where(where)
             .get()?.value ?? 0;
-        const rows = db
+        const after = query.cursor ? decodeCursor(query.cursor, 2) : null;
+        const fetched = db
           .select({ log: auditLogs, actorName: users.name })
           .from(auditLogs)
           .leftJoin(users, eq(users.id, auditLogs.actorUserId))
-          .where(where)
+          .where(
+            after
+              ? and(where, afterCursor([auditLogs.createdAt, auditLogs.id], after, 'desc'))
+              : where,
+          )
           .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
-          .limit(query.limit)
-          .offset(offsetOf(query))
+          .limit(query.limit + 1)
+          .offset(after ? 0 : offsetOf(query))
           .all();
+        const { rows, nextCursor } = keysetPage(fetched, query.limit, (row) => [
+          row.log.createdAt,
+          row.log.id,
+        ]);
         return {
           items: rows.map((row) => toAuditLog(row.log, row.actorName ?? null)),
           total,
           page: query.page,
           limit: query.limit,
+          nextCursor,
         };
       },
       { church: viewGuard, params: churchParamsSchema, query: auditLogFilterSchema },

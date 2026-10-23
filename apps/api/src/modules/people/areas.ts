@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   areaAssignBodySchema,
   areaCoordinatorBodySchema,
   areaInputSchema,
@@ -77,6 +78,7 @@ export const areasRouter = (deps: Deps) => {
           .from(areas)
           .where(and(...conditions))
           .orderBy(asc(areas.sortOrder), asc(areas.name))
+          .limit(LIMITS.listMax)
           .all()
           .filter(
             (row) =>

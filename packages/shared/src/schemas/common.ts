@@ -67,6 +67,19 @@ export const paginationQuerySchema = z.object({
 });
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 
+/**
+ * Keyset paging for the largest lists (audit log, notifications, ledger, attendance sessions):
+ * pass a page's `nextCursor` back as `cursor` to get the rows after it. It costs the same deep
+ * in the list as on the first page and never skips or repeats rows when new ones arrive. With
+ * a cursor, `page` is ignored; `total` still counts every matching row.
+ */
+export const cursorQuerySchema = z.object({
+  cursor: z.string().trim().min(1).max(LIMITS.cursorMax).optional(),
+});
+
+/** `nextCursor` of a keyset page: null on the last page. */
+export const keysetPageSchema = z.object({ nextCursor: z.string().nullable() });
+
 export const paginatedSchema = <T extends z.ZodType>(item: T) =>
   z.object({
     items: z.array(item),

@@ -6,7 +6,19 @@ import {
   songListQuerySchema,
   type Hymnal,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, like, ne, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  like,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { SongRow } from '../../db/schema';
 import { liturgyItems, songs, worshipServices } from '../../db/schema';
@@ -40,6 +52,8 @@ const auditFields = (row: SongRow) => ({
 });
 
 /** The song library: Kidung Jemaat, PKJ, NKB and the church's own songs. */
+const { lyrics: _lyrics, ...songListColumns } = getTableColumns(songs);
+
 export const songsRouter = (deps: Deps) => {
   const { db } = deps;
 
@@ -95,14 +109,16 @@ export const songsRouter = (deps: Deps) => {
             : query.sort === 'most_used'
               ? [desc(useCount), asc(songs.title)]
               : [asc(sql`${songs.title} collate nocase`)];
+        // Lyrics stay out of the list (a page of hymns is mostly lyrics); the detail has them.
         const rows = db
-          .select()
+          .select(songListColumns)
           .from(songs)
           .where(where)
           .orderBy(...order)
           .limit(query.limit)
           .offset(offsetOf(query))
-          .all();
+          .all()
+          .map((row) => ({ ...row, lyrics: null }));
         return { items: hydrate(church.id, rows), total, page: query.page, limit: query.limit };
       },
       {

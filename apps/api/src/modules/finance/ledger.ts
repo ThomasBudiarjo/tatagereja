@@ -27,6 +27,7 @@ import {
   offeringBatches,
 } from '../../db/schema';
 import type { Deps } from '../../deps';
+import { afterCursor, decodeCursor, keysetPage } from '../../lib/cursor';
 import { badRequest, conflict, notFound } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
 import { nowIso } from '../../lib/time';
@@ -276,12 +277,39 @@ export const ledgerRouter = (deps: Deps) => {
 
           const total =
             db.select({ value: count() }).from(financeEntries).where(where).get()?.value ?? 0;
-          const rows = ordered.limit(query.limit).offset(offsetOf(query)).all();
+          const after = query.cursor ? decodeCursor(query.cursor, 3) : null;
+          const { rows, nextCursor } = keysetPage(
+            (after
+              ? db
+                  .select()
+                  .from(financeEntries)
+                  .where(
+                    and(
+                      where,
+                      afterCursor(
+                        [financeEntries.entryDate, financeEntries.createdAt, financeEntries.id],
+                        after,
+                        'desc',
+                      ),
+                    ),
+                  )
+                  .orderBy(
+                    desc(financeEntries.entryDate),
+                    desc(financeEntries.createdAt),
+                    desc(financeEntries.id),
+                  )
+                  .limit(query.limit + 1)
+              : ordered.limit(query.limit + 1).offset(offsetOf(query))
+            ).all(),
+            query.limit,
+            (row) => [row.entryDate, row.createdAt, row.id],
+          );
           return {
             items: hydrateEntries(db, church.id, rows, running),
             total,
             page: query.page,
             limit: query.limit,
+            nextCursor,
           };
         },
         {

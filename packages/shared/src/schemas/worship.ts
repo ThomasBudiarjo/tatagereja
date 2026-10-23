@@ -321,6 +321,7 @@ export const songListQuerySchema = paginationQuerySchema.extend({
 });
 export type SongListQuery = z.infer<typeof songListQuerySchema>;
 
+/** Song lists leave `lyrics` out (always null); the song detail carries them. */
 export const songListSchema = paginatedSchema(songSchema);
 export type SongList = z.infer<typeof songListSchema>;
 

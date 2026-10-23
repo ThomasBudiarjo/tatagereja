@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   canManageBlockout,
   churchIdParamsSchema,
   churchParamsSchema,
@@ -158,6 +159,7 @@ export const volunteersRouter = (deps: Deps) => {
           .from(volunteerBlockouts)
           .where(and(...conditions))
           .orderBy(asc(volunteerBlockouts.startDate))
+          .limit(LIMITS.listMax)
           .all();
         return { items: hydrateBlockouts(church.id, rows) };
       },
