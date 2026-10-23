@@ -586,7 +586,7 @@ export const attendanceModule = (deps: Deps) => {
             });
             return updated;
           });
-          return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
+          return { alert: toAbsenceAlert(person, streak, row, lastPresentAt, access) };
         }
 
         if (!streak || streak.streak < INSIGHTS_LIMITS.absentStreakMin) {
@@ -702,7 +702,7 @@ export const attendanceModule = (deps: Deps) => {
           }
           return saved;
         });
-        return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
+        return { alert: toAbsenceAlert(person, streak, row, lastPresentAt, access) };
       },
       {
         church: true,

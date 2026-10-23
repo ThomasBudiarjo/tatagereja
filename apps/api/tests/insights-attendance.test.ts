@@ -534,7 +534,19 @@ describe('insights attendance', () => {
         `${base}/absences?threshold=3&includeResolved=true`,
         { token: s.leader.token },
       );
-      expect(leaderView.json.items[0].careTaskId).toBe(taskId);
+      // The leader sees that the alert was followed up, not the pastoral care task itself.
+      expect(leaderView.json.items[0].status).toBe('followed_up');
+      expect(leaderView.json.items[0].careTaskId).toBeNull();
+      const carerView = await t.request(
+        'GET',
+        `${base}/absences?threshold=3&includeResolved=true`,
+        { token: carer.token },
+      );
+      expect(
+        carerView.json.items.find(
+          (item: { person: { id: string } }) => item.person.id === s.alice.id,
+        )?.careTaskId,
+      ).toBe(taskId);
     });
 
     it('keeps alerts inside the church', async () => {
