@@ -33,6 +33,7 @@ import {
   volunteerBlockouts,
   worshipServices,
 } from '../db/schema';
+import { notFound } from '../lib/errors';
 import { toPersonSummary } from '../serializers';
 import { toLiturgyItem, toWorshipService } from '../modules/worship/serializers';
 
@@ -582,3 +583,44 @@ export function userIdsOfPeople(
 /** Whether the caller sees draft services (planners, schedulers and team leaders). */
 export const canSeeDraftServices = (access: AccessLike, ledTeamIds: readonly string[]): boolean =>
   has(access, 'services.manage') || has(access, 'volunteers.schedule') || ledTeamIds.length > 0;
+
+/** Drafts are hidden (404) from people who neither plan nor schedule, unless they serve in it. */
+export function assertServiceVisible(
+  db: Queryable,
+  access: AccessLike,
+  ledTeamIds: readonly string[],
+  service: WorshipServiceRow,
+): void {
+  if (service.status !== 'draft' || canSeeDraftServices(access, ledTeamIds)) return;
+  const serving =
+    !!access.personId &&
+    !!db
+      .select({ id: rosterAssignments.id })
+      .from(rosterAssignments)
+      .where(
+        and(
+          eq(rosterAssignments.churchId, service.churchId),
+          eq(rosterAssignments.serviceId, service.id),
+          eq(rosterAssignments.personId, access.personId),
+        ),
+      )
+      .get();
+  if (!serving) throw notFound('Service');
+}
+
+/**
+ * Roster rows as a viewer may see them: everyone sees who serves where, but decline reasons
+ * and conflicts (blockout reasons, other services) stay with the volunteer and whoever
+ * schedules their team.
+ */
+export function rosterForViewer<T extends RosterAssignment>(
+  rows: readonly T[],
+  viewer: { personId: string | null; schedulableTeamIds: readonly string[] },
+): T[] {
+  return rows.map((row) =>
+    (!!viewer.personId && row.person.id === viewer.personId) ||
+    viewer.schedulableTeamIds.includes(row.teamId)
+      ? row
+      : { ...row, declineReason: null, conflicts: [] },
+  );
+}

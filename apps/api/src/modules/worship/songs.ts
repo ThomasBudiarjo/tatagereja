@@ -17,7 +17,7 @@ import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { changes, recordAudit } from '../../services/audit';
-import { songUsage } from '../../services/worship';
+import { canSeeDraftServices, ledTeamIdsOf, songUsage } from '../../services/worship';
 import { loadSong } from './load';
 import { toSong } from './serializers';
 
@@ -163,8 +163,9 @@ export const songsRouter = (deps: Deps) => {
     )
     .get(
       '/:id',
-      ({ church, params }) => {
+      ({ church, access, params }) => {
         const row = loadSong(db, church.id, params.id);
+        const drafts = canSeeDraftServices(access, ledTeamIdsOf(db, church.id, access.personId));
         const usage = db
           .selectDistinct({
             serviceId: worshipServices.id,
@@ -178,6 +179,7 @@ export const songsRouter = (deps: Deps) => {
               eq(liturgyItems.churchId, church.id),
               eq(liturgyItems.songId, row.id),
               ne(worshipServices.status, 'cancelled'),
+              drafts ? undefined : ne(worshipServices.status, 'draft'),
             ),
           )
           .orderBy(desc(worshipServices.startsAt))

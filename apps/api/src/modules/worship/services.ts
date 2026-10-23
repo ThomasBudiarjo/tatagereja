@@ -3,6 +3,8 @@ import {
   churchIdParamsSchema,
   churchParamsSchema,
   liturgyTotalMinutes,
+  nextCalendarDay,
+  localTimeToIsoIn,
   reorderLiturgyBodySchema,
   saveLiturgyBodySchema,
   worshipServiceInputSchema,
@@ -27,8 +29,8 @@ import {
 } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
-import type { ChurchRow, WorshipServiceRow } from '../../db/schema';
-import { liturgyItems, people, rosterAssignments, songs, worshipServices } from '../../db/schema';
+import type { WorshipServiceRow } from '../../db/schema';
+import { liturgyItems, people, songs, worshipServices } from '../../db/schema';
 import type { Deps } from '../../deps';
 import { badRequest, notFound } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
@@ -36,17 +38,18 @@ import { nowIso, toUtcIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { changes, recordAudit, type AuditContext } from '../../services/audit';
-import { notify } from '../../services/notifications';
 import {
+  assertServiceVisible,
   canSeeDraftServices,
   hydrateServices,
   ledTeamIdsOf,
   loadLiturgy,
   loadRoster,
+  rosterForViewer,
   schedulableTeamIds,
-  userIdsOfPeople,
 } from '../../services/worship';
-import { assertAllInChurch, loadService, loadServiceType, serviceLink, serviceWhen } from './load';
+import { assertAllInChurch, loadService, loadServiceType } from './load';
+import { notifyRosterGone, notifyServiceChanged } from './notices';
 
 /** A service counts as upcoming until it ends (two hours after the start without an end). */
 const SERVICE_GRACE_MS = 2 * 60 * 60 * 1000;
@@ -76,41 +79,6 @@ const auditFields = (row: WorshipServiceRow) => ({
   notes: row.notes,
   status: row.status,
 });
-
-/** Tells everyone on the roster (with a login) that their assignment is gone. */
-function notifyRosterGone(
-  tx: Queryable,
-  church: ChurchRow,
-  service: WorshipServiceRow,
-  actorUserId: string,
-  reason: 'cancelled' | 'deleted',
-) {
-  const personIds = tx
-    .select({ personId: rosterAssignments.personId })
-    .from(rosterAssignments)
-    .where(
-      and(eq(rosterAssignments.churchId, church.id), eq(rosterAssignments.serviceId, service.id)),
-    )
-    .all()
-    .map((row) => row.personId);
-  const userIds = [...userIdsOfPeople(tx, church.id, personIds).values()];
-  if (userIds.length === 0) return;
-  notify(tx, {
-    churchId: church.id,
-    userIds,
-    excludeUserIds: [actorUserId],
-    type: 'roster.changed',
-    title:
-      reason === 'cancelled'
-        ? `${service.title} was cancelled`
-        : `${service.title} was removed from the schedule`,
-    body: `${serviceWhen(service.startsAt, church.timezone)} · You no longer serve at this service.`,
-    link:
-      reason === 'cancelled' ? serviceLink(church.id, service.id) : `/c/${church.id}/worship/me`,
-    entityType: 'service',
-    entityId: service.id,
-  });
-}
 
 export const servicesRouter = (deps: Deps) => {
   const { db } = deps;
@@ -147,30 +115,6 @@ export const servicesRouter = (deps: Deps) => {
     return service;
   };
 
-  /** Drafts are hidden from people who neither plan nor schedule, unless they serve in it. */
-  const assertVisible = (
-    church: ChurchRow,
-    access: Parameters<typeof canSeeDraftServices>[0],
-    ledTeamIds: string[],
-    row: WorshipServiceRow,
-  ) => {
-    if (row.status !== 'draft' || canSeeDraftServices(access, ledTeamIds)) return;
-    const serving =
-      !!access.personId &&
-      !!db
-        .select({ id: rosterAssignments.id })
-        .from(rosterAssignments)
-        .where(
-          and(
-            eq(rosterAssignments.churchId, church.id),
-            eq(rosterAssignments.serviceId, row.id),
-            eq(rosterAssignments.personId, access.personId),
-          ),
-        )
-        .get();
-    if (!serving) throw notFound('Service');
-  };
-
   const saveAudit = (
     tx: Queryable,
     audit: AuditContext,
@@ -205,8 +149,20 @@ export const servicesRouter = (deps: Deps) => {
         if (query.serviceTypeId)
           conditions.push(eq(worshipServices.serviceTypeId, query.serviceTypeId));
         if (query.status) conditions.push(eq(worshipServices.status, query.status));
-        if (query.from) conditions.push(gte(worshipServices.startsAt, query.from));
-        if (query.to) conditions.push(lt(worshipServices.startsAt, `${query.to}T23:59:59.999Z`));
+        // Days are the church's calendar days.
+        if (query.from) {
+          conditions.push(
+            gte(worshipServices.startsAt, localTimeToIsoIn(`${query.from}T00:00`, church.timezone)),
+          );
+        }
+        if (query.to) {
+          conditions.push(
+            lt(
+              worshipServices.startsAt,
+              localTimeToIsoIn(`${nextCalendarDay(query.to)}T00:00`, church.timezone),
+            ),
+          );
+        }
         if (query.q) {
           const pattern = likePattern(query.q);
           const text = or(
@@ -281,13 +237,17 @@ export const servicesRouter = (deps: Deps) => {
       ({ church, access, params }) => {
         const row = loadService(db, church.id, params.id);
         const ledTeamIds = ledTeamIdsOf(db, church.id, access.personId);
-        assertVisible(church, access, ledTeamIds, row);
+        assertServiceVisible(db, access, ledTeamIds, row);
+        const teamIds = schedulableTeamIds(db, church.id, access, ledTeamIds);
         return {
           service: hydrateOne(row),
           liturgy: loadLiturgy(db, church.id, row.id),
-          roster: loadRoster(db, church, row),
+          roster: rosterForViewer(loadRoster(db, church, row), {
+            personId: access.personId,
+            schedulableTeamIds: teamIds,
+          }),
           canManage: canManageServices(access),
-          schedulableTeamIds: schedulableTeamIds(db, church.id, access, ledTeamIds),
+          schedulableTeamIds: teamIds,
         };
       },
       {
@@ -322,6 +282,10 @@ export const servicesRouter = (deps: Deps) => {
           );
           if (before.status !== 'cancelled' && updated.status === 'cancelled') {
             notifyRosterGone(tx, church, updated, access.userId, 'cancelled');
+          } else if (before.status === 'cancelled' && updated.status !== 'cancelled') {
+            notifyServiceChanged(tx, church, updated, access.userId, 'restored');
+          } else if (updated.status !== 'cancelled' && updated.startsAt !== before.startsAt) {
+            notifyServiceChanged(tx, church, updated, access.userId, 'moved');
           }
           return updated;
         });

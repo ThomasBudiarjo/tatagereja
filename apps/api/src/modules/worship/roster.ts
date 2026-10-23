@@ -10,9 +10,12 @@ import {
   rankRosterCandidates,
   ROSTER_CONFLICT_LABELS,
   rosterAssignBodySchema,
+  rosterCheckBodySchema,
   rosterRespondBodySchema,
   rosterSuggestionQuerySchema,
   type AccessLike,
+  type PersonSummary,
+  type RosterAssignBody,
   type RosterConflict,
   type RosterSuggestion,
   type ValidationIssue,
@@ -40,15 +43,17 @@ import { HttpError, conflict, forbidden, notFound } from '../../lib/errors';
 import { nowIso } from '../../lib/time';
 import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
-import { recordAudit, type AuditContext } from '../../services/audit';
+import { changes, recordAudit, type AuditContext } from '../../services/audit';
 import { notify } from '../../services/notifications';
 import {
+  assertServiceVisible,
   conflictsOf,
   hydrateRoster,
   ledTeamIdsOf,
   loadRoster,
   personSummaries,
   rosterConflicts,
+  rosterForViewer,
   schedulableTeamIds,
   servingHistory,
   userIdsOfPeople,
@@ -61,6 +66,7 @@ import {
   serviceLink,
   serviceWhen,
 } from './load';
+import { notifyAssignmentsRemoved } from './notices';
 
 type NewAssignment = {
   positionId: string;
@@ -272,6 +278,74 @@ export const rosterRouter = (deps: Deps) => {
     });
   };
 
+  /**
+   * The requested assignments the caller may make (403 for a team they do not schedule, 404
+   * for ids of another church), without duplicates or pairs already on the roster.
+   */
+  const plannedAssignments = (
+    church: ChurchRow,
+    access: AccessLike,
+    service: WorshipServiceRow,
+    requested: RosterAssignBody['assignments'],
+  ) => {
+    const scope = scheduler(church, access);
+    const positions = new Map<string, ServingPositionRow>();
+    for (const entry of requested) {
+      if (!positions.has(entry.positionId)) {
+        positions.set(entry.positionId, loadPosition(db, church.id, entry.positionId));
+      }
+      const position = positions.get(entry.positionId)!;
+      if (!scope.canSchedule(position.teamId)) {
+        throw forbidden('You cannot schedule volunteers for this team');
+      }
+      loadPerson(db, church.id, entry.personId);
+    }
+    const taken = existingPairs(service.id);
+    const seen = new Set<string>();
+    const fresh: NewAssignment[] = [];
+    let skipped = 0;
+    for (const entry of requested) {
+      const key = `${entry.positionId}:${entry.personId}`;
+      if (taken.has(key) || seen.has(key)) {
+        skipped += 1;
+        continue;
+      }
+      seen.add(key);
+      fresh.push({
+        positionId: entry.positionId,
+        teamId: positions.get(entry.positionId)!.teamId,
+        personId: entry.personId,
+        notes: entry.notes,
+      });
+    }
+    return { fresh, skipped };
+  };
+
+  /** Conflicts of each planned assignment, counting two positions in one request as well. */
+  const plannedConflicts = (
+    church: ChurchRow,
+    service: WorshipServiceRow,
+    fresh: readonly NewAssignment[],
+  ): { entry: NewAssignment; person: PersonSummary | null; conflicts: RosterConflict[] }[] => {
+    if (fresh.length === 0) return [];
+    const found = rosterConflicts(db, church, service, fresh);
+    const names = personSummaries(
+      db,
+      church.id,
+      fresh.map((entry) => entry.personId),
+    );
+    return fresh.map((entry, index) => {
+      const list = [...conflictsOf(found, entry)];
+      if (
+        fresh.some((other, at) => at < index && other.personId === entry.personId) &&
+        !list.some((item) => item.kind === 'double_booked')
+      ) {
+        list.push({ kind: 'double_booked', serviceId: service.id, detail: null });
+      }
+      return { entry, person: names.get(entry.personId) ?? null, conflicts: list };
+    });
+  };
+
   const rosterResult = (
     church: ChurchRow,
     service: WorshipServiceRow,
@@ -283,9 +357,17 @@ export const rosterRouter = (deps: Deps) => {
     .use(authPlugin(deps))
     .get(
       '/services/:id/roster',
-      ({ church, params }) => ({
-        items: loadRoster(db, church, loadService(db, church.id, params.id)),
-      }),
+      ({ church, access, params }) => {
+        const service = loadService(db, church.id, params.id);
+        const scope = scheduler(church, access);
+        assertServiceVisible(db, access, scope.ledTeamIds, service);
+        return {
+          items: rosterForViewer(loadRoster(db, church, service), {
+            personId: access.personId,
+            schedulableTeamIds: scope.teamIds(),
+          }),
+        };
+      },
       {
         church: { module: 'worship', permission: 'services.view' },
         params: churchIdParamsSchema,
@@ -296,62 +378,22 @@ export const rosterRouter = (deps: Deps) => {
       ({ church, access, audit, params, body, set }) => {
         const service = loadService(db, church.id, params.id);
         assertOpen(service);
-        const scope = scheduler(church, access);
-        const positions = new Map<string, ServingPositionRow>();
-        for (const entry of body.assignments) {
-          if (!positions.has(entry.positionId)) {
-            positions.set(entry.positionId, loadPosition(db, church.id, entry.positionId));
-          }
-          const position = positions.get(entry.positionId)!;
-          if (!scope.canSchedule(position.teamId)) {
-            throw forbidden('You cannot schedule volunteers for this team');
-          }
-          loadPerson(db, church.id, entry.personId);
-        }
-        const taken = existingPairs(service.id);
-        const seen = new Set<string>();
-        const fresh: NewAssignment[] = [];
-        let skipped = 0;
-        for (const entry of body.assignments) {
-          const key = `${entry.positionId}:${entry.personId}`;
-          if (taken.has(key) || seen.has(key)) {
-            skipped += 1;
-            continue;
-          }
-          seen.add(key);
-          fresh.push({
-            positionId: entry.positionId,
-            teamId: positions.get(entry.positionId)!.teamId,
-            personId: entry.personId,
-            notes: entry.notes,
-          });
-        }
-        if (!body.ignoreConflicts && fresh.length > 0) {
-          const found = rosterConflicts(db, church, service, fresh);
-          const names = personSummaries(
-            db,
-            church.id,
-            fresh.map((entry) => entry.personId),
+        const { fresh, skipped } = plannedAssignments(church, access, service, body.assignments);
+        if (!body.ignoreConflicts) {
+          const issues: ValidationIssue[] = plannedConflicts(church, service, fresh).flatMap(
+            ({ entry, person, conflicts }) =>
+              conflicts.length === 0
+                ? []
+                : [
+                    {
+                      path: `assignments.${body.assignments.findIndex(
+                        (item) =>
+                          item.positionId === entry.positionId && item.personId === entry.personId,
+                      )}`,
+                      message: conflictMessage(person ? fullName(person) : 'Volunteer', conflicts),
+                    },
+                  ],
           );
-          const issues: ValidationIssue[] = [];
-          fresh.forEach((entry, index) => {
-            const list = [...conflictsOf(found, entry)];
-            // Two positions for one person in the same request also double-book them.
-            if (
-              fresh.some((other, at) => at < index && other.personId === entry.personId) &&
-              !list.some((item) => item.kind === 'double_booked')
-            ) {
-              list.push({ kind: 'double_booked', serviceId: service.id, detail: null });
-            }
-            if (list.length === 0) return;
-            const person = names.get(entry.personId);
-            issues.push({
-              path: `assignments.${body.assignments.findIndex(
-                (item) => item.positionId === entry.positionId && item.personId === entry.personId,
-              )}`,
-              message: conflictMessage(person ? fullName(person) : 'Volunteer', list),
-            });
-          });
           if (issues.length > 0) {
             throw new HttpError(
               409,
@@ -379,6 +421,23 @@ export const rosterRouter = (deps: Deps) => {
         church: { module: 'worship', permission: 'services.view' },
         params: churchIdParamsSchema,
         body: rosterAssignBodySchema,
+      },
+    )
+    .post(
+      '/services/:id/roster/check',
+      ({ church, access, params, body }) => {
+        const service = loadService(db, church.id, params.id);
+        const { fresh } = plannedAssignments(church, access, service, body.assignments);
+        return {
+          items: plannedConflicts(church, service, fresh).flatMap(({ entry, person, conflicts }) =>
+            person ? [{ positionId: entry.positionId, person, conflicts }] : [],
+          ),
+        };
+      },
+      {
+        church: { module: 'worship', permission: 'services.view' },
+        params: churchIdParamsSchema,
+        body: rosterCheckBodySchema,
       },
     )
     .get(
@@ -563,6 +622,8 @@ export const rosterRouter = (deps: Deps) => {
             and(
               eq(rosterAssignments.serviceId, source.id),
               inArray(rosterAssignments.teamId, teamIds),
+              // Whoever could not serve then is not asked again by default.
+              ne(rosterAssignments.status, 'declined'),
             ),
           )
           .orderBy(asc(rosterAssignments.createdAt))
@@ -609,6 +670,7 @@ export const rosterRouter = (deps: Deps) => {
         const position = loadPosition(db, church.id, row.positionId);
         const person = loadPerson(db, church.id, row.personId);
         db.transaction((tx) => {
+          notifyAssignmentsRemoved(tx, church, eq(rosterAssignments.id, row.id), access.userId);
           tx.delete(rosterAssignments).where(eq(rosterAssignments.id, row.id)).run();
           recordAudit(tx, audit, {
             module: 'worship',
@@ -618,23 +680,6 @@ export const rosterRouter = (deps: Deps) => {
             summary: `Removed ${fullName(person)} (${position.name}) from ${service.title}`,
             before: { positionId: row.positionId, personId: row.personId, status: row.status },
           });
-          if (
-            person.userId &&
-            service.status !== 'cancelled' &&
-            new Date(service.startsAt).getTime() > Date.now()
-          ) {
-            notify(tx, {
-              churchId: church.id,
-              userIds: [person.userId],
-              excludeUserIds: [access.userId],
-              type: 'roster.changed',
-              title: `You no longer serve at ${service.title}`,
-              body: `${position.name} · ${serviceWhen(service.startsAt, church.timezone)}`,
-              link: `/c/${church.id}/worship/me`,
-              entityType: 'service',
-              entityId: service.id,
-            });
-          }
         });
         return { ok: true as const };
       },
@@ -645,7 +690,7 @@ export const rosterRouter = (deps: Deps) => {
     )
     .post(
       '/roster/:id/respond',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const row = loadAssignment(db, church.id, params.id);
         const ledTeamIds = ledTeamIdsOf(db, church.id, access.personId);
         if (!canRespondToAssignment(access, ledTeamIds, row)) {
@@ -703,6 +748,19 @@ export const rosterRouter = (deps: Deps) => {
                 entityId: service.id,
               });
             }
+          }
+          // An answer recorded for someone else is audited (without the reason).
+          if (row.personId !== access.personId) {
+            recordAudit(tx, audit, {
+              module: 'worship',
+              action: 'roster.respond',
+              entityType: 'service',
+              entityId: service.id,
+              summary: `Recorded that ${fullName(person)} ${
+                body.status === 'accepted' ? 'will serve' : 'cannot serve'
+              } as ${position.name} at ${service.title}`,
+              ...changes({ status: row.status }, { status: next.status }),
+            });
           }
           return next;
         });

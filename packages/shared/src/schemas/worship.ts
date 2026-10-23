@@ -462,6 +462,10 @@ export const rosterAssignBodySchema = z.object({
 });
 export type RosterAssignBody = z.infer<typeof rosterAssignBodySchema>;
 
+/** The conflicts the planned assignments would have, without assigning anyone. */
+export const rosterCheckBodySchema = rosterAssignBodySchema.pick({ assignments: true });
+export type RosterCheckBody = z.infer<typeof rosterCheckBodySchema>;
+
 export const rosterRespondBodySchema = z
   .object({
     status: z.enum(['accepted', 'declined']),
@@ -602,6 +606,17 @@ export const rosterAssignResultSchema = z.object({
   skipped: z.number().int().nonnegative(),
 });
 export type RosterAssignResult = z.infer<typeof rosterAssignResultSchema>;
+
+export const rosterCheckResultSchema = z.object({
+  items: z.array(
+    z.object({
+      positionId: idSchema,
+      person: personSummarySchema,
+      conflicts: z.array(rosterConflictSchema),
+    }),
+  ),
+});
+export type RosterCheckResult = z.infer<typeof rosterCheckResultSchema>;
 
 export const rosterSuggestionQuerySchema = z.object({ positionId: idSchema.optional() });
 
@@ -745,6 +760,53 @@ export const localDateOf = (iso: string, timeZone: string): string => {
     return date.toISOString().slice(0, 10);
   }
 };
+
+/** The wall clock of an instant in a time zone, read back as if it were UTC (epoch ms). */
+const wallClockOf = (at: number, timeZone: string): number => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at));
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((item) => item.type === type)?.value ?? 0);
+    return Date.UTC(
+      part('year'),
+      part('month') - 1,
+      part('day'),
+      part('hour'),
+      part('minute'),
+      part('second'),
+    );
+  } catch {
+    return at - (at % 1000);
+  }
+};
+
+/**
+ * The instant a wall-clock time (`YYYY-MM-DDTHH:MM`, seconds optional) happens in a time zone,
+ * as a UTC ISO string. Two passes settle the offset around daylight saving changes.
+ */
+export const localTimeToIsoIn = (local: string, timeZone: string): string => {
+  const wall = Date.parse(`${local.length === 16 ? `${local}:00` : local}.000Z`);
+  let guess = wall - (wallClockOf(wall, timeZone) - wall);
+  guess = wall - (wallClockOf(guess, timeZone) - guess);
+  return new Date(guess).toISOString();
+};
+
+/** The wall-clock time (`YYYY-MM-DDTHH:MM`) of an instant in a time zone. */
+export const isoToLocalTimeIn = (iso: string, timeZone: string): string =>
+  new Date(wallClockOf(new Date(iso).getTime(), timeZone)).toISOString().slice(0, 16);
+
+/** The day after a calendar day (`YYYY-MM-DD`). */
+export const nextCalendarDay = (day: string): string =>
+  new Date(Date.parse(`${day}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10);
 
 /** Whether a blockout (inclusive day range) covers a day. */
 export const blockoutCovers = (

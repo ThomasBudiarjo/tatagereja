@@ -20,6 +20,7 @@ import type { Queryable } from '../../db/client';
 import type { ServingTeamMemberRow, ServingTeamRow } from '../../db/schema';
 import {
   groups,
+  rosterAssignments,
   servingMemberPositions,
   servingPositions,
   servingTeamMembers,
@@ -33,6 +34,7 @@ import { authPlugin } from '../../plugins/auth';
 import { changes, recordAudit } from '../../services/audit';
 import { ledTeamIdsOf, personSummaries } from '../../services/worship';
 import { loadPerson, loadPosition, loadTeam } from './load';
+import { notifyAssignmentsRemoved } from './notices';
 import { toServingPosition, toServingTeam } from './serializers';
 
 const teamFields = (row: ServingTeamRow) => ({
@@ -307,10 +309,11 @@ export const teamsRouter = (deps: Deps) => {
     )
     .delete(
       '/:id',
-      ({ church, audit, params }) => {
+      ({ church, access, audit, params }) => {
         const row = loadTeam(db, church.id, params.id);
         // Positions, memberships and roster assignments of the team cascade with it.
         db.transaction((tx) => {
+          notifyAssignmentsRemoved(tx, church, eq(rosterAssignments.teamId, row.id), access.userId);
           tx.delete(servingTeams).where(eq(servingTeams.id, row.id)).run();
           recordAudit(tx, audit, {
             module: 'worship',
@@ -403,6 +406,12 @@ export const teamsRouter = (deps: Deps) => {
         if (position.teamId !== team.id) throw notFound('Position');
         // Roster assignments in this position cascade with it.
         db.transaction((tx) => {
+          notifyAssignmentsRemoved(
+            tx,
+            church,
+            eq(rosterAssignments.positionId, position.id),
+            access.userId,
+          );
           tx.delete(servingPositions).where(eq(servingPositions.id, position.id)).run();
           recordAudit(tx, audit, {
             module: 'worship',

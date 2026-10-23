@@ -5,8 +5,11 @@ import {
   canManageServingTeam,
   canRespondToAssignment,
   canScheduleTeam,
+  isoToLocalTimeIn,
   liturgyTotalMinutes,
   localDateOf,
+  localTimeToIsoIn,
+  nextCalendarDay,
   rankRosterCandidates,
   rosterRespondBodySchema,
   serviceWindow,
@@ -120,5 +123,20 @@ describe('worship rules', () => {
     expect(rosterRespondBodySchema.safeParse({ status: 'declined', reason: 'Sakit' }).success).toBe(
       true,
     );
+  });
+
+  it('converts wall-clock times of the church time zone', () => {
+    expect(localTimeToIsoIn('2026-10-25T07:00', 'Asia/Jakarta')).toBe('2026-10-25T00:00:00.000Z');
+    expect(localTimeToIsoIn('2026-10-25T00:00', 'Asia/Jayapura')).toBe('2026-10-24T15:00:00.000Z');
+    expect(isoToLocalTimeIn('2026-10-24T18:30:00.000Z', 'Asia/Jakarta')).toBe('2026-10-25T01:30');
+    // Daylight saving: 09:00 in Amsterdam is 07:00 UTC in summer and 08:00 UTC in winter.
+    expect(localTimeToIsoIn('2026-07-05T09:00', 'Europe/Amsterdam')).toBe(
+      '2026-07-05T07:00:00.000Z',
+    );
+    expect(localTimeToIsoIn('2026-12-06T09:00', 'Europe/Amsterdam')).toBe(
+      '2026-12-06T08:00:00.000Z',
+    );
+    expect(nextCalendarDay('2026-12-31')).toBe('2027-01-01');
+    expect(nextCalendarDay('2028-02-28')).toBe('2028-02-29');
   });
 });
