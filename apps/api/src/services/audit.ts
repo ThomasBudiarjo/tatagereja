@@ -101,12 +101,18 @@ const paramsOf = (entry: AuditEntry): AuditParams => {
   const params: AuditParams = {};
   for (const side of [entry.after, entry.before]) {
     if (params.name !== undefined || !side || typeof side !== 'object') continue;
+    const values = side as Record<string, unknown>;
     for (const field of NAME_FIELDS) {
-      const value = (side as Record<string, unknown>)[field];
+      const value = values[field];
       if (typeof value === 'string' && value.trim()) {
         params.name = value.trim().slice(0, LIMITS.nameMax);
         break;
       }
+    }
+    // People are recorded by their first and last name.
+    if (params.name === undefined && typeof values.firstName === 'string') {
+      const last = typeof values.lastName === 'string' ? ` ${values.lastName}` : '';
+      params.name = `${values.firstName}${last}`.trim().slice(0, LIMITS.nameMax);
     }
   }
   for (const [key, value] of Object.entries(entry.params ?? {})) {

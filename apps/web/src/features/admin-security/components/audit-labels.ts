@@ -131,6 +131,14 @@ const VERB_KEYS: Record<string, MessageKey> = {
   cancel: 'admin-security.verbCancel',
   restore: 'admin-security.verbRestore',
   merge: 'admin-security.verbMerge',
+  stage: 'admin-security.verbStage',
+  status: 'admin-security.verbStatus',
+  respond: 'admin-security.verbRespond',
+  answer: 'admin-security.verbRespond',
+  moderate: 'admin-security.verbApprove',
+  pay: 'admin-security.verbPay',
+  return: 'admin-security.verbReturn',
+  open: 'admin-security.verbOpen',
 };
 
 /** An action key ("member.suspend") in the active language, falling back on its verb. */
@@ -170,7 +178,7 @@ function auditSubject(entry: Pick<AuditLog, 'params' | 'before' | 'after'>): str
 /**
  * The headline of an entry. English shows the summary the API recorded (it names everyone
  * involved); other languages name the action and, from its params, the item and the member.
- * An entry whose content the viewer may not read names only the action.
+ * An entry whose content the viewer may not read names only the action (the list marks it).
  */
 export function auditHeadline(
   entry: Pick<
@@ -181,7 +189,7 @@ export function auditHeadline(
   t: Translate,
 ): string {
   const label = auditActionLabel(entry.action, entry.entityType, t);
-  if (entry.redacted) return `${label} · ${t('admin-security.auditHidden')}`;
+  if (entry.redacted) return label;
   if (locale === 'en') return entry.summary;
   const subject = auditSubject(entry);
   return subject ? `${label}: ${subject}` : label;
