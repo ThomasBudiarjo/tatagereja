@@ -61,6 +61,7 @@ import { enforceRateLimit } from '../../lib/rate-limit';
 import { authPlugin } from '../../plugins/auth';
 import { attendeesOf, headcountOf, localDayOf } from '../../services/attendance';
 import { recordAudit } from '../../services/audit';
+import { cachedReport } from '../../services/report-cache';
 import { assertModuleEnabled, moduleEnabled } from '../../services/modules';
 import { sendCsv } from '../../services/people';
 import { effectiveAreaByPerson } from '../../services/people-households';
@@ -894,7 +895,12 @@ export const insightsReportsRouter = (deps: Deps) => {
         text: (key) => localize(REPORT_TEXT[key], query.locale),
         label: (text) => localize(text, query.locale),
       };
-      const report: Report = { kind: params.kind, ...builders[params.kind](context) };
+      const report: Report = cachedReport(
+        deps,
+        { churchId: church.id, userId: auth.user.id, limiter: 'insights.report' },
+        `insights:${params.kind}:${JSON.stringify([range.from, range.to, range.interval, range.groupId ?? null, range.locale])}`,
+        () => ({ kind: params.kind, ...builders[params.kind](context) }),
+      );
       if (query.format !== 'csv') return report;
 
       enforceRateLimit(deps.limiters, 'insights.export', `${church.id}:${auth.user.id}`, {

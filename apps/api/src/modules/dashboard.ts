@@ -58,11 +58,11 @@ import { nowIso } from '../lib/time';
 import { authPlugin } from '../plugins/auth';
 import { localizedNotificationText } from '../serializers';
 import { hydrateAnnouncements } from '../services/announcements';
-import { hydrateSessions, listAbsences, marksOf } from '../services/attendance';
+import { cachedAbsences, hydrateSessions, marksOf } from '../services/attendance';
 import { hydrateCheckins } from '../services/checkin';
 import { hydrateEvents } from '../services/events';
 import { todayIn } from '../services/people';
-import { peopleStats } from '../services/people-stats';
+import { cachedPeopleStats } from '../services/people-stats';
 import { hydrateTasks } from './care/serializers';
 import { upcomingCondition } from './worship/services';
 import { scheduleItems } from './worship/volunteers';
@@ -285,7 +285,7 @@ export const dashboardModule = (deps: Deps) => {
       }));
     }
     const openAbsences = canViewAbsences(access)
-      ? listAbsences(db, church.id, access, {
+      ? cachedAbsences(deps.cache, db, church.id, access, {
           threshold: INSIGHTS_LIMITS.absentStreakDefault,
           includeResolved: false,
         }).length
@@ -420,7 +420,7 @@ export const dashboardModule = (deps: Deps) => {
             ? announcementsFor(church.id, access, myGroupIds)
             : null,
           celebrations: shows('birthdays')
-            ? peopleStats(db, access, church.id, todayIn(church)).celebrations
+            ? cachedPeopleStats(deps.cache, db, access, church.id, todayIn(church)).celebrations
             : null,
           notifications: notificationsOf(church.id, access.userId, requestLocale(request)),
           attendance: attendanceOf(church, access),

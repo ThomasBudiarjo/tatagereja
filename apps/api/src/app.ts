@@ -5,6 +5,7 @@ import { join, resolve, sep } from 'node:path';
 import type { AppConfig } from './config';
 import type { Db } from './db/client';
 import type { Deps } from './deps';
+import { createResultCache, invalidateForRequest } from './lib/cache';
 import { HttpError } from './lib/errors';
 import { createRateLimiter, type Limiters } from './lib/rate-limit';
 import { securityHeaders } from './lib/security-headers';
@@ -72,6 +73,7 @@ export function createDeps(db: Db, config: AppConfig, overrides: Partial<Deps> =
     config,
     limiters: defaultLimiters(),
     verifyTurnstile: config.turnstile ? createTurnstileVerifier(config.turnstile.secretKey) : null,
+    cache: createResultCache(),
     ...overrides,
   };
 }
@@ -116,6 +118,7 @@ export function createApp(deps: Deps) {
       }),
     )
     .onRequest(({ request, set }) => {
+      invalidateForRequest(deps.cache, request.method, new URL(request.url).pathname);
       if (config.logRequests) {
         console.log(
           `${new Date().toISOString()} ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
@@ -133,6 +136,9 @@ export function createApp(deps: Deps) {
           },
         };
       }
+    })
+    .onAfterResponse(({ request }) => {
+      invalidateForRequest(deps.cache, request.method, new URL(request.url).pathname);
     })
     .onError(({ code, error, set, request }) => {
       if (error instanceof HttpError) {

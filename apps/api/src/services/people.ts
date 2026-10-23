@@ -248,15 +248,16 @@ export function directoryConditions(
 /** Privacy choices of several people; people without a row get the defaults. */
 export function privacyByPerson(
   db: Queryable,
-  personIds: readonly string[],
+  personIds: readonly string[] | { churchId: string },
 ): Map<string, PersonPrivacy> {
   const result = new Map<string, PersonPrivacy>();
-  if (personIds.length === 0) return result;
-  for (const row of db
-    .select()
-    .from(personPrivacySettings)
-    .where(inArray(personPrivacySettings.personId, [...personIds]))
-    .all()) {
+  if (Array.isArray(personIds) && personIds.length === 0) return result;
+  // A whole church (directory counts, exports) is one indexed read, not thousands of parameters.
+  const where =
+    'churchId' in personIds
+      ? eq(personPrivacySettings.churchId, personIds.churchId)
+      : inArray(personPrivacySettings.personId, [...personIds]);
+  for (const row of db.select().from(personPrivacySettings).where(where).all()) {
     result.set(row.personId, {
       showPhone: row.showPhone,
       showEmail: row.showEmail,

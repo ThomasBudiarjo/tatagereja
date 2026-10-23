@@ -24,6 +24,7 @@ import {
   groups,
   people,
 } from '../db/schema';
+import type { ResultCache } from '../lib/cache';
 import { likePattern } from '../lib/query';
 import { toAttendanceSession, toPersonSummary, type AttendanceCounts } from '../serializers';
 
@@ -373,6 +374,27 @@ export function listAbsences(
         a.person.firstName.localeCompare(b.person.firstName),
     )
     .slice(0, INSIGHTS_LIMITS.absenceListMax);
+}
+
+/**
+ * `listAbsences` through the church's result cache. Every write to the church drops it, so a
+ * new mark, a resolved alert or an edited person shows at once; only the scan is saved.
+ */
+export function cachedAbsences(
+  cache: ResultCache,
+  db: Queryable,
+  churchId: string,
+  access: AccessLike,
+  query: Pick<AbsenceQuery, 'threshold' | 'groupId' | 'includeResolved' | 'q'>,
+): AbsenceAlert[] {
+  const scope = absenceScope(access, query.groupId);
+  const key = `absences:${JSON.stringify([
+    scope ? [...scope].sort() : null,
+    query.threshold,
+    query.includeResolved,
+    query.q ?? null,
+  ])}`;
+  return cache.remember(churchId, key, () => listAbsences(db, churchId, access, query));
 }
 
 /**

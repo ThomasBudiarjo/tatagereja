@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5e0521f6-b311-47cf-94e6-6e07382eaa73",
+  "id": "a48df096-3f35-43fe-bd4b-7270040901ed",
   "prevId": "19de926a-c835-4acd-9511-af0a19b54d1e",
   "tables": {
     "announcements": {
@@ -4306,7 +4306,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "person_privacy_settings_church_idx": {
+          "name": "person_privacy_settings_church_idx",
+          "columns": [
+            "church_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "person_privacy_settings_person_id_people_id_fk": {
           "name": "person_privacy_settings_person_id_people_id_fk",

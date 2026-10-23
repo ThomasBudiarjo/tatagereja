@@ -45,10 +45,10 @@ import {
   absenceScope,
   absenceStreaksOf,
   attendanceHistory,
+  cachedAbsences,
   headcountColumns,
   hydrateSessions,
   lastPresentByPerson,
-  listAbsences,
   stillResolved,
   syncRecordTimes,
   toAbsenceAlert,
@@ -500,7 +500,7 @@ export const attendanceModule = (deps: Deps) => {
         if (!canViewAbsences(access, query.groupId)) {
           throw forbidden('You cannot view absences');
         }
-        const items = listAbsences(db, church.id, access, query);
+        const items = cachedAbsences(deps.cache, db, church.id, access, query);
         return {
           items,
           threshold: query.threshold,

@@ -175,6 +175,10 @@ export const DEFAULT_PERSON_PRIVACY = {
 // ---------------------------------------------------------------------------------------------
 
 const parseYmd = (value: string): [number, number, number] => {
+  // The stored YYYY-MM-DD shape is read without splitting: reports parse thousands per request.
+  if (value.length === 10 && value[4] === '-' && value[7] === '-') {
+    return [Number(value.slice(0, 4)), Number(value.slice(5, 7)), Number(value.slice(8, 10))];
+  }
   const [year, month, day] = value.split('-').map(Number);
   return [year ?? 0, month ?? 1, day ?? 1];
 };

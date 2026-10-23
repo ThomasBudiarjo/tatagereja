@@ -29,6 +29,7 @@ import {
   toCsv,
   todayIn,
 } from '../../services/finance';
+import { cachedReport } from '../../services/report-cache';
 
 type Totals = { income: number; expense: number };
 
@@ -203,7 +204,12 @@ export const reportsRouter = (deps: Deps) => {
     ({ church, auth, params, query, set }) => {
       if (query.fundId) loadFund(db, church.id, query.fundId);
       if (query.accountId) loadAccount(db, church.id, query.accountId);
-      const report = buildReport(db, church, params.kind, query);
+      const report = cachedReport(
+        deps,
+        { churchId: church.id, userId: auth.user.id, limiter: 'finance.report' },
+        `finance:${params.kind}:${JSON.stringify([query.from, query.to, query.fundId ?? null, query.accountId ?? null])}`,
+        () => buildReport(db, church, params.kind, query),
+      );
       if (query.format === 'csv') {
         enforceExportLimit(deps.limiters, church.id, auth.user.id);
         const cashFlow = params.kind === 'cash_flow';

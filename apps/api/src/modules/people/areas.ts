@@ -29,7 +29,7 @@ import { changes, recordAudit } from '../../services/audit';
 import { notify } from '../../services/notifications';
 import { coordinatedAreaIdsOf, todayIn } from '../../services/people';
 import { hydrateArea, hydrateAreas } from '../../services/people-households';
-import { peopleStats } from '../../services/people-stats';
+import { cachedPeopleStats } from '../../services/people-stats';
 
 const coordinatorParamsSchema = churchIdParamsSchema.extend({ userId: idSchema });
 
@@ -124,7 +124,7 @@ export const areasRouter = (deps: Deps) => {
         const area = loadArea(church.id, params.id);
         return {
           area: hydrateArea(db, church.id, area),
-          stats: peopleStats(db, access, church.id, todayIn(church), area.id),
+          stats: cachedPeopleStats(deps.cache, db, access, church.id, todayIn(church), area.id),
           canManage: can.manageAreas(access),
           isCoordinator: coordinatedAreaIdsOf(db, church.id, access.userId).includes(area.id),
         };
