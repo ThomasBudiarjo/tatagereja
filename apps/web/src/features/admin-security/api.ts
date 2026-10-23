@@ -21,6 +21,7 @@ import {
   membershipResponseSchema,
   okSchema,
   passwordChangeResponseSchema,
+  passwordResetLinkSchema,
   personalDataExportSchema,
   recoveryCodesSchema,
   revokeSessionsResponseSchema,
@@ -30,10 +31,11 @@ import {
   securityPolicyResponseSchema,
   setMemberRolesBodySchema,
   twoFactorConfirmBodySchema,
+  twoFactorDisabledSchema,
+  twoFactorEnabledSchema,
   twoFactorSetupSchema,
   twoFactorStatusSchema,
   type AuditLogExportQuery,
-  type AuthResponse,
   type ChurchModules,
   type ChurchRole,
   type CustomRoleInput,
@@ -54,7 +56,7 @@ import { api, request as rawRequest } from '@/lib/api';
 import { churchScope } from '@/lib/keys';
 import { queryClient as globalClient } from '@/lib/query-client';
 import { optimistic } from '@/lib/use-mutation-toast';
-import { useAuth, useAuthStore } from '@/stores/auth';
+import { forgetSession, storeSession, transportFor, useAuth } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { localizeSecurityError } from './errors';
 
@@ -164,6 +166,20 @@ export function useRemoveMember(churchId: string) {
       client.removeQueries({ queryKey: securityKeys.member(churchId, membershipId) });
       return refreshChurch(client, churchId);
     },
+  });
+}
+
+/** A one-time password reset link for a member; shown once, audited. */
+export function useCreatePasswordReset(churchId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (membershipId: string) =>
+      request(passwordResetLinkSchema, {
+        method: 'POST',
+        url: `/churches/${churchId}/members/${membershipId}/password-reset`,
+        data: { identityConfirmed: true },
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: securityKeys.audit(churchId) }),
   });
 }
 
@@ -473,29 +489,38 @@ export function useStartTwoFactorSetup() {
   });
 }
 
+/** Turning 2FA on or off ends the other sessions and gives this one new credentials. */
 export function useEnableTwoFactor() {
   const client = useQueryClient();
+  const { serverUrl } = useAuth();
   return useMutation({
     mutationFn: (code: string) =>
-      request(recoveryCodesSchema, {
+      request(twoFactorEnabledSchema, {
         method: 'POST',
         url: '/auth/two-factor/enable',
         data: { code },
       }),
-    onSuccess: () => refreshAccount(client),
+    onSuccess: (response) => {
+      storeSession(serverUrl, response.session);
+      return refreshAccount(client);
+    },
   });
 }
 
 export function useDisableTwoFactor() {
   const client = useQueryClient();
+  const { serverUrl } = useAuth();
   return useMutation({
     mutationFn: (body: z.input<typeof twoFactorConfirmBodySchema>) =>
-      request(okSchema, {
+      request(twoFactorDisabledSchema, {
         method: 'POST',
         url: '/auth/two-factor/disable',
         data: twoFactorConfirmBodySchema.parse(body),
       }),
-    onSuccess: () => refreshAccount(client),
+    onSuccess: (response) => {
+      storeSession(serverUrl, response.session);
+      return refreshAccount(client);
+    },
   });
 }
 
@@ -512,8 +537,10 @@ export function useRegenerateRecoveryCodes() {
   });
 }
 
+/** Every other session ends; this one continues with the rotated credentials. */
 export function useSecurePasswordChange() {
   const client = useQueryClient();
+  const { serverUrl } = useAuth();
   return useMutation({
     mutationFn: (body: z.input<typeof securePasswordChangeBodySchema>) =>
       request(passwordChangeResponseSchema, {
@@ -521,7 +548,10 @@ export function useSecurePasswordChange() {
         url: '/auth/change-password',
         data: securePasswordChangeBodySchema.parse(body),
       }),
-    onSuccess: () => refreshAccount(client),
+    onSuccess: (response) => {
+      storeSession(serverUrl, response.session);
+      return refreshAccount(client);
+    },
   });
 }
 
@@ -558,7 +588,7 @@ export function useDeleteAccount() {
         data: deleteAccountBodySchema.parse(body),
       }),
     onSuccess: () => {
-      useAuthStore.getState().clearSession(serverUrl);
+      forgetSession(serverUrl);
       useUiStore.getState().setLastChurchId(null);
       globalClient.clear();
     },
@@ -569,21 +599,17 @@ export function useDeleteAccount() {
 // Sign-in
 // ---------------------------------------------------------------------------------------------
 
-function storeSession(serverUrl: string, response: AuthResponse) {
-  useAuthStore.getState().setSession(serverUrl, {
-    token: response.token,
-    expiresAt: response.expiresAt,
-    user: response.user,
-  });
-}
-
 /** `POST /auth/login`: a session, or a challenge for the second step. */
 export function useLoginWithChallenge() {
   const { serverUrl } = useAuth();
   const client = useQueryClient();
   return useMutation({
     mutationFn: (body: { email: string; password: string }) =>
-      request(loginResponseSchema, { method: 'POST', url: '/auth/login', data: body }),
+      request(loginResponseSchema, {
+        method: 'POST',
+        url: '/auth/login',
+        data: { ...body, transport: transportFor(serverUrl) },
+      }),
     onSuccess: (response) => {
       if ('token' in response) {
         client.clear();
@@ -601,7 +627,7 @@ export function useLoginSecondStep() {
       request(authResponseSchema, {
         method: 'POST',
         url: '/auth/login/two-factor',
-        data: loginTwoFactorBodySchema.parse(body),
+        data: loginTwoFactorBodySchema.parse({ ...body, transport: transportFor(serverUrl) }),
       }),
     onSuccess: (response) => {
       client.clear();

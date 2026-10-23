@@ -62,3 +62,16 @@ export function useRevokeInvitation(churchId: string) {
     onSuccess: () => void client.invalidateQueries({ queryKey: churchKeys.invitations(churchId) }),
   });
 }
+
+/** A new link for an invitation: the old link and QR code stop working at once. */
+export function useRegenerateInvitation(churchId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request(invitationResponseSchema, {
+        method: 'POST',
+        url: `/churches/${churchId}/invitations/${id}/regenerate`,
+      }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: churchKeys.invitations(churchId) }),
+  });
+}

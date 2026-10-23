@@ -7,7 +7,7 @@ import {
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Ban, Plus, QrCode, Share2 } from 'lucide-react';
+import { Ban, EyeOff, Plus, QrCode, RefreshCw, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
@@ -36,6 +36,7 @@ import type { Tone } from '@/components/ui/tone';
 import {
   invitationsQuery,
   useCreateInvitation,
+  useRegenerateInvitation,
   useRevokeInvitation,
 } from '@/features/invitations/api';
 import { getErrorMessage } from '@/lib/api';
@@ -186,9 +187,26 @@ export function InvitationsSettingsPage() {
   const invitations = useQuery(invitationsQuery(churchId));
   const [state, setState] = useUrlState({ new: false as boolean, show: '', status: 'active' });
   const [revoking, setRevoking] = useState<Invitation | null>(null);
+  const [regenerating, setRegenerating] = useState<Invitation | null>(null);
+  /*
+   * Links the server returned when they were made or regenerated. The server keeps only a
+   * hash, so a link is shown while its dialog is open and forgotten when it closes.
+   */
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
   const revoke = useMutationToast(useRevokeInvitation(churchId), {
     success: t('admin-security.inviteRevokedToast'),
   });
+  const regenerate = useMutationToast(useRegenerateInvitation(churchId), {
+    success: t('admin-security.inviteRegenerated'),
+  });
+  const reveal = (invitation: Invitation) => {
+    const url = invitation.url;
+    if (url) setRevealed((current) => ({ ...current, [invitation.id]: url }));
+  };
+  const closeShown = () => {
+    setRevealed({});
+    setState({ show: '' });
+  };
   const items = (invitations.data?.items ?? []).filter((invitation) =>
     state.status === 'all'
       ? true
@@ -197,16 +215,17 @@ export function InvitationsSettingsPage() {
         : invitation.status !== 'active',
   );
   const shown = invitations.data?.items.find((invitation) => invitation.id === state.show) ?? null;
+  const shownUrl = shown ? revealed[shown.id] : undefined;
   const titleOf = (invitation: Invitation) =>
     invitation.label ||
     t('admin-security.inviteDefaultLabel', { role: t(ROLE_KEYS[invitation.role]) });
 
-  const share = async (invitation: Invitation) => {
+  const share = async (url: string) => {
     if (navigator.share) {
       try {
         await navigator.share({
           title: t('admin-security.shareTitle', { church: church.name }),
-          url: invitation.url,
+          url,
         });
       } catch {
         // Cancelled by the person.
@@ -295,6 +314,13 @@ export function InvitationsSettingsPage() {
           }
           actions={(invitation) => [
             {
+              id: 'regenerate',
+              label: t('admin-security.inviteRegenerate'),
+              icon: RefreshCw,
+              onSelect: () => setRegenerating(invitation),
+              hidden: invitation.status !== 'active',
+            },
+            {
               id: 'revoke',
               label: t('admin-security.revokeInvitation'),
               icon: Ban,
@@ -312,10 +338,13 @@ export function InvitationsSettingsPage() {
       <CreateInvitationDialog
         open={state.new}
         onOpenChange={(open) => setState({ new: open })}
-        onCreated={(invitation) => setState({ new: false, show: invitation.id, status: 'active' })}
+        onCreated={(invitation) => {
+          reveal(invitation);
+          setState({ new: false, show: invitation.id, status: 'active' });
+        }}
       />
 
-      <Dialog open={!!shown} onOpenChange={(open) => !open && setState({ show: '' })}>
+      <Dialog open={!!shown} onOpenChange={(open) => !open && closeShown()}>
         <DialogContent>
           {shown ? (
             <>
@@ -333,28 +362,51 @@ export function InvitationsSettingsPage() {
                     })}
                   </Alert>
                 ) : null}
-                <QrDisplay
-                  value={shown.url}
-                  size={208}
-                  downloadName={`undangan-${church.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-                />
-                <p className="w-full truncate rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground select-all">
-                  {shown.url}
-                </p>
-                <div className="grid w-full grid-cols-2 gap-2">
-                  <CopyButton
-                    value={shown.url}
-                    size="default"
-                    label={t('admin-security.copyLink')}
+                {shownUrl ? (
+                  <>
+                    <Alert variant="warning" className="w-full">
+                      {t('admin-security.inviteShownOnce')}
+                    </Alert>
+                    <QrDisplay
+                      value={shownUrl}
+                      size={208}
+                      downloadName={`undangan-${church.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                    />
+                    <p className="w-full truncate rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground select-all">
+                      {shownUrl}
+                    </p>
+                    <div className="grid w-full grid-cols-2 gap-2">
+                      <CopyButton
+                        value={shownUrl}
+                        size="default"
+                        label={t('admin-security.copyLink')}
+                      />
+                      <Button
+                        onClick={() => void share(shownUrl)}
+                        disabled={typeof navigator.share !== 'function'}
+                      >
+                        <Share2 />
+                        {t('common.share')}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState
+                    compact
+                    icon={EyeOff}
+                    tone="slate"
+                    title={t('admin-security.inviteHiddenTitle')}
+                    description={t('admin-security.inviteHiddenBody')}
+                    action={
+                      shown.status === 'active' ? (
+                        <Button onClick={() => setRegenerating(shown)}>
+                          <RefreshCw />
+                          {t('admin-security.inviteRegenerate')}
+                        </Button>
+                      ) : undefined
+                    }
                   />
-                  <Button
-                    onClick={() => void share(shown)}
-                    disabled={typeof navigator.share !== 'function'}
-                  >
-                    <Share2 />
-                    {t('common.share')}
-                  </Button>
-                </div>
+                )}
               </DialogBody>
               <DialogFooter>
                 {shown.status === 'active' ? (
@@ -363,7 +415,7 @@ export function InvitationsSettingsPage() {
                     {t('admin-security.revokeInvitation')}
                   </Button>
                 ) : null}
-                <Button variant="outline" onClick={() => setState({ show: '' })}>
+                <Button variant="outline" onClick={closeShown}>
                   {t('common.close')}
                 </Button>
               </DialogFooter>
@@ -371,6 +423,24 @@ export function InvitationsSettingsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!regenerating}
+        onOpenChange={(open) => !open && setRegenerating(null)}
+        title={t('admin-security.inviteRegenerateTitle')}
+        description={t('admin-security.inviteRegenerateBody')}
+        confirmLabel={t('admin-security.inviteRegenerate')}
+        loading={regenerate.isPending}
+        onConfirm={async () => {
+          if (!regenerating) return;
+          const result = await regenerate.run(regenerating.id);
+          if (result) {
+            reveal(result.invitation);
+            setState({ show: result.invitation.id }, { push: !state.show });
+            setRegenerating(null);
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={!!revoking}

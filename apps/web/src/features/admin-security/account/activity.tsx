@@ -14,6 +14,7 @@ import {
   Laptop,
   Lock,
   LogOut,
+  ShieldAlert,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react';
@@ -28,7 +29,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Timeline, TimelineItem } from '@/components/ui/timeline';
 import type { Tone } from '@/components/ui/tone';
-import { sessionsQuery, useRevokeSession } from '@/features/auth/api';
+import { sessionsQuery, useRevokeSession, useSignOutEverywhere } from '@/features/auth/api';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
@@ -43,6 +44,9 @@ const OUTCOME_LOOK: Record<LoginEventOutcome, { tone: Tone; icon: typeof CircleC
   failure: { tone: 'danger', icon: CircleX },
   two_factor_failure: { tone: 'danger', icon: CircleX },
   locked: { tone: 'danger', icon: Lock },
+  refresh_reuse: { tone: 'danger', icon: ShieldAlert },
+  password_reset: { tone: 'warning', icon: KeyRound },
+  password_reset_failure: { tone: 'danger', icon: CircleX },
 };
 
 /** Devices signed in to the account: sign one out, or every other one at once. */
@@ -54,7 +58,11 @@ export function SessionsSection() {
   const revokeOthers = useMutationToast(useRevokeOtherSessions(), {
     success: (data) => t('profile.othersSignedOut', { count: data.revokedSessions }),
   });
+  const everywhere = useMutationToast(useSignOutEverywhere(), {
+    success: t('profile.signedOutEverywhere'),
+  });
   const [confirming, setConfirming] = useState(false);
+  const [confirmingEverywhere, setConfirmingEverywhere] = useState(false);
   const others = sessions.data?.items.filter((session) => !session.current).length ?? 0;
 
   return (
@@ -110,11 +118,19 @@ export function SessionsSection() {
           )}
           subtitle={(session) =>
             [
+              session.transport === 'cookie'
+                ? t('profile.sessionCookie')
+                : t('profile.sessionBearer'),
               session.ip,
-              t('profile.sessionMeta', {
-                lastActive: formatRelative(session.lastUsedAt),
-                expires: formatRelative(session.expiresAt),
-              }),
+              session.idleExpiresAt
+                ? t('profile.sessionIdleMeta', {
+                    lastActive: formatRelative(session.lastUsedAt),
+                    idle: formatRelative(session.idleExpiresAt),
+                  })
+                : t('profile.sessionMeta', {
+                    lastActive: formatRelative(session.lastUsedAt),
+                    expires: formatRelative(session.expiresAt),
+                  }),
             ]
               .filter(Boolean)
               .join(' · ')
@@ -146,6 +162,29 @@ export function SessionsSection() {
         loading={revokeOthers.isPending}
         onConfirm={async () => {
           if (await revokeOthers.run()) setConfirming(false);
+        }}
+      />
+      {sessions.data ? (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            className="w-full text-destructive sm:w-auto"
+            onClick={() => setConfirmingEverywhere(true)}
+          >
+            <ShieldAlert />
+            {t('profile.signOutEverywhere')}
+          </Button>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={confirmingEverywhere}
+        onOpenChange={setConfirmingEverywhere}
+        title={t('profile.signOutEverywhereTitle')}
+        description={t('profile.signOutEverywhereBody')}
+        confirmLabel={t('profile.signOutEverywhere')}
+        loading={everywhere.isPending}
+        onConfirm={async () => {
+          if (await everywhere.run()) setConfirmingEverywhere(false);
         }}
       />
     </Section>

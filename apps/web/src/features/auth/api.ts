@@ -1,5 +1,8 @@
 import {
   authResponseSchema,
+  completePasswordResetBodySchema,
+  passwordResetPreviewSchema,
+  recoveryPasswordResetBodySchema,
   changePasswordBodySchema,
   loginBodySchema,
   meResponseSchema,
@@ -14,7 +17,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/r
 import type { z } from 'zod';
 import { api, probeServer, request } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
-import { useAuthStore, useAuth } from '@/stores/auth';
+import { forgetSession, storeSession, transportFor, useAuth, useAuthStore } from '@/stores/auth';
 import { hostLabel } from '@/lib/utils';
 import {
   DEFAULT_SERVER_NAME,
@@ -72,11 +75,7 @@ export const sessionsQuery = () =>
   });
 
 function storeAuth(serverUrl: string, response: AuthResponse) {
-  useAuthStore.getState().setSession(serverUrl, {
-    token: response.token,
-    expiresAt: response.expiresAt,
-    user: response.user,
-  });
+  storeSession(serverUrl, response);
   // Remembering the church makes the post-auth redirect land on it even when the
   // guard for authenticated users redirects first.
   if (response.joinedChurchId) useUiStore.getState().setLastChurchId(response.joinedChurchId);
@@ -90,7 +89,7 @@ export function useLogin() {
       request(authResponseSchema, {
         method: 'POST',
         url: '/auth/login',
-        data: loginBodySchema.parse(body),
+        data: loginBodySchema.parse({ ...body, transport: transportFor(serverUrl) }),
       }),
     onSuccess: (response) => {
       client.clear();
@@ -107,7 +106,7 @@ export function useRegister() {
       request(authResponseSchema, {
         method: 'POST',
         url: '/auth/register',
-        data: registerBodySchema.parse(body),
+        data: registerBodySchema.parse({ ...body, transport: transportFor(serverUrl) }),
       }),
     onSuccess: (response) => {
       client.clear();
@@ -116,24 +115,33 @@ export function useRegister() {
   });
 }
 
-export function useLogout() {
+/**
+ * Signs out: the server ends the session (and clears the cookie), then the credentials in
+ * memory, the stored session, everything cached and the remembered church are forgotten here
+ * and in every other tab. `everywhere` ends every session of the account.
+ */
+function useSignOut(path: '/auth/logout' | '/auth/logout/everywhere') {
   const { serverUrl } = useAuth();
   const client = useQueryClient();
   return useMutation({
     mutationFn: async () => {
       try {
-        await api.post('/auth/logout');
+        await api.post(path);
       } catch {
         // The local session is cleared regardless of the server response.
       }
+      return true as const;
     },
     onSettled: () => {
-      useAuthStore.getState().clearSession(serverUrl);
+      forgetSession(serverUrl);
       useUiStore.getState().setLastChurchId(null);
       client.clear();
     },
   });
 }
+
+export const useLogout = () => useSignOut('/auth/logout');
+export const useSignOutEverywhere = () => useSignOut('/auth/logout/everywhere');
 
 export function useUpdateProfile() {
   const { serverUrl } = useAuth();
@@ -171,5 +179,40 @@ export function useRevokeSession() {
     mutationFn: (id: string) =>
       request(okSchema, { method: 'DELETE', url: `/auth/sessions/${id}` }),
     onSuccess: () => void client.invalidateQueries({ queryKey: ['me', 'sessions'] }),
+  });
+}
+
+export const passwordResetQuery = (token: string) =>
+  queryOptions({
+    queryKey: ['password-reset', token],
+    queryFn: () =>
+      request(passwordResetPreviewSchema, {
+        url: `/auth/password-reset/${encodeURIComponent(token)}`,
+      }),
+    retry: false,
+    staleTime: Infinity,
+  });
+
+/** Uses an administrator's reset link; every session of the account ends. */
+export function useCompletePasswordReset() {
+  return useMutation({
+    mutationFn: (body: z.input<typeof completePasswordResetBodySchema>) =>
+      request(okSchema, {
+        method: 'POST',
+        url: '/auth/password-reset',
+        data: completePasswordResetBodySchema.parse(body),
+      }),
+  });
+}
+
+/** Self-service reset with a recovery code (accounts with two-step verification). */
+export function useRecoveryPasswordReset() {
+  return useMutation({
+    mutationFn: (body: z.input<typeof recoveryPasswordResetBodySchema>) =>
+      request(okSchema, {
+        method: 'POST',
+        url: '/auth/password-reset/recovery',
+        data: recoveryPasswordResetBodySchema.parse(body),
+      }),
   });
 }

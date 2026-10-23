@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { onSignOut } from '@/stores/auth';
+import { useUiStore } from '@/stores/ui';
 import { isApiClientError } from './api';
 
 export const queryClient = new QueryClient({
@@ -18,5 +19,9 @@ export const queryClient = new QueryClient({
   },
 });
 
-// A session the server ended must not leave the previous account's data in memory.
-onSignOut(() => queryClient.clear());
+// A session that ended must not leave the previous account's data in memory, nor the church
+// it last opened in storage.
+onSignOut(() => {
+  queryClient.clear();
+  useUiStore.getState().setLastChurchId(null);
+});

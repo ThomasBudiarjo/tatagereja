@@ -1,5 +1,13 @@
 import { can, type ChurchRole, type MembershipStatus, type Permission } from '@tatagereja/shared';
-import { Eye, PauseCircle, PlayCircle, ShieldCheck, UserMinus, UserRound } from 'lucide-react';
+import {
+  Eye,
+  KeyRound,
+  PauseCircle,
+  PlayCircle,
+  ShieldCheck,
+  UserMinus,
+  UserRound,
+} from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
@@ -9,6 +17,7 @@ import { useI18n } from '@/lib/i18n';
 import { ROLE_KEYS } from '@/lib/i18n/labels';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useChangeBaseRole, useRemoveMember, useSetMemberStatus } from '../api';
+import { PasswordResetDialog } from './password-reset-dialog';
 
 /** What the member actions need to know about a member. */
 export type MemberTarget = {
@@ -22,12 +31,13 @@ export type MemberTarget = {
 };
 
 type Pending =
-  | { kind: 'suspend' | 'reactivate' | 'remove'; member: MemberTarget }
+  | { kind: 'suspend' | 'reactivate' | 'remove' | 'reset'; member: MemberTarget }
   | { kind: 'role'; member: MemberTarget; role: ChurchRole }
   | null;
 
 /**
- * The actions people may take on a member (change base role, suspend, reactivate, remove),
+ * The actions people may take on a member (change base role, suspend, reactivate, make a
+ * password reset link, remove),
  * with their confirmations. Rules come from the shared `can.*` functions, so hidden actions
  * match what the API refuses.
  */
@@ -92,6 +102,13 @@ export function useMemberActions({ onRemoved }: { onRemoved?: () => void } = {})
         hidden: member.status !== 'suspended' || !can.suspendMember(access, target),
       },
       {
+        id: 'reset',
+        label: t('admin-security.resetPassword'),
+        icon: KeyRound,
+        onSelect: () => setPending({ kind: 'reset', member }),
+        hidden: isSelf || !can.resetMemberPassword(access, target),
+      },
+      {
         id: 'remove',
         label: t('admin-security.removeMember'),
         icon: UserMinus,
@@ -150,6 +167,8 @@ export function useMemberActions({ onRemoved }: { onRemoved?: () => void } = {})
         }}
       />
     );
+  } else if (pending?.kind === 'reset') {
+    dialog = <PasswordResetDialog member={pending.member} onClose={close} />;
   } else if (pending?.kind === 'remove') {
     dialog = (
       <ConfirmDialog
