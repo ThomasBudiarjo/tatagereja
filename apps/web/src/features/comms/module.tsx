@@ -11,7 +11,7 @@ import {
   Rss,
   SquarePen,
 } from 'lucide-react';
-import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
+import { defineModule, lazyPage, type AccessRule, type RoutePrefetch } from '@/lib/modules';
 import { NotificationsBell } from './notifications-bell';
 
 const viewEvents: AccessRule = { anyOf: ['events.view'] };
@@ -20,6 +20,14 @@ const viewBulletins: AccessRule = { anyOf: ['bulletin.view', 'bulletin.manage'] 
 const manageBulletins: AccessRule = { check: ({ access }) => canManageBulletins(access) };
 const createEvent: AccessRule = { check: ({ access }) => can.createAnyEvent(access) };
 const createAnnouncement: AccessRule = { check: ({ access }) => can.createAnyAnnouncement(access) };
+
+/** The events page as it opens: upcoming events, first page. */
+const prefetchEvents: RoutePrefetch = async ({ churchId, client }) => {
+  const { eventsQuery } = await import('@/features/events/api');
+  void client.prefetchQuery(
+    eventsQuery(churchId, { page: 1, limit: 25, scope: 'upcoming', mine: false }),
+  );
+};
 
 export const commsModule = defineModule({
   id: 'comms',
@@ -32,7 +40,7 @@ export const commsModule = defineModule({
     {
       path: 'events',
       lazy: lazyPage(() => import('@/features/events/events-page'), 'EventsPage'),
-      handle: { access: viewEvents },
+      handle: { access: viewEvents, prefetch: prefetchEvents },
     },
     {
       path: 'events/new',

@@ -10,3 +10,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Every feature message in one language (`vite.config.ts`, `localeMessages`). */
+declare module 'virtual:locale-messages/*' {
+  const messages: Record<string, unknown>;
+  export default messages;
+}

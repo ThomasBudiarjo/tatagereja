@@ -349,6 +349,15 @@
   text-transform: uppercase;
 }
 
+/*
+ * A block of a long list (a day of the inbox or the audit log) that the browser skips laying
+ * out and painting while it is off screen; `auto` remembers its height once it was shown.
+ */
+@utility offscreen-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24rem;
+}
+
 @utility scrollbar-none {
   scrollbar-width: none;
   &::-webkit-scrollbar {

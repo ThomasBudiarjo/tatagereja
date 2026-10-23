@@ -77,6 +77,9 @@ export const commonDictionary = defineDictionary('common', {
     crashTitle: 'Something went wrong',
     crashDescription: 'The app hit an unexpected error. Reloading usually fixes it.',
     reload: 'Reload the app',
+    updateAvailable: 'A new version is available',
+    updateDescription: 'Reload when you are ready to start using it.',
+    updateReload: 'Reload',
     comingTitle: '{module} is coming together',
     comingDescription:
       'This module is being built. Everything below will appear here, protected by the same permissions.',
@@ -84,7 +87,7 @@ export const commonDictionary = defineDictionary('common', {
     comingPermissions: 'Your access here',
     comingNoPermissions: 'You can see this module. Actions will appear when they are ready.',
     // Network
-    offline: 'You are offline. Changes will not be saved until you reconnect.',
+    offline: 'You are offline. Showing what you viewed last; changes are saved once you reconnect.',
     backOnline: 'Back online',
     slowNetwork: 'This is taking longer than usual…',
     // Unsaved changes
@@ -276,13 +279,17 @@ export const commonDictionary = defineDictionary('common', {
     crashTitle: 'Terjadi kesalahan',
     crashDescription: 'Aplikasi mengalami kesalahan tak terduga. Memuat ulang biasanya membantu.',
     reload: 'Muat ulang aplikasi',
+    updateAvailable: 'Versi baru tersedia',
+    updateDescription: 'Muat ulang saat Anda siap untuk memakainya.',
+    updateReload: 'Muat ulang',
     comingTitle: '{module} sedang disiapkan',
     comingDescription:
       'Modul ini sedang dibangun. Semua fitur di bawah akan tersedia di sini, dengan perlindungan hak akses yang sama.',
     comingPlanned: 'Yang akan tersedia',
     comingPermissions: 'Akses Anda di sini',
     comingNoPermissions: 'Anda dapat melihat modul ini. Tindakan akan muncul saat sudah siap.',
-    offline: 'Anda sedang luring. Perubahan tidak akan tersimpan sampai koneksi kembali.',
+    offline:
+      'Anda sedang luring. Menampilkan data terakhir; perubahan tersimpan setelah koneksi kembali.',
     backOnline: 'Kembali daring',
     slowNetwork: 'Memuat lebih lama dari biasanya…',
     unsavedTitle: 'Buang perubahan yang belum disimpan?',

@@ -1,10 +1,10 @@
-import type { QueryKey } from '@tanstack/react-query';
+import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import type { Access, Church, ModuleId, Permission } from '@tatagereja/shared';
 import { hasAll, hasAny } from '@tatagereja/shared';
 import type { ComponentType } from 'react';
-import type { RouteObject } from 'react-router';
+import type { Params, RouteObject } from 'react-router';
 import type { ModuleTone } from '@/components/ui/tone';
-import type { MessageKey } from '@/lib/i18n';
+import { loadDictionaries, type MessageKey } from '@/lib/i18n';
 
 /*
  * The module registry contract. Each module describes itself in
@@ -111,7 +111,21 @@ export type CommandEntry = {
 export type ModuleRouteHandle = {
   moduleId?: ModuleId;
   access?: AccessRule;
+  /**
+   * Warms the data the screen opens with, when a link to it is touched, hovered or focused
+   * (the code is fetched for every route). Import query factories inside it (`import('./api')`)
+   * so the registry stays small; check `access` like the screen does, never fetch what it
+   * would not show.
+   */
+  prefetch?: RoutePrefetch;
 };
+
+export type RoutePrefetch = (context: {
+  churchId: string;
+  access: Access;
+  client: QueryClient;
+  params: Params;
+}) => unknown;
 
 export type ModuleManifest = {
   id: ModuleId;
@@ -135,7 +149,19 @@ export type ModuleManifest = {
 
 export const defineModule = (manifest: ModuleManifest): ModuleManifest => manifest;
 
-/** Loads a named page component on demand, so the first paint stays small on phones. */
-export const lazyPage =
-  <T extends string>(loader: () => Promise<Record<T, ComponentType>>, name: T) =>
-  async () => ({ Component: (await loader())[name] });
+/**
+ * Loads a named page component on demand, so the first paint stays small on phones, together
+ * with the dictionaries of every feature (one chunk, fetched once in parallel with the page).
+ */
+export const lazyPage = <T extends string>(
+  loader: () => Promise<Record<T, ComponentType>>,
+  name: T,
+) =>
+  Object.assign(
+    async () => {
+      const [page] = await Promise.all([loader(), loadDictionaries()]);
+      return { Component: page[name] };
+    },
+    /** Downloads the page without opening it (link prefetching). */
+    { preload: loader },
+  );

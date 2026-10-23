@@ -399,7 +399,7 @@ export function AuditLogPage() {
           )}
         >
           {groups.map((group) => (
-            <section key={group.day} className="flex flex-col gap-2">
+            <section key={group.day} className="flex flex-col gap-2 offscreen-lazy">
               <h2 className="text-overline sticky top-16 z-10 -mx-1 w-fit rounded-full bg-background/90 px-2 py-1 text-muted-foreground backdrop-blur md:top-2">
                 {formatDate(group.day, 'dateLong')}
               </h2>

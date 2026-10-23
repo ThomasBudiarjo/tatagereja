@@ -1,5 +1,6 @@
 import { Church } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useI18n, useLocale } from '@/lib/i18n';
 import { BottomNav } from './bottom-nav';
 import { CommandPalette } from './command-palette';
@@ -58,25 +59,31 @@ export function AccountShell() {
   );
 }
 
-/** Shell for pages inside a church: sidebar, top bar, bottom tabs and the command palette. */
+/**
+ * Shell for pages inside a church: sidebar, top bar, bottom tabs and the command palette.
+ * Tooltips (the collapsed sidebar) only exist here, so their provider is not in the sign-in
+ * download.
+ */
 export function AppShell() {
   return (
-    <div className="flex min-h-dvh">
-      <SkipLink />
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <main
-          id="main"
-          className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] safe-x md:pb-8"
-        >
-          <ModuleRouteGuard>
-            <AnimatedOutlet />
-          </ModuleRouteGuard>
-        </main>
-        <BottomNav />
+    <TooltipProvider delayDuration={350} skipDelayDuration={150}>
+      <div className="flex min-h-dvh">
+        <SkipLink />
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar />
+          <main
+            id="main"
+            className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] safe-x md:pb-8"
+          >
+            <ModuleRouteGuard>
+              <AnimatedOutlet />
+            </ModuleRouteGuard>
+          </main>
+          <BottomNav />
+        </div>
+        <CommandPalette />
       </div>
-      <CommandPalette />
-    </div>
+    </TooltipProvider>
   );
 }

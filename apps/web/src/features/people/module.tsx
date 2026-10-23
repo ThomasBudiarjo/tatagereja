@@ -9,7 +9,7 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react';
-import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
+import { defineModule, lazyPage, type AccessRule, type RoutePrefetch } from '@/lib/modules';
 import { pendingJoinRequestsBadge } from './api';
 
 const viewPeople: AccessRule = { anyOf: ['people.view'] };
@@ -20,6 +20,19 @@ const manageFields: AccessRule = { check: ({ access }) => can.manageCustomFields
 const createGroup: AccessRule = { check: ({ access }) => can.createGroup(access) };
 const manageHouseholds: AccessRule = { check: ({ access }) => can.manageHouseholds(access) };
 const manageAreas: AccessRule = { check: ({ access }) => can.manageAreas(access) };
+/** The directory as it opens: the people page's default list, its counts and filters. */
+const prefetchDirectory: RoutePrefetch = async ({ churchId, access: caller, client }) => {
+  const [api, groups] = await Promise.all([import('./api'), import('@/features/groups/api')]);
+  void client.prefetchQuery(
+    api.peopleListQuery(churchId, { sort: 'name', order: 'asc', page: 1, limit: 50 }),
+  );
+  void client.prefetchQuery(api.peopleSummaryQuery(churchId));
+  void client.prefetchQuery(api.areasQuery(churchId));
+  void client.prefetchQuery(api.tagsQuery(churchId));
+  void client.prefetchQuery(api.fieldsQuery(churchId));
+  if (has(caller, 'groups.view')) void client.prefetchQuery(groups.groupsQuery(churchId));
+};
+
 /** Leaders and people with `groups.manage` decide on join requests. */
 const decideRequests: AccessRule = {
   check: ({ access }) => has(access, 'groups.manage') || access.leaderGroupIds.length > 0,
@@ -36,7 +49,7 @@ export const peopleModule = defineModule({
     {
       path: 'people',
       lazy: lazyPage(() => import('./people-page'), 'PeoplePage'),
-      handle: { access: viewPeople },
+      handle: { access: viewPeople, prefetch: prefetchDirectory },
     },
     {
       path: 'people/new',

@@ -5,7 +5,7 @@ import {
   type LoginChallenge,
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import { useLoginWithChallenge } from '@/features/admin-security/api';
 import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { applyServerErrors } from '@/lib/forms';
+import { prefetchSignedInShell } from '@/lib/prefetch';
 import { useServerStore } from '@/stores/server';
 import { AuthLayout } from './auth-layout';
 import { TwoFactorStep } from './two-factor-step';
@@ -42,6 +43,9 @@ export function LoginPage() {
     resolver: zodResolver(loginBodySchema),
     defaultValues: { email: '', password: '' },
   });
+
+  // The church screens download while the person types (not with Data Saver on).
+  useEffect(() => prefetchSignedInShell(), []);
 
   const finish = async () => {
     if (inviteToken) {

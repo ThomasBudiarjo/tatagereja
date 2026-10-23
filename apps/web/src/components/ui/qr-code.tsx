@@ -1,9 +1,13 @@
 import { Download } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import * as React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
+
+/** The QR encoder downloads with the first code shown, not with every page that may show one. */
+const QRCodeSVG = React.lazy(() =>
+  import('qrcode.react').then((module) => ({ default: module.QRCodeSVG })),
+);
 
 /**
  * A QR code on a white card (scanners need contrast in dark mode too), with an optional
@@ -58,7 +62,16 @@ export function QrDisplay({
         role="img"
         aria-label={t('common.qrCode')}
       >
-        <QRCodeSVG value={value} size={size} level="M" marginSize={0} />
+        <React.Suspense
+          fallback={
+            <div
+              className="animate-pulse rounded-md bg-muted"
+              style={{ width: size, height: size }}
+            />
+          }
+        >
+          <QRCodeSVG value={value} size={size} level="M" marginSize={0} />
+        </React.Suspense>
       </div>
       {caption ? (
         <div className="max-w-xs text-center text-sm text-muted-foreground">{caption}</div>
