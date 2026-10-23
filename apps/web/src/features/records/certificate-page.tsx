@@ -81,10 +81,15 @@ export function CertificatePage() {
     <Page className="print:p-0">
       <style>{'@page { size: A4 portrait; margin: 10mm; }'}</style>
       <div data-print="hide" className="flex flex-wrap items-center justify-between gap-3">
-        <Button asChild variant="ghost" size="sm" className="-ml-2.5 text-muted-foreground">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2.5 max-w-full min-w-0 text-muted-foreground"
+        >
           <Link to={`${base}/records/${record.id}`}>
             <ArrowLeft />
-            {recordTitle(record)}
+            <span className="truncate">{recordTitle(record)}</span>
           </Link>
         </Button>
         <PrintButton size="sm" label={t('records.printCertificate')} />
@@ -123,6 +128,14 @@ function Certificate({
   const details = record.details;
   const parents = [father?.name, mother?.name].filter(Boolean).join(` ${t('records.certAnd')} `);
   const city = church.city ?? church.address ?? '';
+  // "pada 10 Oktober 2026 di GKI, dilayani oleh Pdt. ..., M.Th." without a doubled full stop.
+  const when = [
+    t('records.certOn', { date: formatDate(record.date, 'dateLong') }),
+    record.place ? ` ${t('records.certAt', { place: record.place })}` : '',
+    record.officiantName ? `, ${t('records.certBy', { name: record.officiantName })}` : '',
+  ]
+    .join('')
+    .replace(/\.?$/, '.');
 
   return (
     <article
@@ -133,7 +146,7 @@ function Certificate({
       className="relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-xl border bg-white p-3 text-neutral-900 shadow-soft print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none sm:p-4"
     >
       <div className="rounded-lg border-[3px] border-double border-tone p-1.5">
-        <div className="relative flex min-h-[250mm] flex-col items-center rounded-md border border-tone/50 px-5 py-8 text-center font-serif sm:px-12 sm:py-12 print:min-h-[270mm]">
+        <div className="relative flex min-h-[250mm] flex-col items-center rounded-md border border-tone/50 px-5 py-8 text-center font-serif sm:px-12 sm:py-12 print:min-h-[250mm] print:py-6">
           {record.status === 'voided' ? (
             <span
               aria-hidden
@@ -160,7 +173,10 @@ function Certificate({
             ) : null}
           </header>
 
-          <div aria-hidden className="my-6 flex w-full max-w-sm items-center gap-3 text-tone-ink">
+          <div
+            aria-hidden
+            className="my-6 flex w-full max-w-sm items-center gap-3 text-tone-ink print:my-4"
+          >
             <span className="h-px flex-1 bg-current opacity-40" />
             <meta.icon className="size-5" />
             <span className="h-px flex-1 bg-current opacity-40" />
@@ -173,7 +189,7 @@ function Certificate({
             {t('records.certNumber', { number: record.number })}
           </p>
 
-          <p className="mt-8 text-base italic sm:text-lg">{t('records.certIntro')}</p>
+          <p className="mt-8 text-base italic sm:text-lg print:mt-5">{t('records.certIntro')}</p>
           <div className="mt-3 flex flex-col items-center gap-1">
             {subjects.map((person, index) => (
               <div key={person.id} className="flex flex-col items-center">
@@ -211,12 +227,7 @@ function Certificate({
               milestone: record.subtype ?? '',
             })}
           </p>
-          <p className="mt-2 max-w-lg text-base leading-relaxed">
-            {t('records.certOn', { date: formatDate(record.date, 'dateLong') })}
-            {record.place ? ` ${t('records.certAt', { place: record.place })}` : ''}
-            {record.officiantName ? `, ${t('records.certBy', { name: record.officiantName })}` : ''}
-            .
-          </p>
+          <p className="mt-2 max-w-lg text-base leading-relaxed">{when}</p>
           {record.type === 'death' && (details.funeralDate || details.burialPlace) ? (
             <p className="mt-2 max-w-lg text-base leading-relaxed">
               {t('records.certBuried', {
@@ -256,7 +267,7 @@ function Certificate({
             </div>
           ) : null}
 
-          <div className="mt-auto flex w-full justify-end pt-12">
+          <div className="mt-auto flex w-full justify-end pt-12 print:pt-8">
             <div className="flex min-w-56 flex-col items-center text-base">
               <p>
                 {city ? `${city}, ` : ''}
@@ -265,7 +276,7 @@ function Certificate({
               {certificate.signatoryTitle ? (
                 <p className="mt-1">{certificate.signatoryTitle}</p>
               ) : null}
-              <span aria-hidden className="h-20" />
+              <span aria-hidden className="h-20 print:h-16" />
               <p className="min-w-56 border-t border-neutral-500 pt-1 font-bold">
                 {certificate.signatoryName ?? ' '}
               </p>
@@ -273,7 +284,9 @@ function Certificate({
           </div>
 
           {certificate.footer ? (
-            <p className="mt-8 font-sans text-xs text-neutral-500 italic">{certificate.footer}</p>
+            <p className="mt-8 font-sans text-xs text-neutral-500 italic print:mt-5">
+              {certificate.footer}
+            </p>
           ) : null}
         </div>
       </div>

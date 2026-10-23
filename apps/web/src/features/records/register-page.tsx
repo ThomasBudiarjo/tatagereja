@@ -115,7 +115,7 @@ export function RegisterPage() {
       primary: true,
       cell: (record) => (
         <span className="flex min-w-0 flex-col">
-          <span className="truncate font-medium">{recordTitle(record)}</span>
+          <span className="font-medium text-pretty break-words">{recordTitle(record)}</span>
           {!type ? (
             <span className="mt-1 md:hidden">
               <RecordTypeBadge record={record} />
@@ -148,12 +148,15 @@ export function RegisterPage() {
       header: t('records.colPlace'),
       hideBelowLg: true,
       hideOnMobile: true,
+      // The printed register always shows where and by whom.
+      className: 'print:table-cell',
       cell: (record) => record.place ?? <span className="text-muted-foreground">—</span>,
     },
     {
       id: 'officiant',
       header: t('records.colOfficiant'),
       hideBelowLg: true,
+      className: 'print:table-cell',
       cell: (record) => record.officiantName ?? <span className="text-muted-foreground">—</span>,
     },
     {

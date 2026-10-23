@@ -270,7 +270,7 @@ function RecordPeople({ record, linkPeople }: { record: RegistryRecord; linkPeop
               <>
                 <EntityAvatar name={person.name} size={isPrimary ? 'md' : 'sm'} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{person.name}</span>
+                  <span className="block font-medium break-words">{person.name}</span>
                   <span className="block text-xs text-muted-foreground">
                     {label}
                     {!person.personId ? ` · ${t('records.notInDirectory')}` : ''}
