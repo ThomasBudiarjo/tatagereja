@@ -26,7 +26,12 @@ describe('kids check-in access', () => {
       `${c.base}/households?q=Simanjuntak`,
     ];
     for (const path of reads) {
-      for (const token of [c.s.owner.token, c.s.admin.token, c.teacher.token, c.coordinator.token]) {
+      for (const token of [
+        c.s.owner.token,
+        c.s.admin.token,
+        c.teacher.token,
+        c.coordinator.token,
+      ]) {
         expect(await status('GET', path, token)).toBe(200);
       }
       for (const token of [c.s.member.token, c.s.leader.token, c.clerk.token, c.guardian.token]) {
@@ -76,9 +81,7 @@ describe('kids check-in access', () => {
         body: { ...classBody, name: `Kelas ${Math.random().toString(36).slice(2, 8)}` },
       });
       expect(created.status).toBe(201);
-      expect(await status('DELETE', `${c.base}/classes/${created.json.class.id}`, token)).toBe(
-        200,
-      );
+      expect(await status('DELETE', `${c.base}/classes/${created.json.class.id}`, token)).toBe(200);
     }
   });
 
@@ -148,11 +151,9 @@ describe('kids check-in access', () => {
     expect(detail.status).toBe(200);
     expect(detail.json.checkin.securityCode).toBeNull();
     expect(detail.json.canOverride).toBe(false);
-    const roster = await t.request(
-      'GET',
-      `${c.sessionPath}/classes/${lukas!.classId}/roster`,
-      { token: c.teacher.token },
-    );
+    const roster = await t.request('GET', `${c.sessionPath}/classes/${lukas!.classId}/roster`, {
+      token: c.teacher.token,
+    });
     expect(roster.json.checkins.every((item: any) => item.securityCode === null)).toBe(true);
     const managed = await t.request('GET', `${c.base}/checkins/${lukas!.id}`, {
       token: c.coordinator.token,
@@ -208,16 +209,12 @@ describe('kids check-in access', () => {
       ).toBe(404);
       expect(await status('GET', `${c.base}/sessions/${c.otherSessionId}`, token)).toBe(404);
       expect(await status('POST', `${c.base}/sessions/${c.otherSessionId}/close`, token)).toBe(404);
-      expect(
-        await status('GET', `${c.base}/sessions/${c.otherSessionId}/checkins`, token),
-      ).toBe(404);
-      expect(
-        await status(
-          'GET',
-          `${c.sessionPath}/classes/${c.otherClassId}/roster`,
-          token,
-        ),
-      ).toBe(404);
+      expect(await status('GET', `${c.base}/sessions/${c.otherSessionId}/checkins`, token)).toBe(
+        404,
+      );
+      expect(await status('GET', `${c.sessionPath}/classes/${c.otherClassId}/roster`, token)).toBe(
+        404,
+      );
       expect(await status('GET', `${c.base}/checkins/${c.otherCheckinId}`, token)).toBe(404);
       expect(
         await status('POST', `${c.base}/checkins/${c.otherCheckinId}/checkout`, token, {
@@ -271,9 +268,14 @@ describe('kids check-in access', () => {
       }),
     ).toBe(404);
     expect(
-      await status('PUT', `${c.base}/classes/${c.classId('Balita')}/teachers`, c.coordinator.token, {
-        teachers: [{ personId: c.outsider.id }],
-      }),
+      await status(
+        'PUT',
+        `${c.base}/classes/${c.classId('Balita')}/teachers`,
+        c.coordinator.token,
+        {
+          teachers: [{ personId: c.outsider.id }],
+        },
+      ),
     ).toBe(404);
     expect(
       await status('POST', `${c.base}/children/${c.yosua.id}/pickups`, c.guardian.token, {

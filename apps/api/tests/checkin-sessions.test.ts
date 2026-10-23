@@ -117,10 +117,7 @@ describe('kids check-in classes, sessions and rosters', () => {
       const set = await t.request('PUT', `${c.base}/classes/${id}/teachers`, {
         token: c.coordinator.token,
         body: {
-          teachers: [
-            { personId: teacherPerson.id, isLead: true },
-            { personId: c.budi.id },
-          ],
+          teachers: [{ personId: teacherPerson.id, isLead: true }, { personId: c.budi.id }],
         },
       });
       expect(set.status).toBe(200);

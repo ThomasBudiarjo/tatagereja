@@ -19,7 +19,10 @@ export function insertHousehold(
   t: TestApp,
   churchId: string,
   name: string,
-  members: { personId: string; relationship: 'head' | 'spouse' | 'child' | 'parent' | 'relative' }[],
+  members: {
+    personId: string;
+    relationship: 'head' | 'spouse' | 'child' | 'parent' | 'relative';
+  }[],
   phone: string | null = null,
 ) {
   const id = newId();
@@ -94,7 +97,11 @@ export async function seedCheckin(t: TestApp) {
 
   const person = (body: Record<string, unknown>) =>
     t.createPerson(s.owner.token, s.church.id, body);
-  const sari = await person({ firstName: 'Sari', lastName: 'Simanjuntak', phone: '0812-3456-7788' });
+  const sari = await person({
+    firstName: 'Sari',
+    lastName: 'Simanjuntak',
+    phone: '0812-3456-7788',
+  });
   const budi = await person({ firstName: 'Budi', lastName: 'Simanjuntak' });
   const yosua = await person({
     firstName: 'Yosua',
@@ -127,8 +134,16 @@ export async function seedCheckin(t: TestApp) {
   ]);
 
   // Another family with a child, so guardians cannot reach other households.
-  const lukas = await person({ firstName: 'Lukas', lastName: 'Hutapea', birthDate: bornYearsAgo(8) });
-  const hutapea = await person({ firstName: 'Rina', lastName: 'Hutapea', phone: '+62 811 2222 9901' });
+  const lukas = await person({
+    firstName: 'Lukas',
+    lastName: 'Hutapea',
+    birthDate: bornYearsAgo(8),
+  });
+  const hutapea = await person({
+    firstName: 'Rina',
+    lastName: 'Hutapea',
+    phone: '+62 811 2222 9901',
+  });
   insertHousehold(t, s.church.id, 'Keluarga Hutapea', [
     { personId: hutapea.id, relationship: 'head' },
     { personId: lukas.id, relationship: 'child' },

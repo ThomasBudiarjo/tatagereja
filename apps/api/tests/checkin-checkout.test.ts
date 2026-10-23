@@ -19,7 +19,12 @@ describe('kids check-out', () => {
       { token: c.s.owner.token },
     );
     expect(response.status).toBe(200);
-    return response.json.items as { action: string; entityId: string; summary: string; after: any }[];
+    return response.json.items as {
+      action: string;
+      entityId: string;
+      summary: string;
+      after: any;
+    }[];
   };
 
   /** A code from the alphabet that is not `code`. */
