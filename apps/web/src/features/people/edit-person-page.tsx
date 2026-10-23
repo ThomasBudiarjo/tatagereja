@@ -11,6 +11,7 @@ import { ErrorState, NoAccessState } from '@/components/ui/states';
 import { getErrorMessage } from '@/lib/api';
 import { applyServerErrors } from '@/lib/forms';
 import { useI18n } from '@/lib/i18n';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { isGone } from '@/lib/use-mutation-toast';
 import { personQuery, tagsQuery, useUpdatePerson } from './api';
 import { PersonForm } from './person-form';
@@ -25,6 +26,7 @@ export function EditPersonPage() {
   const tags = useQuery({ ...tagsQuery(churchId), enabled: !!query.data?.canEditTags });
   const update = useUpdatePerson(churchId, id);
   const back = `${base}/people/${id}`;
+  useDocumentTitle(query.data && !query.data.canEdit ? t('people.editPerson') : null);
 
   if (query.isPending || (query.data?.canEditTags && tags.isPending)) {
     return (

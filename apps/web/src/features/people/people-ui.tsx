@@ -141,7 +141,7 @@ export function ContactButtons({
     'inline-flex size-11 items-center justify-center rounded-full border border-border/80 bg-card text-foreground shadow-xs transition-[background-color,transform] duration-150 hover:bg-muted active:scale-95 focus-visible:ring-[3px] focus-visible:ring-ring/40 outline-none [&_svg]:size-[18px]';
   if (!phone && !email) return null;
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn('flex items-center gap-2', className)} data-print="hide">
       {phone ? (
         <a href={`tel:${phone}`} className={button} aria-label={t('people.call', { phone })}>
           <Phone />

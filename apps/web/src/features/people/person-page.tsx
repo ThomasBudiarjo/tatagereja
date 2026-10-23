@@ -253,7 +253,9 @@ export function PersonPage() {
                 <span className="block text-xs leading-snug font-semibold sm:text-sm">
                   {link.label}
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">{link.value}</span>
+                <span className="block text-xs leading-snug text-muted-foreground">
+                  {link.value}
+                </span>
               </span>
             </Link>
           ))}

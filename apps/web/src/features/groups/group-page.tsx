@@ -1,6 +1,7 @@
 import {
   GROUP_TYPE_TEXT,
   fullName,
+  has,
   localize,
   type GroupJoinRequest,
   type GroupPage as GroupPageData,
@@ -8,6 +9,7 @@ import {
 } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import {
+  ArrowRight,
   CalendarClock,
   CalendarDays,
   Check,
@@ -55,7 +57,7 @@ import { RowActions } from '@/components/ui/row-actions';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
 import { ErrorState } from '@/components/ui/states';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import { TabsContent, TabsList, TabsTrigger, UrlTabs } from '@/components/ui/tabs';
 import { accountsQuery, downloadGroupRoster } from '@/features/people/api';
 import { ContactButtons, GroupCover, PersonStatusBadge } from '@/features/people/people-ui';
@@ -82,7 +84,7 @@ type DialogName = 'edit' | 'delete' | 'add' | 'leader' | 'join' | 'leave' | null
 
 export function GroupPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { churchId, base } = useChurch();
+  const { churchId, base, access } = useChurch();
   const { t } = useI18n();
   const navigate = useNavigate();
   const query = useQuery(groupQuery(churchId, id));
@@ -126,7 +128,17 @@ export function GroupPage() {
   const page = query.data;
   const { group } = page;
   const canDecide = page.canManage;
-  const tabs = ['members', ...(canDecide ? ['requests'] : []), 'activity'];
+  // Events, attendance and announcements live in their own modules; the tabs link there.
+  const showEvents = has(access, 'events.view');
+  const showAttendance = page.stats.attendance !== null;
+  const showAnnouncements = has(access, 'announcements.view');
+  const tabs = [
+    'members',
+    ...(canDecide ? ['requests'] : []),
+    ...(showEvents ? ['events'] : []),
+    ...(showAttendance ? ['attendance'] : []),
+    ...(showAnnouncements ? ['announcements'] : []),
+  ];
 
   const exportRoster = async () => {
     if (exporting) return;
@@ -215,7 +227,20 @@ export function GroupPage() {
               ) : null}
             </TabsTrigger>
           ) : null}
-          <TabsTrigger value="activity">{t('groups.tabActivity')}</TabsTrigger>
+          {showEvents ? (
+            <TabsTrigger value="events">
+              {t('groups.statEvents')}
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular">
+                {page.stats.eventCount}
+              </span>
+            </TabsTrigger>
+          ) : null}
+          {showAttendance ? (
+            <TabsTrigger value="attendance">{t('groups.statAttendance')}</TabsTrigger>
+          ) : null}
+          {showAnnouncements ? (
+            <TabsTrigger value="announcements">{t('groups.statAnnouncements')}</TabsTrigger>
+          ) : null}
         </TabsList>
         <TabsContent value="members">
           <MembersTab page={page} onAdd={() => setDialog('add')} />
@@ -225,9 +250,21 @@ export function GroupPage() {
             <RequestsList groupId={group.id} requests={page.joinRequests} />
           </TabsContent>
         ) : null}
-        <TabsContent value="activity">
-          <ActivityTab page={page} />
-        </TabsContent>
+        {showEvents ? (
+          <TabsContent value="events">
+            <EventsTab page={page} />
+          </TabsContent>
+        ) : null}
+        {showAttendance ? (
+          <TabsContent value="attendance">
+            <AttendanceTab page={page} />
+          </TabsContent>
+        ) : null}
+        {showAnnouncements ? (
+          <TabsContent value="announcements">
+            <AnnouncementsTab page={page} />
+          </TabsContent>
+        ) : null}
       </UrlTabs>
 
       {page.canManage ? (
@@ -658,94 +695,114 @@ function RequestRow({
   );
 }
 
-function ActivityTab({ page }: { page: GroupPageData }) {
-  const { base } = useChurch();
-  const { t, formatDate, formatPercent, formatRelative } = useI18n();
-  const { stats, group } = page;
+/** A tab's link to the module that owns the data, filtered to this group. */
+function ModuleLink({ to, label }: { to: string; label: string }) {
   return (
-    <div className="flex flex-col gap-5">
+    <Button asChild variant="outline" size="sm" className="self-start">
+      <Link to={to}>
+        {label} <ArrowRight />
+      </Link>
+    </Button>
+  );
+}
+
+function EventsTab({ page }: { page: GroupPageData }) {
+  const { base } = useChurch();
+  const { t, formatDate } = useI18n();
+  const { stats, group } = page;
+  const to = `${base}/events?groupId=${group.id}`;
+  return (
+    <Section
+      title={t('groups.upcomingEvents')}
+      description={t('groups.eventsTotal', { count: stats.eventCount })}
+      action={<ModuleLink to={to} label={t('groups.openEvents')} />}
+    >
+      {stats.upcomingEvents.length === 0 ? (
+        <EmptyState compact icon={CalendarDays} tone="amber" title={t('groups.noEvents')} />
+      ) : (
+        <ListGroup>
+          {stats.upcomingEvents.map((event) => (
+            <ListRow
+              key={event.id}
+              to={`${base}/events/${event.id}`}
+              leading={<ToneIcon icon={CalendarDays} tone="amber" size="sm" />}
+              title={event.title}
+              subtitle={formatDate(event.startsAt, 'dateTime')}
+            />
+          ))}
+        </ListGroup>
+      )}
+    </Section>
+  );
+}
+
+function AttendanceTab({ page }: { page: GroupPageData }) {
+  const { base } = useChurch();
+  const { t, formatPercent, formatRelative } = useI18n();
+  const { stats, group } = page;
+  if (!stats.attendance) return null;
+  const { attendance } = stats;
+  return (
+    <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatCard
-          label={t('groups.statEvents')}
-          value={stats.eventCount}
-          icon={CalendarDays}
-          tone="amber"
-          to={`${base}/events?groupId=${group.id}`}
+          label={t('groups.attendanceRate')}
+          value={attendance.rate === null ? '—' : formatPercent(attendance.rate)}
+          icon={ClipboardCheck}
+          tone="teal"
         />
-        {stats.attendance ? (
-          <StatCard
-            label={t('groups.statAttendance')}
-            value={stats.attendance.rate === null ? '—' : formatPercent(stats.attendance.rate)}
-            hint={
-              stats.attendance.lastSessionAt
-                ? t('groups.lastSession', { when: formatRelative(stats.attendance.lastSessionAt) })
-                : t('groups.noSessions')
-            }
-            icon={ClipboardCheck}
-            tone="teal"
-            to={`${base}/attendance?groupId=${group.id}`}
-          />
-        ) : null}
         <StatCard
-          label={t('groups.statAnnouncements')}
-          value={stats.recentAnnouncements.length}
-          icon={Megaphone}
-          tone="rose"
-          to={`${base}/announcements?groupId=${group.id}`}
-          className={stats.attendance ? 'col-span-2 lg:col-span-1' : undefined}
+          label={t('groups.attendanceSessions')}
+          value={attendance.sessions}
+          hint={
+            attendance.lastSessionAt
+              ? t('groups.lastSession', { when: formatRelative(attendance.lastSessionAt) })
+              : t('groups.noSessions')
+          }
+          icon={CalendarDays}
+          tone="sky"
         />
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Section
-          title={t('groups.upcomingEvents')}
-          action={
-            <Button asChild variant="link" size="sm">
-              <Link to={`${base}/events?groupId=${group.id}`}>{t('common.seeAll')}</Link>
-            </Button>
-          }
-        >
-          {stats.upcomingEvents.length === 0 ? (
-            <EmptyState compact icon={CalendarDays} tone="amber" title={t('groups.noEvents')} />
-          ) : (
-            <ListGroup>
-              {stats.upcomingEvents.map((event) => (
-                <ListRow
-                  key={event.id}
-                  to={`${base}/events/${event.id}`}
-                  title={event.title}
-                  subtitle={formatDate(event.startsAt, 'dateTime')}
-                />
-              ))}
-            </ListGroup>
-          )}
-        </Section>
-        <Section
-          title={t('groups.recentAnnouncements')}
-          action={
-            <Button asChild variant="link" size="sm">
-              <Link to={`${base}/announcements?groupId=${group.id}`}>{t('common.seeAll')}</Link>
-            </Button>
-          }
-        >
-          {stats.recentAnnouncements.length === 0 ? (
-            <EmptyState compact icon={Megaphone} tone="rose" title={t('groups.noAnnouncements')} />
-          ) : (
-            <ListGroup>
-              {stats.recentAnnouncements.map((announcement) => (
-                <ListRow
-                  key={announcement.id}
-                  to={`${base}/announcements/${announcement.id}`}
-                  title={announcement.title}
-                  subtitle={
-                    announcement.publishedAt ? formatRelative(announcement.publishedAt) : undefined
-                  }
-                />
-              ))}
-            </ListGroup>
-          )}
-        </Section>
-      </div>
+      <ModuleLink
+        to={`${base}/attendance?groupId=${group.id}`}
+        label={t('groups.openAttendance')}
+      />
     </div>
+  );
+}
+
+function AnnouncementsTab({ page }: { page: GroupPageData }) {
+  const { base } = useChurch();
+  const { t, formatRelative } = useI18n();
+  const { stats, group } = page;
+  return (
+    <Section
+      title={t('groups.recentAnnouncements')}
+      action={
+        <ModuleLink
+          to={`${base}/announcements?groupId=${group.id}`}
+          label={t('groups.openAnnouncements')}
+        />
+      }
+    >
+      {stats.recentAnnouncements.length === 0 ? (
+        <EmptyState compact icon={Megaphone} tone="rose" title={t('groups.noAnnouncements')} />
+      ) : (
+        <ListGroup>
+          {stats.recentAnnouncements.map((announcement) => (
+            <ListRow
+              key={announcement.id}
+              to={`${base}/announcements/${announcement.id}`}
+              leading={<ToneIcon icon={Megaphone} tone="rose" size="sm" />}
+              title={announcement.title}
+              subtitle={
+                announcement.publishedAt ? formatRelative(announcement.publishedAt) : undefined
+              }
+            />
+          ))}
+        </ListGroup>
+      )}
+    </Section>
   );
 }
 

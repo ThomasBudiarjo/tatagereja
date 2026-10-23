@@ -328,7 +328,9 @@ export function PeoplePage() {
         title={t('people.title')}
         description={
           query.data
-            ? t('people.directoryCount', { count: query.data.total })
+            ? t(filtered ? 'people.matchCount' : 'people.directoryCount', {
+                count: query.data.total,
+              })
             : t('people.navDescription')
         }
         actions={
@@ -558,6 +560,12 @@ function DirectoryList({
                           {details.join(' · ')}
                         </p>
                       ) : null}
+                      {/* On phones the status sits under the name so long names keep their width. */}
+                      <PersonStatusBadge
+                        status={person.membershipStatus}
+                        size="sm"
+                        className="mt-1 sm:hidden"
+                      />
                     </div>
                     <div className="hidden min-w-0 shrink items-center gap-1.5 lg:flex">
                       {area ? <AreaChip area={area} /> : null}
@@ -566,7 +574,11 @@ function DirectoryList({
                         return tag ? <TagChip key={tagId} tag={tag} /> : null;
                       })}
                     </div>
-                    <PersonStatusBadge status={person.membershipStatus} size="sm" />
+                    <PersonStatusBadge
+                      status={person.membershipStatus}
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                    />
                   </Link>
                 </li>
               );

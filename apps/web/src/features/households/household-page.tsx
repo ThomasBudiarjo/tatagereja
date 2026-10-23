@@ -19,6 +19,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  Search,
   Star,
   Trash2,
   UserMinus,
@@ -143,7 +144,7 @@ export function HouseholdPage() {
           { label: household.name },
         ]}
         title={household.name}
-        description={[household.address, household.city].filter(Boolean).join(', ') || undefined}
+        description={household.city ?? undefined}
         actions={
           canManage ? (
             <>
@@ -211,14 +212,14 @@ export function HouseholdPage() {
         action={
           canManage ? (
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="ghost" onClick={() => setDialog('pick')}>
-                <UserPlus />{' '}
-                <span className="sr-only sm:not-sr-only">{t('people.addExisting')}</span>
+              <Button size="sm" variant="outline" onClick={() => setDialog('pick')}>
+                <Search /> <span className="sm:hidden">{t('people.addExistingShort')}</span>
+                <span className="hidden sm:inline">{t('people.addExisting')}</span>
               </Button>
               {canAddPeople ? (
                 <Button size="sm" onClick={() => setDialog('new')}>
-                  <UserPlus />{' '}
-                  <span className="sr-only sm:not-sr-only">{t('people.addFamily')}</span>
+                  <UserPlus /> <span className="sm:hidden">{t('people.addFamilyShort')}</span>
+                  <span className="hidden sm:inline">{t('people.addFamily')}</span>
                 </Button>
               ) : null}
             </div>
