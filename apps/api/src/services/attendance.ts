@@ -1,15 +1,28 @@
 import {
+  INSIGHTS_LIMITS,
   attendanceStreakOf,
+  has,
   headcountTotal,
+  type AbsenceAlert,
+  type AbsenceQuery,
+  type AccessLike,
   type AttendanceHistory,
   type AttendanceSessionView,
   type AttendanceStatus,
   type Headcount,
 } from '@tatagereja/shared';
-import { and, count, desc, eq, inArray, ne, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, like, max, ne, or, type SQL } from 'drizzle-orm';
 import type { Db, Queryable } from '../db/client';
-import type { AttendanceSessionRow, PersonRow } from '../db/schema';
-import { attendanceRecords, attendanceSessions, events, groups } from '../db/schema';
+import type { AbsenceAlertRow, AttendanceSessionRow, PersonRow } from '../db/schema';
+import {
+  absenceAlerts,
+  attendanceRecords,
+  attendanceSessions,
+  events,
+  groups,
+  people,
+} from '../db/schema';
+import { likePattern } from '../lib/query';
 import { toAttendanceSession, toPersonSummary, type AttendanceCounts } from '../serializers';
 
 const NO_COUNTS: AttendanceCounts = {
@@ -195,6 +208,128 @@ export function absenceStreaks(marks: readonly PersonMark[]): Map<string, Absenc
     }
   }
   return result;
+}
+
+/** The groups whose sessions the caller's absence view covers; undefined means every session. */
+export const absenceScope = (access: AccessLike, groupId?: string): string[] | undefined => {
+  if (groupId) return [groupId];
+  return has(access, 'attendance.view') ? undefined : [...access.leaderGroupIds];
+};
+
+/** The latest session each person was present at, across every session of the church. */
+export function lastPresentByPerson(
+  db: Queryable,
+  churchId: string,
+  personIds: readonly string[],
+): Map<string, string> {
+  if (personIds.length === 0) return new Map();
+  return new Map(
+    db
+      .select({ personId: attendanceRecords.personId, at: max(attendanceSessions.sessionAt) })
+      .from(attendanceRecords)
+      .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
+      .where(
+        and(
+          eq(attendanceRecords.churchId, churchId),
+          eq(attendanceRecords.status, 'present'),
+          inArray(attendanceRecords.personId, [...personIds]),
+        ),
+      )
+      .groupBy(attendanceRecords.personId)
+      .all()
+      .flatMap((row) => (row.at ? [[row.personId, row.at] as const] : [])),
+  );
+}
+
+/**
+ * Whether a dismissed or followed-up alert still holds: the person has not been present at a
+ * session held after it was resolved. Attending again reopens the alert for the next streak.
+ */
+export const stillResolved = (row: AbsenceAlertRow | undefined, lastPresentAt: string | null) =>
+  !!row &&
+  row.status !== 'open' &&
+  !!row.resolvedAt &&
+  (lastPresentAt === null || lastPresentAt <= row.resolvedAt);
+
+export const toAbsenceAlert = (
+  person: PersonRow,
+  streak: AbsenceStreak,
+  row: AbsenceAlertRow | undefined,
+  lastPresentAt: string | null,
+): AbsenceAlert => {
+  const resolved = stillResolved(row, lastPresentAt);
+  return {
+    person: toPersonSummary(person),
+    streak: streak.streak,
+    lastPresentAt: streak.lastPresentAt,
+    lastAbsentAt: streak.lastAbsentAt,
+    status: resolved && row ? row.status : 'open',
+    careTaskId: resolved ? (row?.careTaskId ?? null) : null,
+    resolvedAt: resolved ? (row?.resolvedAt ?? null) : null,
+  };
+};
+
+/**
+ * People absent from at least `threshold` consecutive roster sessions in the caller's scope
+ * (every session with `attendance.view`, the groups they lead otherwise), longest streak first.
+ * Inactive people are left out. The caller's access to the scope is checked by the route.
+ */
+export function listAbsences(
+  db: Queryable,
+  churchId: string,
+  access: AccessLike,
+  query: Pick<AbsenceQuery, 'threshold' | 'groupId' | 'includeResolved' | 'q'>,
+): AbsenceAlert[] {
+  const streaks = [
+    ...absenceStreaks(
+      marksOf(db, churchId, { groupIds: absenceScope(access, query.groupId) }),
+    ).values(),
+  ].filter((streak) => streak.streak >= query.threshold);
+  if (streaks.length === 0) return [];
+  const ids = streaks.map((streak) => streak.personId);
+  const conditions: SQL[] = [
+    eq(people.churchId, churchId),
+    ne(people.membershipStatus, 'inactive'),
+    inArray(people.id, ids),
+  ];
+  if (query.q) {
+    const pattern = likePattern(query.q);
+    const nameMatch = or(like(people.firstName, pattern), like(people.lastName, pattern));
+    if (nameMatch) conditions.push(nameMatch);
+  }
+  const persons = new Map(
+    db
+      .select()
+      .from(people)
+      .where(and(...conditions))
+      .all()
+      .map((row) => [row.id, row]),
+  );
+  const stored = new Map(
+    db
+      .select()
+      .from(absenceAlerts)
+      .where(and(eq(absenceAlerts.churchId, churchId), inArray(absenceAlerts.personId, ids)))
+      .all()
+      .map((row) => [row.personId, row]),
+  );
+  const lastPresent = lastPresentByPerson(db, churchId, ids);
+  return streaks
+    .flatMap((streak) => {
+      const person = persons.get(streak.personId);
+      if (!person) return [];
+      return [
+        toAbsenceAlert(person, streak, stored.get(person.id), lastPresent.get(person.id) ?? null),
+      ];
+    })
+    .filter((alert) => query.includeResolved || alert.status === 'open')
+    .sort(
+      (a, b) =>
+        b.streak - a.streak ||
+        b.lastAbsentAt.localeCompare(a.lastAbsentAt) ||
+        a.person.firstName.localeCompare(b.person.firstName),
+    )
+    .slice(0, INSIGHTS_LIMITS.absenceListMax);
 }
 
 /** A person's attendance history: streaks, counts, the last twelve months and recent sessions. */

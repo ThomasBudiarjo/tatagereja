@@ -2,7 +2,7 @@
 // it is already exported from the package index. See docs/ARCHITECTURE-MODULES.md.
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES, LIMITS } from '../constants';
-import type { LocalizedText } from '../localized';
+import { LOCALES, type LocalizedText } from '../localized';
 import { isModuleEnabled, type ModuleId } from '../modules';
 import { has, hasAll, isLeaderOfAny, type AccessLike, type Permission } from '../permissions';
 import { idSchema, isoDateSchema, isoDateTimeSchema, optionalText } from './common';
@@ -406,6 +406,46 @@ export const ageBandOf = (age: number | null): AgeBand => {
   return '61+';
 };
 
+/** Labels of report series, breakdowns and headline numbers, by key. */
+export const REPORT_TEXT = {
+  new: { en: 'New people', id: 'Jemaat baru' },
+  newMembers: { en: 'New members', id: 'Anggota baru' },
+  total: { en: 'Total', id: 'Total' },
+  status: { en: 'Membership status', id: 'Status keanggotaan' },
+  age: { en: 'Age band', id: 'Kelompok usia' },
+  gender: { en: 'Gender', id: 'Jenis kelamin' },
+  area: { en: 'Area (wilayah/sektor)', id: 'Wilayah / sektor' },
+  noArea: { en: 'No area', id: 'Tanpa wilayah' },
+  household: { en: 'Households', id: 'Keluarga' },
+  inHousehold: { en: 'In a household', id: 'Tercatat dalam keluarga' },
+  noHousehold: { en: 'No household', id: 'Belum tercatat dalam keluarga' },
+  attendance: { en: 'Attendance', id: 'Kehadiran' },
+  sessions: { en: 'Sessions', id: 'Sesi' },
+  tracks: { en: 'Average per service or group', id: 'Rata-rata per ibadah atau kelompok' },
+  churchWide: { en: 'Church-wide', id: 'Seluruh jemaat' },
+  sundaySchool: { en: 'Sunday school', id: 'Sekolah Minggu' },
+  headcount: { en: 'Headcount', id: 'Hitungan jumlah' },
+  visitors: { en: 'New visitors', id: 'Simpatisan baru' },
+  converted: { en: 'Became regular or member', id: 'Menjadi jemaat tetap / anggota' },
+  counted: { en: 'Visitors counted at services', id: 'Tamu terhitung di ibadah' },
+  stages: { en: 'Follow-up stage', id: 'Tahap tindak lanjut' },
+  sources: { en: 'How they found us', id: 'Sumber kedatangan' },
+  unknownSource: { en: 'Not recorded', id: 'Tidak dicatat' },
+  volunteers: { en: 'Volunteers serving', id: 'Pelayan yang bertugas' },
+  assignments: { en: 'Assignments', id: 'Penugasan' },
+  declined: { en: 'Declined', id: 'Ditolak' },
+  teams: { en: 'Volunteers per team', id: 'Pelayan per tim' },
+  offerings: { en: 'Offerings', id: 'Persembahan ibadah' },
+  contributions: { en: 'Tithes and gifts', id: 'Perpuluhan & persembahan khusus' },
+  funds: { en: 'By fund', id: 'Per kas / dana' },
+  categories: { en: 'By category', id: 'Per kategori' },
+  noCategory: { en: 'Uncategorised', id: 'Tanpa kategori' },
+  period: { en: 'Period', id: 'Periode' },
+  value: { en: 'Value', id: 'Nilai' },
+  summary: { en: 'Summary', id: 'Ringkasan' },
+} as const satisfies Record<string, LocalizedText>;
+export type ReportTextKey = keyof typeof REPORT_TEXT;
+
 export const reportQuerySchema = z
   .object({
     from: isoDateSchema,
@@ -413,6 +453,8 @@ export const reportQuerySchema = z
     interval: z.enum(REPORT_INTERVALS).default('month'),
     groupId: idSchema.optional(),
     format: z.enum(['json', 'csv']).default('json'),
+    /** Language of series and category labels (and of the CSV). */
+    locale: z.enum(LOCALES).default('id'),
   })
   .refine((value) => value.to >= value.from, {
     message: 'The end date must be on or after the start date',
@@ -447,6 +489,7 @@ export type ReportSeries = z.infer<typeof reportSeriesSchema>;
 /** A categorical split (by status, age band, team, fund). Keys are stable; labels for display. */
 export const reportBreakdownSchema = z.object({
   key: z.string(),
+  label: z.string(),
   items: z.array(z.object({ key: z.string(), label: z.string(), value: z.number() })),
 });
 export type ReportBreakdown = z.infer<typeof reportBreakdownSchema>;

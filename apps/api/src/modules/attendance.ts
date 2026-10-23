@@ -17,14 +17,12 @@ import {
   personAttendanceParamsSchema,
   resolveAbsenceAlertBodySchema,
   saveAttendanceRecordsBodySchema,
-  type AbsenceAlert,
-  type AccessLike,
   type AttendanceRecord,
   type AttendanceStatus,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, inArray, like, max, ne, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, like, ne, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
-import type { AbsenceAlertRow, AttendanceSessionRow, PersonRow } from '../db/schema';
+import type { AttendanceSessionRow, PersonRow } from '../db/schema';
 import {
   absenceAlerts,
   attendanceRecords,
@@ -44,12 +42,16 @@ import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toPersonSummary } from '../serializers';
 import {
+  absenceScope,
   absenceStreaks,
   attendanceHistory,
   headcountColumns,
   hydrateSessions,
+  lastPresentByPerson,
+  listAbsences,
   marksOf,
-  type AbsenceStreak,
+  stillResolved,
+  toAbsenceAlert,
 } from '../services/attendance';
 import { changes, recordAudit } from '../services/audit';
 import { assertActiveMembers } from '../services/care';
@@ -62,13 +64,6 @@ const SORTS = {
   oldest: [asc(attendanceSessions.sessionAt)],
   title: [asc(attendanceSessions.title), desc(attendanceSessions.sessionAt)],
 } as const;
-
-/** Whether a resolved alert still holds: the person has not been present since it was resolved. */
-const stillResolved = (row: AbsenceAlertRow | undefined, lastPresentAt: string | null) =>
-  !!row &&
-  row.status !== 'open' &&
-  !!row.resolvedAt &&
-  (lastPresentAt === null || lastPresentAt <= row.resolvedAt);
 
 export const attendanceModule = (deps: Deps) => {
   const { db } = deps;
@@ -236,51 +231,6 @@ export const attendanceModule = (deps: Deps) => {
         .where(eq(attendanceSessions.id, session.id))
         .run();
     });
-  };
-
-  /** The groups whose sessions the caller's absence view covers; undefined means every session. */
-  const absenceScope = (access: AccessLike, groupId?: string): string[] | undefined => {
-    if (groupId) return [groupId];
-    return has(access, 'attendance.view') ? undefined : [...access.leaderGroupIds];
-  };
-
-  /** The latest session each person was present at, across every session of the church. */
-  const lastPresentByPerson = (churchId: string, personIds: readonly string[]) => {
-    if (personIds.length === 0) return new Map<string, string>();
-    return new Map(
-      db
-        .select({ personId: attendanceRecords.personId, at: max(attendanceSessions.sessionAt) })
-        .from(attendanceRecords)
-        .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
-        .where(
-          and(
-            eq(attendanceRecords.churchId, churchId),
-            eq(attendanceRecords.status, 'present'),
-            inArray(attendanceRecords.personId, [...personIds]),
-          ),
-        )
-        .groupBy(attendanceRecords.personId)
-        .all()
-        .flatMap((row) => (row.at ? [[row.personId, row.at] as const] : [])),
-    );
-  };
-
-  const toAlert = (
-    person: PersonRow,
-    streak: AbsenceStreak,
-    row: AbsenceAlertRow | undefined,
-    lastPresentAt: string | null,
-  ): AbsenceAlert => {
-    const resolved = stillResolved(row, lastPresentAt);
-    return {
-      person: toPersonSummary(person),
-      streak: streak.streak,
-      lastPresentAt: streak.lastPresentAt,
-      lastAbsentAt: streak.lastAbsentAt,
-      status: resolved && row ? row.status : 'open',
-      careTaskId: resolved ? (row?.careTaskId ?? null) : null,
-      resolvedAt: resolved ? (row?.resolvedAt ?? null) : null,
-    };
   };
 
   return new Elysia({ prefix: '/churches/:churchId/attendance' })
@@ -539,65 +489,7 @@ export const attendanceModule = (deps: Deps) => {
         if (!canViewAbsences(access, query.groupId)) {
           throw forbidden('You cannot view absences');
         }
-        const streaks = [
-          ...absenceStreaks(
-            marksOf(db, church.id, { groupIds: absenceScope(access, query.groupId) }),
-          ).values(),
-        ].filter((streak) => streak.streak >= query.threshold);
-        const ids = streaks.map((streak) => streak.personId);
-        const conditions: SQL[] = [
-          eq(people.churchId, church.id),
-          ne(people.membershipStatus, 'inactive'),
-          inArray(people.id, ids.length > 0 ? ids : ['']),
-        ];
-        if (query.q) {
-          const pattern = likePattern(query.q);
-          const nameMatch = or(like(people.firstName, pattern), like(people.lastName, pattern));
-          if (nameMatch) conditions.push(nameMatch);
-        }
-        const persons = new Map(
-          db
-            .select()
-            .from(people)
-            .where(and(...conditions))
-            .all()
-            .map((row) => [row.id, row]),
-        );
-        const stored = new Map(
-          db
-            .select()
-            .from(absenceAlerts)
-            .where(
-              and(
-                eq(absenceAlerts.churchId, church.id),
-                inArray(absenceAlerts.personId, ids.length > 0 ? ids : ['']),
-              ),
-            )
-            .all()
-            .map((row) => [row.personId, row]),
-        );
-        const lastPresent = lastPresentByPerson(church.id, ids);
-        const items = streaks
-          .flatMap((streak) => {
-            const person = persons.get(streak.personId);
-            if (!person) return [];
-            return [
-              toAlert(
-                person,
-                streak,
-                stored.get(person.id),
-                lastPresent.get(person.id) ?? null,
-              ),
-            ];
-          })
-          .filter((alert) => query.includeResolved || alert.status === 'open')
-          .sort(
-            (a, b) =>
-              b.streak - a.streak ||
-              b.lastAbsentAt.localeCompare(a.lastAbsentAt) ||
-              a.person.firstName.localeCompare(b.person.firstName),
-          )
-          .slice(0, INSIGHTS_LIMITS.absenceListMax);
+        const items = listAbsences(db, church.id, access, query);
         return {
           items,
           threshold: query.threshold,
@@ -621,7 +513,7 @@ export const attendanceModule = (deps: Deps) => {
           .from(absenceAlerts)
           .where(and(eq(absenceAlerts.churchId, church.id), eq(absenceAlerts.personId, person.id)))
           .get();
-        const lastPresentAt = lastPresentByPerson(church.id, [person.id]).get(person.id) ?? null;
+        const lastPresentAt = lastPresentByPerson(db, church.id, [person.id]).get(person.id) ?? null;
         const name = fullName(person);
 
         if (body.action === 'reopen') {
@@ -652,7 +544,7 @@ export const attendanceModule = (deps: Deps) => {
             });
             return updated;
           });
-          return { alert: toAlert(person, streak, row, lastPresentAt) };
+          return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
         }
 
         if (!streak || streak.streak < INSIGHTS_LIMITS.absentStreakMin) {
@@ -744,7 +636,7 @@ export const attendanceModule = (deps: Deps) => {
           }
           return saved;
         });
-        return { alert: toAlert(person, streak, row, lastPresentAt) };
+        return { alert: toAbsenceAlert(person, streak, row, lastPresentAt) };
       },
       {
         church: true,
