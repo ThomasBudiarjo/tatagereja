@@ -239,7 +239,11 @@ export function CareHomePage() {
                     ? t('care.statFollowUpHint', { count: overview.data.visits.followUpNeeded })
                     : undefined
                 }
-                to={`${base}/care/visits`}
+                to={
+                  overview.data.visits.followUpNeeded > 0
+                    ? `${base}/care/visits?followUp=needed`
+                    : `${base}/care/visits`
+                }
               />
             ) : null}
             {diakonia && overview.data.diakonia ? (

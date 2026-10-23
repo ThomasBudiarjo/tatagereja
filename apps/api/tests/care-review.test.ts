@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { visitorFollowUps } from '../src/db/schema';
-import { careAudit, dayOffset, memberWithRole, notificationsOf, type Member } from './care-helpers';
+import {
+  careAudit,
+  dayOffset,
+  memberWithRole,
+  notificationsOf,
+  setCareEnabled,
+  type Member,
+} from './care-helpers';
 import { createTestApp, seedChurch } from './helpers';
 
 /*
@@ -282,6 +289,35 @@ describe('care review', () => {
       const board = await t.request('GET', `${base}/follow-ups`, { token: elder.token });
       const overview = await t.request('GET', `${base}/overview`, { token: elder.token });
       expect(overview.json.followUps).toEqual(board.json.counts);
+    });
+  });
+
+  describe('switched off', () => {
+    it('answers 403 MODULE_DISABLED on every care route, reads and writes', async () => {
+      await setCareEnabled(t, s, false);
+      const id = '00000000-0000-4000-8000-000000000000';
+      const routes: [string, string, Record<string, unknown>?][] = [
+        ['GET', '/status'],
+        ['GET', '/team'],
+        ['GET', '/households'],
+        ['GET', '/follow-ups'],
+        ['GET', '/diakonia'],
+        ['GET', `/cases/${id}/notes`],
+        ['POST', '/cases', { category: 'other', title: 'Mati' }],
+        ['POST', '/visits', { personId: s.alice.id, visitDate: dayOffset(0) }],
+        ['POST', '/prayer-requests', { title: 'Doa', body: 'Doa' }],
+        ['POST', `/prayer-requests/${id}/pray`],
+        ['POST', '/follow-ups', { newVisitor: { firstName: 'Tamu' } }],
+        ['POST', '/tasks', { title: 'Tugas' }],
+        ['POST', '/diakonia', { recipientName: 'X', category: 'food', givenAt: dayOffset(0) }],
+        ['PATCH', `/tasks/${id}/status`, { status: 'done' }],
+      ];
+      for (const [method, path, body] of routes) {
+        const response = await t.request(method, `${base}${path}`, { token: s.owner.token, body });
+        expect(`${method} ${path} ${response.status}`).toBe(`${method} ${path} 403`);
+        expect(response.json.error.code).toBe('MODULE_DISABLED');
+      }
+      await setCareEnabled(t, s, true);
     });
   });
 });

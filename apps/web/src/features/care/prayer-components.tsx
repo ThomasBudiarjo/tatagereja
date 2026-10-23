@@ -361,7 +361,11 @@ export function PrayerCard({
                 id: 'answer',
                 label: request.answeredAt ? t('care.editTestimony') : t('care.markAnswered'),
                 icon: CircleCheckBig,
-                hidden: !request.canManage || !onAnswer || request.moderationStatus === 'rejected',
+                // A declined testimony can be rewritten; a declined request is not answered.
+                hidden:
+                  !request.canManage ||
+                  !onAnswer ||
+                  (request.moderationStatus === 'rejected' && !request.answeredAt),
                 onSelect: () => onAnswer?.(request),
               },
               {

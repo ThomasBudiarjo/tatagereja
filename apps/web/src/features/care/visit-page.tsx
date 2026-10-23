@@ -260,6 +260,14 @@ export function EditVisitPage() {
           message={getErrorMessage(query.error)}
           onRetry={() => void query.refetch()}
         />
+      ) : !query.data.visit.canManage ? (
+        <NoAccessState
+          action={
+            <Button asChild variant="outline">
+              <Link to={`${base}/care/visits/${visitId}`}>{t('common.back')}</Link>
+            </Button>
+          }
+        />
       ) : (
         <VisitForm visit={query.data.visit} />
       )}

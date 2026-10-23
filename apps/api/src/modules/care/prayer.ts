@@ -45,7 +45,7 @@ import { newId } from '../../lib/tokens';
 import { authPlugin } from '../../plugins/auth';
 import { recordAudit, redact } from '../../services/audit';
 import { permissionsByUser } from '../../services/access';
-import { redactedChanges } from '../../services/care';
+import { redactedChanges, sendDueCareReminders } from '../../services/care';
 import { notify } from '../../services/notifications';
 import { hydratePrayerRequests } from './serializers';
 
@@ -152,6 +152,8 @@ export const prayerRouter = (deps: Deps) => {
     .get(
       '/',
       ({ church, access, query }) => {
+        // The prayer wall is the care screen members open most, so reminders go out from here too.
+        sendDueCareReminders(db, church);
         const conditions: SQL[] = [eq(prayerRequests.churchId, church.id)];
         let order: SQL[] = [desc(prayerRequests.createdAt)];
         switch (query.scope) {
