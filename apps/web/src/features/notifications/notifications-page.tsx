@@ -67,13 +67,17 @@ export function NotificationsPage() {
                 variant="outline"
                 onClick={() => markAll.mutate(scopedChurch)}
                 disabled={markAll.isPending}
+                aria-label={t('comms.markAllRead')}
               >
                 <CheckCheck />
                 <span className="hidden sm:inline">{t('comms.markAllRead')}</span>
               </Button>
             ) : null}
-            <Button asChild size="sm" variant="ghost" aria-label={t('comms.notificationSettings')}>
-              <Link to={`${base}/notifications/settings`}>
+            <Button asChild size="sm" variant="ghost">
+              <Link
+                to={`${base}/notifications/settings`}
+                aria-label={t('comms.notificationSettings')}
+              >
                 <Settings2 />
                 <span className="hidden sm:inline">{t('comms.notificationSettings')}</span>
               </Link>

@@ -121,7 +121,7 @@ export function EventPage() {
             </Button>
             {canManage ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={`${base}/events/${event.id}/edit`}>
+                <Link to={`${base}/events/${event.id}/edit`} aria-label={t('common.edit')}>
                   <Pencil />
                   <span className="hidden sm:inline">{t('common.edit')}</span>
                 </Link>
@@ -173,7 +173,7 @@ export function EventPage() {
         {event.coverColor ? (
           <div className="h-1.5" style={{ backgroundColor: event.coverColor }} aria-hidden />
         ) : null}
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <CardContent className="flex items-start gap-4">
           <EventDateTile
             startsAt={event.startsAt}
             color={event.coverColor}

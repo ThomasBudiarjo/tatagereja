@@ -28,6 +28,7 @@ import { MarkdownEditor } from '@/features/comms/markdown';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
+import { cn } from '@/lib/utils';
 import { audienceOptionsQuery, useSaveAnnouncement, type AnnouncementFormInput } from './api';
 import { AUDIENCE_ICONS } from './announcement-lib';
 
@@ -227,21 +228,38 @@ function AnnouncementFormFields({
               control={form.control}
               name="audience"
               render={({ field }) => (
-                <Segmented
+                <div
+                  role="radiogroup"
                   aria-label={t('announcements.audienceTitle')}
-                  value={field.value ?? 'church'}
-                  onChange={(value) => field.onChange(value)}
-                  options={audiences.map((value) => ({
-                    value,
-                    label:
-                      value === 'church'
-                        ? t('announcements.audienceChurch')
-                        : value === 'group'
-                          ? t('announcements.audienceGroup')
-                          : t('announcements.audienceRoles'),
-                    icon: AUDIENCE_ICONS[value],
-                  }))}
-                />
+                  className="grid gap-2 sm:grid-cols-3"
+                >
+                  {audiences.map((value) => {
+                    const Icon = AUDIENCE_ICONS[value];
+                    const selected = (field.value ?? 'church') === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => field.onChange(value)}
+                        className={cn(
+                          'flex min-h-12 items-center gap-2.5 rounded-lg border px-3.5 text-left text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+                          selected
+                            ? 'border-primary/40 bg-accent text-accent-foreground'
+                            : 'hover:bg-muted',
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" aria-hidden />
+                        {value === 'church'
+                          ? t('announcements.audienceChurch')
+                          : value === 'group'
+                            ? t('announcements.audienceGroup')
+                            : t('announcements.audienceRoles')}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             />
           ) : null}
@@ -437,7 +455,7 @@ function AnnouncementFormFields({
         </CardContent>
       </Card>
 
-      <FormActions className="sticky bottom-0 z-10 -mx-4 border-t bg-background/90 px-4 py-3 backdrop-blur safe-bottom sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+      <FormActions>
         <Button type="button" variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>

@@ -7,6 +7,7 @@ import {
 } from '@tatagereja/shared';
 import { CalendarClock, Eye, Pin } from 'lucide-react';
 import { Link } from 'react-router';
+import { useChurch } from '@/components/layout/church-provider';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -34,7 +35,11 @@ export function AnnouncementCard({
   const { t, formatRelative, formatDateTime, formatList, formatNumber } = useI18n();
   const AudienceIcon = AUDIENCE_ICONS[announcement.audience];
   const when = announcement.visibleFrom ?? announcement.createdAt;
-  const unread = !announcement.readByMe && announcement.state === 'published';
+  const { access } = useChurch();
+  const unread =
+    !announcement.readByMe &&
+    announcement.state === 'published' &&
+    announcement.createdBy !== access.userId;
   return (
     <Link
       to={to}
@@ -96,7 +101,8 @@ export function AnnouncementCard({
               {formatRelative(when)}
             </time>
           )}
-          {announcement.seenCount !== null && announcement.state !== 'draft' ? (
+          {announcement.seenCount !== null &&
+          (announcement.state === 'published' || announcement.state === 'expired') ? (
             <span className="inline-flex items-center gap-1">
               <Eye className="size-3.5" aria-hidden />
               {t('announcements.seenBy', {

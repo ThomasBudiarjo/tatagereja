@@ -112,7 +112,10 @@ export function BulletinPage() {
               {canManage ? (
                 <>
                   <Button asChild size="sm" variant="outline">
-                    <Link to={`${base}/bulletins/${bulletin.id}/edit`}>
+                    <Link
+                      to={`${base}/bulletins/${bulletin.id}/edit`}
+                      aria-label={t('common.edit')}
+                    >
                       <Pencil />
                       <span className="hidden sm:inline">{t('common.edit')}</span>
                     </Link>

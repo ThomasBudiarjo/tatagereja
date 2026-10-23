@@ -247,7 +247,7 @@ export const MarkdownEditor = React.forwardRef<HTMLTextAreaElement, EditorProps>
           className,
         )}
       >
-        <div className="flex items-center gap-1 border-b bg-sunken/60 px-1.5 py-1">
+        <div className="flex flex-wrap items-center gap-1 border-b bg-sunken/60 px-1.5 py-1">
           {mode === 'write'
             ? tools.map((tool) => (
                 <Button
@@ -264,7 +264,7 @@ export const MarkdownEditor = React.forwardRef<HTMLTextAreaElement, EditorProps>
                 </Button>
               ))
             : null}
-          <div className="ml-auto w-44">
+          <div className="ml-auto w-40">
             <Segmented
               value={mode}
               onChange={setMode}

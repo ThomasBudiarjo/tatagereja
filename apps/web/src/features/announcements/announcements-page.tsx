@@ -71,9 +71,12 @@ export function AnnouncementsPage() {
 
   const newButton = writer ? (
     <Button asChild size="sm">
-      <Link to={`${base}/announcements/new${state.groupId ? `?groupId=${state.groupId}` : ''}`}>
+      <Link
+        to={`${base}/announcements/new${state.groupId ? `?groupId=${state.groupId}` : ''}`}
+        aria-label={t('announcements.new')}
+      >
         <SquarePen />
-        {t('announcements.new')}
+        <span className="hidden sm:inline">{t('announcements.new')}</span>
       </Link>
     </Button>
   ) : null;

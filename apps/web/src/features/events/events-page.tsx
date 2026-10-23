@@ -91,16 +91,16 @@ export function EventsPage() {
         actions={
           <>
             <Button asChild size="sm" variant="outline">
-              <Link to={`${base}/calendar`}>
+              <Link to={`${base}/calendar`} aria-label={t('events.openCalendar')}>
                 <CalendarRange />
                 <span className="hidden sm:inline">{t('events.openCalendar')}</span>
               </Link>
             </Button>
             {canCreate ? (
               <Button asChild size="sm">
-                <Link to={`${base}/events/new`}>
+                <Link to={`${base}/events/new`} aria-label={t('events.new')}>
                   <CalendarPlus />
-                  {t('events.new')}
+                  <span className="hidden sm:inline">{t('events.new')}</span>
                 </Link>
               </Button>
             ) : null}

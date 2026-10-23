@@ -46,7 +46,13 @@ export function BulletinsPage() {
     }),
   );
   const items = query.data?.items ?? [];
-  const [latest, ...rest] = state.page === 1 && !state.q && !status ? items : [undefined, ...items];
+  // The newest published issue leads; drafts and earlier issues follow.
+  const featured =
+    state.page === 1 && !state.q && !status
+      ? items.find((item) => item.status === 'published')
+      : undefined;
+  const latest = featured;
+  const rest = items.filter((item) => item !== featured);
 
   return (
     <Page>
@@ -58,9 +64,9 @@ export function BulletinsPage() {
         actions={
           manager ? (
             <Button asChild size="sm">
-              <Link to={`${base}/bulletins/new`}>
+              <Link to={`${base}/bulletins/new`} aria-label={t('comms.bulletinNew')}>
                 <FilePlus2 />
-                {t('comms.bulletinNew')}
+                <span className="hidden sm:inline">{t('comms.bulletinNew')}</span>
               </Link>
             </Button>
           ) : null

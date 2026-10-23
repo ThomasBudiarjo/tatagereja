@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
 import { Switch } from '@/components/ui/switch';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
+import { churchToday, fromChurchInput } from '@/features/comms/church-time';
 import { ChurchDateTimeInput } from '@/features/comms/church-time-input';
 import { useCommsResolver, useServerErrors } from '@/features/comms/forms';
 import { MarkdownEditor } from '@/features/comms/markdown';
@@ -70,12 +71,9 @@ const formSchema = z
 type FormInput = z.input<typeof formSchema>;
 type FormOutput = z.output<typeof formSchema>;
 
-const nextEvening = () => {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  date.setHours(18, 0, 0, 0);
-  return date.toISOString();
-};
+/** Tomorrow at 18.00 church time: the usual evening gathering. */
+const nextEvening = (timeZone: string) =>
+  fromChurchInput(`${addDaysToDate(churchToday(timeZone), 1)}T18:00`, timeZone);
 
 const plusMinutes = (iso: string, minutes: number) =>
   new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
@@ -131,9 +129,9 @@ function EventFormFields({
   const selectable = manager
     ? groups
     : groups.filter((group) => access.leaderGroupIds.includes(group.id));
-  const [defaultStart] = useState(nextEvening);
-  const start = event?.startsAt ?? defaultStart;
   const zone = timeZone ?? 'Asia/Jakarta';
+  const [defaultStart] = useState(() => nextEvening(zone));
+  const start = event?.startsAt ?? defaultStart;
 
   const form = useForm<FormInput, unknown, FormOutput>({
     resolver: useCommsResolver(zodResolver(formSchema)),
@@ -591,7 +589,7 @@ function EventFormFields({
         </CardContent>
       </Card>
 
-      <FormActions className="sticky bottom-0 z-10 -mx-4 border-t bg-background/90 px-4 py-3 backdrop-blur safe-bottom sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+      <FormActions>
         <Button type="button" variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>

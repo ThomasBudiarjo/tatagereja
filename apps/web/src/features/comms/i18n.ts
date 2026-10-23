@@ -88,7 +88,7 @@ export const commsDictionary = defineDictionary('comms', {
     bulletinEmptyEditor:
       'Compose this week’s Warta Jemaat from services, rosters, announcements and birthdays.',
     bulletinEmptyMember: 'The weekly Warta Jemaat will appear here.',
-    bulletinLatest: 'This week',
+    bulletinLatest: 'Latest issue',
     bulletinRead: 'Read the bulletin',
     bulletinSections: { one: '{count} section', other: '{count} sections' },
     bulletinMasthead: 'Warta Jemaat',
@@ -243,7 +243,7 @@ export const commsDictionary = defineDictionary('comms', {
     bulletinEmptyEditor:
       'Susun Warta Jemaat minggu ini dari jadwal ibadah, jadwal pelayanan, pengumuman, dan ulang tahun.',
     bulletinEmptyMember: 'Warta Jemaat mingguan akan muncul di sini.',
-    bulletinLatest: 'Minggu ini',
+    bulletinLatest: 'Edisi terbaru',
     bulletinRead: 'Baca warta',
     bulletinSections: '{count} bagian',
     bulletinMasthead: 'Warta Jemaat',

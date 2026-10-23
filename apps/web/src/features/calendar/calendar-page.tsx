@@ -117,7 +117,7 @@ export function CalendarPage() {
         ? `${formatDate(days[0], 'dayMonth')} – ${formatDate(days[1], 'dayMonth')}`
         : `${formatDate(days[0], 'dayMonth')} – ${formatDate(days[1], 'dateShort')}`;
 
-  const dayList = (day: string, compact = false) => {
+  const dayList = (day: string, compact = false, badge = true) => {
     const items = byDay.get(day) ?? [];
     if (items.length === 0) {
       return compact ? null : (
@@ -132,6 +132,7 @@ export function CalendarPage() {
             item={item}
             time={timeLabel(item)}
             compact={compact}
+            badge={badge}
           />
         ))}
       </ul>
@@ -147,13 +148,18 @@ export function CalendarPage() {
         tone="sky"
         actions={
           <>
-            <Button size="sm" variant="outline" onClick={() => setFeedsOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFeedsOpen(true)}
+              aria-label={t('comms.subscribe')}
+            >
               <Rss />
               <span className="hidden sm:inline">{t('comms.subscribe')}</span>
             </Button>
             {can.createAnyEvent(access) ? (
               <Button asChild size="sm">
-                <Link to={`${base}/events/new`}>
+                <Link to={`${base}/events/new`} aria-label={t('comms.newEvent')}>
                   <CalendarPlus />
                   <span className="hidden sm:inline">{t('comms.newEvent')}</span>
                 </Link>
@@ -164,7 +170,8 @@ export function CalendarPage() {
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex items-center gap-2">
+        {/* The month grid has its own month navigation. */}
+        <div className={cn('flex items-center gap-2', view === 'month' && 'hidden')}>
           <Button
             variant="outline"
             size="icon"
@@ -283,7 +290,11 @@ export function CalendarPage() {
             <h3 className="text-overline px-1 text-muted-foreground">
               {formatDate(selectedDay, 'dateLong')}
             </h3>
-            {query.isPending ? <SkeletonList rows={3} avatar={false} /> : dayList(selectedDay)}
+            {query.isPending ? (
+              <SkeletonList rows={3} avatar={false} />
+            ) : (
+              dayList(selectedDay, false, false)
+            )}
           </section>
         </div>
       ) : query.isPending ? (
@@ -298,6 +309,9 @@ export function CalendarPage() {
                 className={cn(
                   'flex min-w-0 flex-col gap-2 rounded-xl border border-border/70 bg-card p-2.5 shadow-soft md:min-h-64',
                   day === today && 'border-primary/40 ring-1 ring-primary/15',
+                  // Free days stay one line on phones, so the week fits on a screen.
+                  !byDay.has(day) &&
+                    'flex-row items-center gap-3 py-1.5 md:flex-col md:items-stretch md:py-2.5',
                 )}
               >
                 <h3 className="flex items-baseline gap-1.5 px-1">
@@ -371,10 +385,12 @@ function CalendarRow({
   item,
   time,
   compact,
+  badge,
 }: {
   item: CalendarItem;
   time: string;
   compact: boolean;
+  badge: boolean;
 }) {
   const { t, locale } = useI18n();
   const Icon = SOURCE_ICONS[item.source];
@@ -406,7 +422,7 @@ function CalendarRow({
           ) : null}
         </span>
       </span>
-      {!compact ? (
+      {!compact && badge ? (
         <span
           data-tone={SOURCE_TONES[item.source]}
           className="hidden shrink-0 items-center gap-1 rounded-full bg-tone-soft px-2 py-0.5 text-[11px] font-semibold text-tone-ink sm:inline-flex"
