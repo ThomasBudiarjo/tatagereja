@@ -36,7 +36,7 @@ export function DeclineDialog({
   open,
   onOpenChange,
 }: {
-  assignment: Pick<RosterAssignment, 'id' | 'positionName'>;
+  assignment: Pick<RosterAssignment, 'id' | 'serviceId' | 'positionName'>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -53,7 +53,11 @@ export function DeclineDialog({
     form,
   });
   const submit = form.handleSubmit(async (values) => {
-    const done = await respond.run({ id: assignment.id, ...values });
+    const done = await respond.run({
+      id: assignment.id,
+      serviceId: assignment.serviceId,
+      ...values,
+    });
     if (done) {
       form.reset();
       onOpenChange(false);
@@ -85,7 +89,14 @@ export function DeclineDialog({
             />
           </Field>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset();
+                onOpenChange(false);
+              }}
+            >
               {t('common.cancel')}
             </Button>
             <Button type="submit" variant="destructive" loading={respond.isPending}>
@@ -104,7 +115,7 @@ export function RespondButtons({
   size = 'sm',
   className,
 }: {
-  assignment: Pick<RosterAssignment, 'id' | 'status' | 'positionName'>;
+  assignment: Pick<RosterAssignment, 'id' | 'serviceId' | 'status' | 'positionName'>;
   size?: 'sm' | 'default';
   className?: string;
 }) {
@@ -121,7 +132,14 @@ export function RespondButtons({
           size={size}
           variant={assignment.status === 'pending' ? 'default' : 'outline'}
           loading={respond.isPending}
-          onClick={() => void respond.run({ id: assignment.id, status: 'accepted', reason: null })}
+          onClick={() =>
+            void respond.run({
+              id: assignment.id,
+              serviceId: assignment.serviceId,
+              status: 'accepted',
+              reason: null,
+            })
+          }
         >
           {!respond.isPending ? <Check /> : null}
           {t('worship.accept')}

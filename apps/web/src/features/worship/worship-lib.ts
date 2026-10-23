@@ -1,7 +1,12 @@
 import {
+  DEFAULT_TIMEZONE,
   LITURGY_ITEM_TYPE_LABELS,
   fullName,
+  isoToLocalTimeIn,
+  localDateOf,
+  localTimeToIsoIn,
   localize,
+  nextCalendarDay,
   type LiturgyItemType,
   type RosterStatus,
   type ServiceStatus,
@@ -124,3 +129,30 @@ export const withMessages =
     }
     return result;
   };
+
+/**
+ * Dates and times in the church time zone, whatever the device's own zone is: the day a
+ * service falls on, today's date and the next Sunday at a given time.
+ */
+export function useChurchTime() {
+  const { church } = useChurch();
+  const timeZone = church.timezone || DEFAULT_TIMEZONE;
+  const today = () => localDateOf(new Date().toISOString(), timeZone);
+  /** Keeps the church day of `iso` (or of the coming Sunday) and moves it to `HH:MM`. */
+  const atTime = (iso: string, time: string) =>
+    localTimeToIsoIn(`${iso ? localDateOf(iso, timeZone) : nextSundayDay()}T${time}`, timeZone);
+  /** The coming Sunday (next week's when today is Sunday). */
+  const nextSundayDay = () => {
+    let day = nextCalendarDay(today());
+    while (new Date(`${day}T00:00:00.000Z`).getUTCDay() !== 0) day = nextCalendarDay(day);
+    return day;
+  };
+  return {
+    timeZone,
+    today,
+    atTime,
+    nextSundayAt: (time = '09:00') => localTimeToIsoIn(`${nextSundayDay()}T${time}`, timeZone),
+    toInput: (iso: string | null | undefined) => (iso ? isoToLocalTimeIn(iso, timeZone) : ''),
+    fromInput: (local: string) => (local ? localTimeToIsoIn(local, timeZone) : ''),
+  };
+}

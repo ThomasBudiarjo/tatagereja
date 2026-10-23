@@ -25,7 +25,7 @@ describe('worship services, liturgy and songs', () => {
 
       const first = await t.request('POST', `${w.base}/setup`, { token: w.planner.token });
       expect(first.status).toBe(200);
-      expect(first.json).toEqual({ serviceTypes: 6, teams: 6 });
+      expect(first.json).toEqual({ serviceTypes: 7, teams: 6 });
       const again = await t.request('POST', `${w.base}/setup`, { token: w.planner.token });
       expect(again.json).toEqual({ serviceTypes: 0, teams: 0 });
 

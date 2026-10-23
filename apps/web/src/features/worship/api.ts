@@ -5,6 +5,8 @@ import {
   rosterAssignmentResponseSchema,
   rosterAssignBodySchema,
   rosterAssignResultSchema,
+  rosterCheckBodySchema,
+  rosterCheckResultSchema,
   rosterSuggestionsSchema,
   saveLiturgyBodySchema,
   serviceTypeInputSchema,
@@ -40,6 +42,8 @@ import {
   type RosterRespondBody,
   type SongListQuery,
   type VolunteerBlockoutListQuery,
+  type WorshipOverview,
+  type WorshipServiceDetail,
   type WorshipServiceListQuery,
 } from '@tatagereja/shared';
 import {
@@ -209,6 +213,9 @@ export const worshipPeopleQuery = (churchId: string, q: string) =>
 // Mutations
 // ---------------------------------------------------------------------------------------------
 
+/** An answer to an assignment; `serviceId` names the service page to update at once. */
+export type RespondVariables = RosterRespondBody & { id: string; serviceId: string };
+
 /** A mutation that refreshes the worship module when it succeeds. */
 function useWorshipMutation<TVariables, TData>(
   churchId: string,
@@ -281,6 +288,18 @@ export const useAssignRoster = (churchId: string, serviceId: string) =>
     }),
   );
 
+/** The conflicts planned assignments would have, to explain a 409 SCHEDULING_CONFLICT. */
+export const checkRoster = (
+  churchId: string,
+  serviceId: string,
+  body: z.input<typeof rosterCheckBodySchema>,
+) =>
+  request(rosterCheckResultSchema, {
+    method: 'POST',
+    url: at(churchId, `/services/${serviceId}/roster/check`),
+    data: rosterCheckBodySchema.parse(body),
+  });
+
 export const useAutoFillRoster = (churchId: string, serviceId: string) =>
   useWorshipMutation(churchId, (body: { teamId?: string }) =>
     request(rosterAssignResultSchema, {
@@ -305,36 +324,45 @@ export const useRemoveAssignment = (churchId: string) =>
   );
 
 /**
- * Accepting or declining shows at once in "My schedule" and on the service; the server answer
- * (with fresh conflicts) replaces it, and a failure puts the old status back.
+ * Accepting or declining shows at once in "My schedule", the module home and on the service;
+ * the server answer (with fresh conflicts) replaces it, and a failure puts the old status back.
  */
 export function useRespondToAssignment(churchId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: RosterRespondBody & { id: string }) =>
+    mutationFn: ({ id, status, reason }: RespondVariables) =>
       request(rosterAssignmentResponseSchema, {
         method: 'POST',
         url: at(churchId, `/roster/${id}/respond`),
-        data: body,
+        data: { status, reason },
       }),
-    onMutate: async ({ id, status, reason }) => {
-      const rollback = await optimistic<MySchedule>(
-        client,
-        worshipKeys.schedule(churchId, 'upcoming'),
-        (old) =>
-          old && {
-            items: old.items.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    status,
-                    declineReason: status === 'declined' ? (reason ?? null) : null,
-                  }
-                : item,
-            ),
-          },
-      );
-      return { rollback };
+    onMutate: async ({ id, serviceId, status, reason }) => {
+      const answer = <T extends { id: string; status: string; declineReason: string | null }>(
+        items: T[],
+      ): T[] =>
+        items.map((item) =>
+          item.id === id
+            ? { ...item, status, declineReason: status === 'declined' ? (reason ?? null) : null }
+            : item,
+        );
+      const rollbacks = await Promise.all([
+        optimistic<MySchedule>(
+          client,
+          worshipKeys.schedule(churchId, 'upcoming'),
+          (old) => old && { items: answer(old.items) },
+        ),
+        optimistic<WorshipOverview>(
+          client,
+          worshipKeys.overview(churchId),
+          (old) => old && { ...old, mySchedule: answer(old.mySchedule) },
+        ),
+        optimistic<WorshipServiceDetail>(
+          client,
+          worshipKeys.service(churchId, serviceId),
+          (old) => old && { ...old, roster: answer(old.roster) },
+        ),
+      ]);
+      return { rollback: () => rollbacks.forEach((rollback) => rollback()) };
     },
     onError: (_error, _variables, context) => context?.rollback(),
     onSettled: () => invalidateWorship(client, churchId),

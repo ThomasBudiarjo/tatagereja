@@ -22,11 +22,12 @@ import {
   TriangleAlert,
   UserRoundX,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ComponentType } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Combobox } from '@/components/ui/combobox';
+import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type { Tone } from '@/components/ui/tone';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -37,6 +38,7 @@ import {
   SERVICE_STATUS_TONES,
   WORSHIP_TONE,
   preacherOf,
+  useChurchTime,
   useDuration,
 } from './worship-lib';
 
@@ -358,6 +360,29 @@ export function PersonSelect({
         label: fullName(person),
         leading: <EntityAvatar name={fullName(person)} src={person.photoUrl} size="xs" />,
       }))}
+    />
+  );
+}
+
+/**
+ * A date and time picker in the church time zone (the zone every service is shown in), so a
+ * planner on a device set to another zone still plans 07:00 church time. Values are ISO.
+ */
+export function ChurchDateTimeInput({
+  value,
+  onChange,
+  ...props
+}: Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'type'> & {
+  value: string;
+  onChange: (iso: string) => void;
+}) {
+  const { toInput, fromInput } = useChurchTime();
+  return (
+    <Input
+      type="datetime-local"
+      value={toInput(value)}
+      onChange={(event) => onChange(fromInput(event.target.value))}
+      {...props}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { canManageServices, has } from '@tatagereja/shared';
+import { canManageServices, fullName, has } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarCheck,
@@ -242,9 +242,7 @@ export function WorshipHomePage() {
                             className="flex min-w-0 flex-col gap-1.5 px-4 py-3 transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
                           >
                             <span className="flex min-w-0 items-center justify-between gap-2">
-                              <span className="truncate font-medium">
-                                {item.person.firstName} {item.person.lastName ?? ''}
-                              </span>
+                              <span className="truncate font-medium">{fullName(item.person)}</span>
                               <RosterStatusBadge status={item.status} />
                             </span>
                             <span className="truncate text-sm text-muted-foreground">

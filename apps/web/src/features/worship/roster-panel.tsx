@@ -1,6 +1,7 @@
 import {
   fullName,
   type RosterAssignment,
+  type RosterCheckResult,
   type ServingPosition,
   type ServingTeam,
   type WorshipServiceDetail,
@@ -31,6 +32,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { cn } from '@/lib/utils';
 import {
+  checkRoster,
   suggestionsQuery,
   teamsQuery,
   useAssignRoster,
@@ -61,7 +63,10 @@ export function RosterPanel({ detail }: { detail: WorshipServiceDetail }) {
     team: ServingTeam;
     position: ServingPosition;
   } | null>(null);
-  const [conflict, setConflict] = useState<{ entries: Entry[]; messages: string[] } | null>(null);
+  const [conflict, setConflict] = useState<{
+    entries: Entry[];
+    items: RosterCheckResult['items'];
+  } | null>(null);
   const [copying, setCopying] = useState(false);
   const open = service.status !== 'cancelled';
   const canScheduleAny = open && schedulableTeamIds.length > 0;
@@ -77,7 +82,16 @@ export function RosterPanel({ detail }: { detail: WorshipServiceDetail }) {
       return true;
     } catch (error) {
       if (isApiClientError(error) && error.code === 'SCHEDULING_CONFLICT') {
-        setConflict({ entries, messages: error.issues.map((issue) => issue.message) });
+        // The server explains conflicts in English; ask for them structured to translate.
+        try {
+          const checked = await checkRoster(churchId, service.id, { assignments: entries });
+          setConflict({
+            entries,
+            items: checked.items.filter((item) => item.conflicts.length > 0),
+          });
+        } catch (checkError) {
+          toast.error(getErrorMessage(checkError));
+        }
       } else {
         toast.error(getErrorMessage(error));
       }
@@ -239,9 +253,14 @@ export function RosterPanel({ detail }: { detail: WorshipServiceDetail }) {
         loading={assignMutation.isPending}
         onConfirm={() => (conflict ? void assign(conflict.entries, true) : undefined)}
       >
-        <ul className="flex flex-col gap-1.5 rounded-lg bg-muted/60 p-3 text-sm">
-          {conflict?.messages.map((message) => (
-            <li key={message}>{message}</li>
+        <ul className="flex flex-col gap-2.5 rounded-lg bg-muted/60 p-3 text-sm">
+          {conflict?.items.map((item) => (
+            <li key={`${item.positionId}:${item.person.id}`} className="flex flex-col gap-1.5">
+              <span className="font-medium">
+                <PersonChip person={item.person} size="xs" />
+              </span>
+              <ConflictBadges conflicts={item.conflicts} />
+            </li>
           ))}
         </ul>
       </ConfirmDialog>
@@ -433,7 +452,12 @@ function AssignmentRow({
               icon: Check,
               hidden: assignment.status === 'accepted',
               onSelect: () =>
-                void respond.run({ id: assignment.id, status: 'accepted', reason: null }),
+                void respond.run({
+                  id: assignment.id,
+                  serviceId: assignment.serviceId,
+                  status: 'accepted',
+                  reason: null,
+                }),
             },
             {
               id: 'decline',

@@ -227,6 +227,7 @@ export function SongPage() {
         title={t('worship.deleteSongTitle', { title: song.title })}
         description={t('worship.deleteSongBody')}
         confirmLabel={t('worship.deleteSong')}
+        confirmText={song.title}
         loading={remove.isPending}
         onConfirm={async () => {
           if (await remove.run(song.id)) {

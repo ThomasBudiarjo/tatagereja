@@ -72,6 +72,7 @@ export const DEFAULT_SERVICE_TYPES: readonly {
   { name: 'Ibadah Remaja', category: 'teens', defaultTime: '09:30' },
   { name: 'Sekolah Minggu', category: 'sunday_school', defaultTime: '07:00' },
   { name: 'Persekutuan Doa', category: 'prayer', defaultTime: '19:00' },
+  { name: 'Ibadah Hari Raya', category: 'holy_day', defaultTime: '09:00' },
 ];
 
 export const SERVICE_STATUSES = ['draft', 'published', 'cancelled'] as const;

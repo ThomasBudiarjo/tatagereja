@@ -1,6 +1,7 @@
 import {
   TEAM_MEMBER_ROLES,
   canManageServices,
+  fullName,
   servingPositionInputSchema,
   servingTeamInputSchema,
   servingTeamMemberInputSchema,
@@ -88,7 +89,8 @@ export function TeamDialog({
   const navigate = useNavigate();
   const form = useForm<TeamForm, unknown, z.output<typeof servingTeamInputSchema>>({
     resolver: zodResolver(servingTeamInputSchema),
-    defaultValues: {
+    // `values` follows the saved team, so cancelling never brings back an older version.
+    values: {
       name: team?.name ?? '',
       description: team?.description ?? '',
       color: team?.color ?? null,
@@ -181,7 +183,14 @@ export function TeamDialog({
             />
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset();
+                onOpenChange(false);
+              }}
+            >
               {t('common.cancel')}
             </Button>
             <Button type="submit" loading={save.isPending}>
@@ -230,7 +239,13 @@ export function PositionDialog({
     }
   });
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) form.reset();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4" noValidate>
           <DialogHeader>
@@ -267,7 +282,14 @@ export function PositionDialog({
             />
           </Field>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset();
+                onOpenChange(false);
+              }}
+            >
               {t('common.cancel')}
             </Button>
             <Button type="submit" loading={save.isPending}>
@@ -331,7 +353,13 @@ export function MemberDialog({
     }
   });
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) form.reset();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <form
           onSubmit={(event) => void submit(event)}
@@ -340,7 +368,9 @@ export function MemberDialog({
         >
           <DialogHeader>
             <DialogTitle>{member ? t('worship.editMember') : t('worship.addMember')}</DialogTitle>
-            <DialogDescription>{team.name}</DialogDescription>
+            <DialogDescription>
+              {member ? `${fullName(member)} · ${team.name}` : team.name}
+            </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-4">
             {member ? null : (
@@ -360,9 +390,7 @@ export function MemberDialog({
                       excludeIds={existingIds}
                       invalid={!!errors.personId}
                       onChange={(personId, person) => {
-                        setPersonName(
-                          person ? `${person.firstName} ${person.lastName ?? ''}`.trim() : null,
-                        );
+                        setPersonName(person ? fullName(person) : null);
                         field.onChange(personId ?? '');
                       }}
                     />
@@ -432,7 +460,14 @@ export function MemberDialog({
             ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset();
+                onOpenChange(false);
+              }}
+            >
               {t('common.cancel')}
             </Button>
             <Button type="submit" loading={add.isPending || update.isPending}>

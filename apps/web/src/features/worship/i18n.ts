@@ -23,7 +23,6 @@ export const worshipDictionary = defineDictionary('worship', {
     pendingReplies: 'Waiting for reply',
     declinedCount: 'Declined',
     songsCount: 'Songs',
-    teamsCount: 'Serving teams',
     myNext: 'Your next assignments',
     needsAttention: 'Needs attention',
     needsAttentionHint: 'Declined or conflicting assignments in the next 4 weeks.',
@@ -33,10 +32,9 @@ export const worshipDictionary = defineDictionary('worship', {
       other: 'You have {count} assignments waiting for your reply.',
     },
     reply: 'Reply',
-    seeSchedule: 'Open my schedule',
     setupTitle: 'Set up worship planning',
     setupBody:
-      'Start with the usual service types (Ibadah Umum, Pemuda, Remaja, Sekolah Minggu, Doa) and serving teams (Pemusik, Singers, Multimedia, Penerima Tamu, Penatua Bertugas, Guru Sekolah Minggu). You can change them later.',
+      'Start with the usual service types (Ibadah Umum, Pemuda, Remaja, Sekolah Minggu, Doa, Hari Raya) and serving teams (Pemusik, Singers, Multimedia, Penerima Tamu, Penatua Bertugas, Guru Sekolah Minggu). You can change them later.',
     setupAction: 'Add suggested types and teams',
     setupDone: 'Added {types} service types and {teams} teams',
     setupNothing: 'The suggested types and teams are already there',
@@ -66,7 +64,6 @@ export const worshipDictionary = defineDictionary('worship', {
     guestPreacher: 'Guest preacher',
     theme: 'Theme',
     readings: 'Scripture readings',
-    location: 'Location',
     notes: 'Notes',
     noTheme: 'No theme yet',
 
@@ -78,15 +75,15 @@ export const worshipDictionary = defineDictionary('worship', {
     fieldServiceType: 'Service type',
     noServiceType: 'No type',
     fieldTitle: 'Title',
-    fieldTitlePlaceholder: 'Ibadah Minggu Adven I',
+    fieldTitlePlaceholder: 'First Sunday of Advent',
     fieldStartsAt: 'Starts',
     fieldEndsAt: 'Ends',
     endsBeforeStart: 'The end must be after the start',
     fieldEndsAtHint: 'Optional. Used to spot volunteers serving twice at the same time.',
     fieldLocation: 'Location',
-    fieldLocationPlaceholder: 'Gedung Gereja',
+    fieldLocationPlaceholder: 'Main sanctuary',
     fieldTheme: 'Theme',
-    fieldThemePlaceholder: 'Bersiaplah menyambut Dia',
+    fieldThemePlaceholder: 'Prepare the way of the Lord',
     fieldReadings: 'Scripture readings',
     readingPlaceholder: 'Yesaya 40:1-11',
     addReading: 'Add a reading',
@@ -94,7 +91,7 @@ export const worshipDictionary = defineDictionary('worship', {
     fieldPreacher: 'Preacher',
     preacherFromChurch: 'From the church',
     preacherGuest: 'Guest',
-    preacherGuestPlaceholder: 'Pdt. Yohanes Siahaan (GKI Pondok Indah)',
+    preacherGuestPlaceholder: 'Rev. Yohanes Siahaan (GKI Pondok Indah)',
     fieldNotes: 'Notes for the team',
     fieldStatus: 'Status',
     statusHelp: 'Drafts are only visible to planners and schedulers.',
@@ -148,7 +145,7 @@ export const worshipDictionary = defineDictionary('worship', {
     itemLeader: 'Led by',
     itemLeaderPerson: 'Person',
     itemLeaderName: 'Or a name',
-    itemLeaderNamePlaceholder: 'Liturgos, Paduan Suara Efrata, …',
+    itemLeaderNamePlaceholder: 'Liturgist, Efrata Choir, …',
     itemNotes: 'Notes',
     saveItem: 'Apply',
     removeItem: 'Remove {title}',
@@ -165,7 +162,7 @@ export const worshipDictionary = defineDictionary('worship', {
     startTime: 'Time',
     leader: 'Leader',
     templateItems:
-      'Votum dan Salam|Nyanyian Pembukaan|Pengakuan Dosa|Berita Anugerah|Pembacaan Alkitab|Khotbah|Pengakuan Iman|Doa Syafaat|Persembahan|Warta Jemaat|Nyanyian Penutup|Berkat',
+      'Votum and Greeting|Opening Hymn|Confession of Sin|Assurance of Pardon|Scripture Reading|Sermon|Confession of Faith|Prayers of Intercession|Offering|Announcements|Closing Hymn|Benediction',
 
     // Roster
     rosterSummary: '{accepted} accepted · {pending} waiting · {declined} declined',
@@ -232,10 +229,9 @@ export const worshipDictionary = defineDictionary('worship', {
     declineTitle: 'Cannot serve?',
     declineBody: 'Tell the scheduler why, so they can find someone else in time.',
     declineReason: 'Reason',
-    declineReasonPlaceholder: 'Ada tugas ke luar kota',
+    declineReasonPlaceholder: 'Out of town for work',
     declineConfirm: 'Send',
     declineReasonRequired: 'Tell the scheduler why you cannot serve',
-    changeAnswer: 'Change answer',
     reasonShown: 'Reason: {reason}',
 
     // My schedule
@@ -253,7 +249,7 @@ export const worshipDictionary = defineDictionary('worship', {
     blockoutFrom: 'From',
     blockoutTo: 'To',
     blockoutReason: 'Reason (optional)',
-    blockoutReasonPlaceholder: 'Mudik Lebaran',
+    blockoutReasonPlaceholder: 'Family visit for Lebaran',
     blockoutAdded: 'Dates saved',
     blockoutEndBeforeStart: 'The last day must be on or after the first day',
     blockoutRemoved: 'Dates removed',
@@ -281,6 +277,7 @@ export const worshipDictionary = defineDictionary('worship', {
     usedTimes: { zero: 'Never sung', one: 'Sung once', other: 'Sung {count}×' },
     lastUsed: 'Last sung {when}',
     restWarning: 'Sung less than {weeks} weeks ago',
+    restWarningNear: 'Also sung at {title} ({date}), less than {weeks} weeks from this service',
     inactive: 'Not in use',
     songFormNew: 'New song',
     songFormEdit: 'Edit song',
@@ -369,7 +366,6 @@ export const worshipDictionary = defineDictionary('worship', {
     noTeamsManage:
       'Create teams such as Pemusik or Penerima Tamu, or start with the suggested ones.',
     noTeamsView: 'Serving teams appear here once they are set up.',
-    upcomingForTeam: 'Coming up for this team',
 
     // Service types
     typesTitle: 'Service types',
@@ -418,17 +414,15 @@ export const worshipDictionary = defineDictionary('worship', {
     pendingReplies: 'Menunggu konfirmasi',
     declinedCount: 'Berhalangan',
     songsCount: 'Lagu',
-    teamsCount: 'Tim pelayanan',
     myNext: 'Jadwal pelayanan Anda berikutnya',
     needsAttention: 'Perlu perhatian',
     needsAttentionHint: 'Pelayan yang berhalangan atau bentrok dalam 4 minggu ke depan.',
     allGood: 'Semua jadwal pelayanan aman',
     pendingBanner: 'Ada {count} jadwal pelayanan yang menunggu konfirmasi Anda.',
     reply: 'Konfirmasi',
-    seeSchedule: 'Buka jadwal saya',
     setupTitle: 'Siapkan perencanaan ibadah',
     setupBody:
-      'Mulai dengan jenis ibadah yang biasa (Ibadah Umum, Pemuda, Remaja, Sekolah Minggu, Persekutuan Doa) dan tim pelayanan (Pemusik, Singers, Multimedia, Penerima Tamu, Penatua Bertugas, Guru Sekolah Minggu). Semuanya bisa diubah nanti.',
+      'Mulai dengan jenis ibadah yang biasa (Ibadah Umum, Pemuda, Remaja, Sekolah Minggu, Persekutuan Doa, Hari Raya) dan tim pelayanan (Pemusik, Singers, Multimedia, Penerima Tamu, Penatua Bertugas, Guru Sekolah Minggu). Semuanya bisa diubah nanti.',
     setupAction: 'Tambahkan jenis ibadah & tim yang disarankan',
     setupDone: '{types} jenis ibadah dan {teams} tim ditambahkan',
     setupNothing: 'Jenis ibadah dan tim yang disarankan sudah ada',
@@ -458,7 +452,6 @@ export const worshipDictionary = defineDictionary('worship', {
     guestPreacher: 'Pengkhotbah tamu',
     theme: 'Tema',
     readings: 'Bacaan Alkitab',
-    location: 'Tempat',
     notes: 'Catatan',
     noTheme: 'Tema belum diisi',
 
@@ -615,7 +608,6 @@ export const worshipDictionary = defineDictionary('worship', {
     declineReasonPlaceholder: 'Ada tugas ke luar kota',
     declineConfirm: 'Kirim',
     declineReasonRequired: 'Tuliskan alasan Anda berhalangan',
-    changeAnswer: 'Ubah jawaban',
     reasonShown: 'Alasan: {reason}',
 
     myTitle: 'Jadwal pelayanan saya',
@@ -662,6 +654,8 @@ export const worshipDictionary = defineDictionary('worship', {
     usedTimes: { zero: 'Belum pernah dinyanyikan', other: 'Dinyanyikan {count}×' },
     lastUsed: 'Terakhir {when}',
     restWarning: 'Dinyanyikan kurang dari {weeks} minggu lalu',
+    restWarningNear:
+      'Juga dinyanyikan di {title} ({date}), kurang dari {weeks} minggu dari ibadah ini',
     inactive: 'Tidak dipakai',
     songFormNew: 'Lagu baru',
     songFormEdit: 'Ubah lagu',
@@ -749,7 +743,6 @@ export const worshipDictionary = defineDictionary('worship', {
     noTeamsManage:
       'Buat tim seperti Pemusik atau Penerima Tamu, atau mulai dari tim yang disarankan.',
     noTeamsView: 'Tim pelayanan muncul di sini setelah disiapkan.',
-    upcomingForTeam: 'Jadwal tim berikutnya',
 
     typesTitle: 'Jenis ibadah',
     typesDescription: 'Macam ibadah yang direncanakan, lengkap dengan waktu dan tempat biasanya.',

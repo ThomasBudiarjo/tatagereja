@@ -65,7 +65,7 @@ import { getErrorMessage, request } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { cn } from '@/lib/utils';
-import { servicesQuery, songsQuery, useSaveLiturgy } from './api';
+import { servicesQuery, songQuery, songsQuery, useSaveLiturgy } from './api';
 import { PersonSelect } from './worship-ui';
 import {
   LITURGY_TYPE_STYLE,
@@ -315,7 +315,12 @@ export function LiturgyEditor({
         </p>
         {canManage ? (
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setCopying(true)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('worship.copyLiturgy')}
+              onClick={() => setCopying(true)}
+            >
               <Copy />
               <span className="hidden sm:inline">{t('worship.copyLiturgy')}</span>
             </Button>
@@ -543,13 +548,14 @@ function ItemFormBody({
   onCancel: () => void;
   onApply: (item: Draft) => void;
 }) {
-  const { t, formatRelative } = useI18n();
+  const { churchId } = useChurch();
+  const { t, formatDate } = useI18n();
   const typeLabel = useLiturgyTypeLabel();
-  const [song, setSong] = useState<Pick<Song, 'id' | 'title' | 'lastUsedAt'> | null>(
-    item?.songId
-      ? { id: item.songId, title: item.songTitle ?? item.title, lastUsedAt: null }
-      : null,
+  const [song, setSong] = useState<Pick<Song, 'id' | 'title'> | null>(
+    item?.songId ? { id: item.songId, title: item.songTitle ?? item.title } : null,
   );
+  // The song's other services (before or after this one) tell whether it repeats too soon.
+  const history = useQuery({ ...songQuery(churchId, song?.id ?? ''), enabled: !!song });
   const [person, setPerson] = useState<PersonSummary | null>(item?.person ?? null);
   const form = useForm<ItemForm, unknown, z.output<typeof liturgyItemInputSchema>>({
     resolver: zodResolver(liturgyItemInputSchema),
@@ -584,7 +590,7 @@ function ItemFormBody({
     });
   });
 
-  const recent = song?.lastUsedAt ? songRecentlyUsed(song.lastUsedAt, service.startsAt) : false;
+  const near = song && history.data ? nearestOtherUse(history.data.usage, service) : null;
 
   return (
     <form
@@ -654,17 +660,14 @@ function ItemFormBody({
                 </Field>
               )}
             />
-            {song ? (
-              recent ? (
-                <StatusBadge
-                  tone="warning"
-                  icon={TriangleAlert}
-                  className="-mt-2 whitespace-normal"
-                >
-                  {t('worship.restWarning', { weeks: SONG_REST_WEEKS })} ·{' '}
-                  {formatRelative(song.lastUsedAt)}
-                </StatusBadge>
-              ) : null
+            {near ? (
+              <StatusBadge tone="warning" icon={TriangleAlert} className="-mt-2 whitespace-normal">
+                {t('worship.restWarningNear', {
+                  weeks: SONG_REST_WEEKS,
+                  title: near.title,
+                  date: formatDate(near.startsAt, 'dayMonth'),
+                })}
+              </StatusBadge>
             ) : null}
           </>
         ) : null}
@@ -732,6 +735,22 @@ function ItemFormBody({
     </form>
   );
 }
+
+/** The closest other service using a song within the rest weeks of this one, if any. */
+const nearestOtherUse = (
+  usage: readonly { serviceId: string; title: string; startsAt: string }[],
+  service: Pick<WorshipService, 'id' | 'startsAt'>,
+) => {
+  const at = new Date(service.startsAt).getTime();
+  const gap = (item: { startsAt: string }) => Math.abs(new Date(item.startsAt).getTime() - at);
+  return (
+    usage
+      .filter(
+        (item) => item.serviceId !== service.id && gap(item) < SONG_REST_WEEKS * 7 * 86_400_000,
+      )
+      .sort((a, b) => gap(a) - gap(b))[0] ?? null
+  );
+};
 
 /** Songs from the library, searched on the server, with hymnal number and last use. */
 export function SongSelect({

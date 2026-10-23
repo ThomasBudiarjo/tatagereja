@@ -63,7 +63,9 @@ export function ServicePage() {
     success: (result) =>
       result.service.status === 'cancelled'
         ? t('worship.serviceCancelled')
-        : t('worship.published'),
+        : query.data?.service.status === 'cancelled'
+          ? t('worship.serviceRestored')
+          : t('worship.published'),
   });
   const remove = useMutationToast(useDeleteService(churchId), {
     success: t('worship.serviceDeleted'),

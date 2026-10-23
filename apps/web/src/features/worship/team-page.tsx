@@ -101,7 +101,12 @@ export function TeamPage() {
         actions={
           planner ? (
             <>
-              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label={t('worship.editTeam')}
+                onClick={() => setEditing(true)}
+              >
                 <Pencil />
                 <span className="hidden sm:inline">{t('common.edit')}</span>
               </Button>

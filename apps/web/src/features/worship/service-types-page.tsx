@@ -153,6 +153,7 @@ export function ServiceTypesPage() {
         title={t('worship.deleteTypeTitle', { name: deleting?.name ?? '' })}
         description={t('worship.deleteTypeBody')}
         confirmLabel={t('common.delete')}
+        confirmText={deleting?.name}
         loading={remove.isPending}
         onConfirm={async () => {
           if (deleting && (await remove.run(deleting.id))) setDeleting(null);
@@ -197,7 +198,13 @@ function TypeDialog({
     if (await save.run({ ...values, id: type?.id })) onOpenChange(false);
   });
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) form.reset();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <form
           onSubmit={(event) => void submit(event)}
@@ -297,7 +304,14 @@ function TypeDialog({
             />
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset();
+                onOpenChange(false);
+              }}
+            >
               {t('common.cancel')}
             </Button>
             <Button type="submit" loading={save.isPending}>

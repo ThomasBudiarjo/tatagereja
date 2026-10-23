@@ -18,7 +18,6 @@ import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Field, FormActions } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { Alert, Segmented } from '@/components/ui/misc';
@@ -30,28 +29,11 @@ import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { serviceQuery, serviceTypesQuery, useSaveService } from './api';
-import { PersonSelect } from './worship-ui';
-import { WORSHIP_TONE, withMessages } from './worship-lib';
+import { ChurchDateTimeInput, PersonSelect } from './worship-ui';
+import { WORSHIP_TONE, useChurchTime, withMessages } from './worship-lib';
 
 type FormInput = z.input<typeof worshipServiceInputSchema>;
 type FormOutput = z.output<typeof worshipServiceInputSchema>;
-
-/** The coming Sunday (or next week's when today is Sunday) at the given local time. */
-const nextSundayAt = (time = '09:00') => {
-  const date = new Date();
-  date.setDate(date.getDate() + (7 - date.getDay() || 7));
-  const [hours = 9, minutes = 0] = time.split(':').map(Number);
-  date.setHours(hours, minutes, 0, 0);
-  return date.toISOString();
-};
-
-/** Keeps the day of `iso` and moves it to a local `HH:MM`. */
-const atTime = (iso: string, time: string) => {
-  const date = iso ? new Date(iso) : new Date(nextSundayAt());
-  const [hours = 9, minutes = 0] = time.split(':').map(Number);
-  date.setHours(hours, minutes, 0, 0);
-  return date.toISOString();
-};
 
 const plusMinutes = (iso: string, minutes: number) =>
   new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
@@ -133,6 +115,7 @@ function ServiceForm({ service, types }: { service?: WorshipService; types: Serv
   const { churchId, base } = useChurch();
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const { nextSundayAt, atTime } = useChurchTime();
   const active = types.filter((type) => type.isActive || type.id === service?.serviceTypeId);
   const [preacherMode, setPreacherMode] = useState<'church' | 'guest'>(
     service?.preacherName ? 'guest' : 'church',
@@ -267,7 +250,7 @@ function ServiceForm({ service, types }: { service?: WorshipService; types: Serv
                   error={errors.startsAt?.message}
                   required
                 >
-                  <DateTimeInput
+                  <ChurchDateTimeInput
                     id="service-starts"
                     value={field.value}
                     onChange={field.onChange}
@@ -286,7 +269,7 @@ function ServiceForm({ service, types }: { service?: WorshipService; types: Serv
                   error={errors.endsAt?.message}
                   description={t('worship.fieldEndsAtHint')}
                 >
-                  <DateTimeInput
+                  <ChurchDateTimeInput
                     id="service-ends"
                     value={field.value ?? ''}
                     onChange={field.onChange}
