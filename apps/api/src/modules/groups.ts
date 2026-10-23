@@ -4,6 +4,7 @@ import {
   addGroupMembersBodySchema,
   applyPersonPrivacy,
   can,
+  canAddGroupMember,
   canDecideJoinRequests,
   canRequestToJoinGroup,
   canSeeGroup,
@@ -281,7 +282,7 @@ export const groupsModule = (deps: Deps) => {
     group: GroupRow,
     personIds: string[],
     { notifyAdded = true } = {},
-  ): void => {
+  ): string[] => {
     const existing = new Set(
       tx
         .select({ personId: groupMembers.personId })
@@ -291,7 +292,7 @@ export const groupsModule = (deps: Deps) => {
         .map((row) => row.personId),
     );
     const added = personIds.filter((id) => !existing.has(id));
-    if (added.length === 0) return;
+    if (added.length === 0) return [];
     if (group.capacity !== null && existing.size + added.length > group.capacity) {
       throw conflict(`This group is full (${group.capacity} places)`);
     }
@@ -336,6 +337,7 @@ export const groupsModule = (deps: Deps) => {
         entityId: group.id,
       });
     }
+    return added;
   };
 
   const pageOf = (access: AccessLike, group: GroupRow): GroupPage => {
@@ -645,34 +647,87 @@ export const groupsModule = (deps: Deps) => {
     )
     .post(
       '/:id/members',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.manageGroup(access, group.id)) throw forbidden('You cannot manage this group');
         const personIds = [...new Set(body.personIds)];
         const found = db
-          .select({ id: people.id })
+          .select({ id: people.id, firstName: people.firstName, lastName: people.lastName })
           .from(people)
           .where(and(eq(people.churchId, church.id), inArray(people.id, personIds)))
           .all();
         if (found.length !== personIds.length) throw notFound('One or more people');
-        db.transaction((tx) => addMembers(tx, access, group, personIds));
+        const requested = new Set(
+          db
+            .select({ personId: groupJoinRequests.personId })
+            .from(groupJoinRequests)
+            .where(
+              and(
+                eq(groupJoinRequests.groupId, group.id),
+                eq(groupJoinRequests.status, 'pending'),
+                inArray(groupJoinRequests.personId, personIds),
+              ),
+            )
+            .all()
+            .map((row) => row.personId),
+        );
+        if (
+          found.some(
+            (person) =>
+              !canAddGroupMember(access, group.id, { requestedToJoin: requested.has(person.id) }),
+          )
+        ) {
+          throw forbidden('Leaders add people who asked to join or who are in the directory');
+        }
+        db.transaction((tx) => {
+          const added = addMembers(tx, access, group, personIds);
+          if (added.length === 0) return;
+          const names = found.filter((person) => added.includes(person.id)).map(fullName);
+          recordAudit(tx, audit, {
+            module: 'people',
+            action: 'group.members_add',
+            entityType: 'group',
+            entityId: group.id,
+            summary: `Added ${names.join(', ')} to ${group.name}`.slice(0, LIMITS.auditSummaryMax),
+            params: {
+              name: group.name,
+              members: names.slice(0, 10).join(', '),
+              count: names.length,
+              asLeader: !has(access, 'groups.manage'),
+            },
+            after: { personIds: added, requested: added.filter((id) => requested.has(id)) },
+          });
+        });
         return { group: hydrateOne(access, group) };
       },
       { church: 'people', params: churchIdParamsSchema, body: addGroupMembersBodySchema },
     )
     .delete(
       '/:id/members/:personId',
-      ({ church, access, params }) => {
+      ({ church, access, audit, params }) => {
         const group = loadGroup(church.id, params.id);
         if (!can.manageGroup(access, group.id)) throw forbidden('You cannot manage this group');
-        const deleted = db
-          .delete(groupMembers)
-          .where(
-            and(eq(groupMembers.groupId, group.id), eq(groupMembers.personId, params.personId)),
-          )
-          .returning({ id: groupMembers.id })
-          .get();
-        if (!deleted) throw notFound('Group member');
+        db.transaction((tx) => {
+          const deleted = tx
+            .delete(groupMembers)
+            .where(
+              and(eq(groupMembers.groupId, group.id), eq(groupMembers.personId, params.personId)),
+            )
+            .returning({ id: groupMembers.id })
+            .get();
+          if (!deleted) throw notFound('Group member');
+          const person = tx.select().from(people).where(eq(people.id, params.personId)).get();
+          const name = person ? fullName(person) : 'a member';
+          recordAudit(tx, audit, {
+            module: 'people',
+            action: 'group.member_remove',
+            entityType: 'group',
+            entityId: group.id,
+            summary: `Removed ${name} from ${group.name}`,
+            params: { name: group.name, person: name, asLeader: !has(access, 'groups.manage') },
+            before: { personId: params.personId },
+          });
+        });
         return { ok: true as const };
       },
       { church: 'people', params: memberParamsSchema },

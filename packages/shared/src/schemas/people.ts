@@ -1086,6 +1086,20 @@ export const canRequestToJoinGroup = (
   group.joinPolicy === 'request' &&
   state === 'none';
 
+/**
+ * Who a caller may add to a group. `groups.manage` adds anyone in the directory. A leader of
+ * the group adds people who asked to join it, or people already in the directory when they may
+ * browse it (`people.view`); leaders never create people this way, and every add is audited.
+ */
+export const canAddGroupMember = (
+  access: AccessLike,
+  groupId: string,
+  person: { requestedToJoin: boolean },
+): boolean =>
+  has(access, 'groups.manage') ||
+  (access.leaderGroupIds.includes(groupId) &&
+    (person.requestedToJoin || has(access, 'people.view')));
+
 /** Leaders of the group and holders of `groups.manage` decide on join requests. */
 export const canDecideJoinRequests = (access: AccessLike, groupId: string): boolean =>
   has(access, 'groups.manage') || access.leaderGroupIds.includes(groupId);
