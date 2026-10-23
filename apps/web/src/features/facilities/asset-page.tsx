@@ -361,7 +361,7 @@ export function AssetPage() {
                             onClick={() => setRemovingEntry(entry.id)}
                             className="font-medium text-destructive underline-offset-2 hover:underline"
                           >
-                            {t('common.remove')}
+                            {t('common.delete')}
                           </button>
                         ) : null}
                       </p>
@@ -428,7 +428,7 @@ export function AssetPage() {
         }}
         title={t('facilities.deleteMaintenanceTitle')}
         description={t('facilities.deleteMaintenanceBody')}
-        confirmLabel={t('common.remove')}
+        confirmLabel={t('common.delete')}
         loading={removeEntry.isPending}
         onConfirm={async () => {
           if (removingEntry && (await removeEntry.run(removingEntry))) setRemovingEntry(null);

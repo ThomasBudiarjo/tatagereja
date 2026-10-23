@@ -238,29 +238,40 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
       <Card>
         <CardContent>
           <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4" noValidate>
-            <Field
-              label={t('facilities.fieldResource')}
-              htmlFor="booking-resource"
-              error={errors.resourceId ? t('facilities.chooseRoom') : undefined}
-              required
-            >
-              <Select
-                id="booking-resource"
-                aria-invalid={!!errors.resourceId}
-                disabled={resources.isPending}
-                {...form.register('resourceId')}
-              >
-                <option value="">{t('facilities.chooseRoom')}</option>
-                {(resources.data?.items ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                    {item.capacity
-                      ? ` · ${t('facilities.capacityValue', { count: item.capacity })}`
-                      : ''}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {/* Controlled, so a room passed in the link shows once the list has loaded. */}
+            <Controller
+              control={form.control}
+              name="resourceId"
+              render={({ field }) => (
+                <Field
+                  label={t('facilities.fieldResource')}
+                  htmlFor="booking-resource"
+                  error={errors.resourceId ? t('facilities.chooseRoom') : undefined}
+                  required
+                >
+                  <Select
+                    id="booking-resource"
+                    ref={field.ref}
+                    name={field.name}
+                    aria-invalid={!!errors.resourceId}
+                    disabled={resources.isPending}
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                  >
+                    <option value="">{t('facilities.chooseRoom')}</option>
+                    {(resources.data?.items ?? []).map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                        {item.capacity
+                          ? ` · ${t('facilities.capacityValue', { count: item.capacity })}`
+                          : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            />
             <Field
               label={t('facilities.fieldTitle')}
               htmlFor="booking-title"
