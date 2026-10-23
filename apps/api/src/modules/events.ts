@@ -686,12 +686,17 @@ export const eventsModule = (deps: Deps) => {
             ...changes(snapshot(event), snapshot(row)),
           });
           if (shift !== 0 || row.location !== event.location) {
+            // People who signed up for a later occurrence hear about it too.
+            const recipients = [
+              ...new Set(targets.flatMap((target) => attendeeUserIds(tx, target))),
+            ];
             notifyAttendees(
               tx,
               church,
               row,
               auth.user.id,
               `Jadwal berubah: ${eventWhen(row, church.timezone)}${row.location ? ` · ${row.location}` : ''}${future && targets.length > 1 ? ' (juga pertemuan berikutnya)' : ''}`,
+              recipients,
             );
           }
           return row;
@@ -1102,8 +1107,8 @@ export const eventsModule = (deps: Deps) => {
             entityType: 'event',
             entityId: event.id,
           });
-          if (registration.status === 'registered')
-            promoteWaitlist(tx, church, event, auth.user.id);
+          // A freed place, or a large party leaving the head of the waitlist, lets others move up.
+          promoteWaitlist(tx, church, event, auth.user.id);
         });
         const item = hydrateRegistrations(db, event.id).find((row) => row.id === registration.id);
         if (!item) throw notFound('Registration');

@@ -45,6 +45,7 @@ import {
   servingTeams,
   worshipServices,
 } from '../../db/schema';
+import { nowIso } from '../../lib/time';
 import { enabledModulesOf, moduleEnabled } from '../../services/modules';
 
 const ITEMS_MAX = 30;
@@ -89,8 +90,12 @@ const pick = <T extends { id: string }>(rows: T[], itemIds: readonly string[]): 
   });
 };
 
-/** Church-wide announcements live during the week: the only ones a bulletin may carry. */
-function weekAnnouncements(db: Queryable, church: ChurchRow, week: Week) {
+/**
+ * Church-wide announcements live during the week: the only ones a bulletin may carry. Readers
+ * only get those already released (`releasedBy` now), so a scheduled post is never shown early.
+ */
+function weekAnnouncements(db: Queryable, church: ChurchRow, week: Week, releasedBy?: string) {
+  const until = releasedBy && releasedBy < week.toInstant ? releasedBy : week.toInstant;
   return db
     .select()
     .from(announcements)
@@ -99,7 +104,7 @@ function weekAnnouncements(db: Queryable, church: ChurchRow, week: Week) {
         eq(announcements.churchId, church.id),
         eq(announcements.status, 'published'),
         eq(announcements.audience, 'church'),
-        or(isNull(announcements.publishAt), lt(announcements.publishAt, week.toInstant)),
+        or(isNull(announcements.publishAt), lt(announcements.publishAt, until)),
         or(isNull(announcements.expiresAt), gt(announcements.expiresAt, week.fromInstant)),
       ),
     )
@@ -363,13 +368,14 @@ export function renderBulletin(
         return [
           {
             ...rendered,
-            items: pick(weekAnnouncements(db, church, week), section.itemIds).map((entry) =>
-              item({
-                id: entry.id,
-                title: entry.title,
-                body: entry.body,
-                startsAt: entry.publishAt ?? entry.publishedAt,
-              }),
+            items: pick(weekAnnouncements(db, church, week, nowIso()), section.itemIds).map(
+              (entry) =>
+                item({
+                  id: entry.id,
+                  title: entry.title,
+                  body: entry.body,
+                  startsAt: entry.publishAt ?? entry.publishedAt,
+                }),
             ),
           },
         ];

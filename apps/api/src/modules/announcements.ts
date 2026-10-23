@@ -1,5 +1,6 @@
 import {
   announcementDetailsInputSchema,
+  announcementStateOf,
   announcementDetailsListQuerySchema,
   can,
   canTargetChurchWide,
@@ -331,17 +332,29 @@ export const announcementsModule = (deps: Deps) => {
     )
     .put(
       '/:id/pin',
-      ({ church, access, params, body }) => {
+      ({ church, access, audit, params, body }) => {
         const row = loadAnnouncement(church.id, params.id);
         if (!can.manageAnnouncement(access, row))
           throw forbidden('You cannot pin this announcement');
-        const updated = db
-          .update(announcements)
-          .set({ pinnedAt: body.pinned ? (row.pinnedAt ?? nowIso()) : null, updatedAt: nowIso() })
-          .where(eq(announcements.id, row.id))
-          .returning()
-          .get();
-        if (!updated) throw notFound('Announcement');
+        const updated = db.transaction((tx) => {
+          const next = tx
+            .update(announcements)
+            .set({ pinnedAt: body.pinned ? (row.pinnedAt ?? nowIso()) : null, updatedAt: nowIso() })
+            .where(eq(announcements.id, row.id))
+            .returning()
+            .get();
+          if (!next) throw notFound('Announcement');
+          if ((row.pinnedAt !== null) !== body.pinned) {
+            recordAudit(tx, audit, {
+              module: 'comms',
+              action: body.pinned ? 'announcement.pin' : 'announcement.unpin',
+              entityType: 'announcement',
+              entityId: row.id,
+              summary: `${body.pinned ? 'Pinned' : 'Unpinned'} the announcement ${row.title}`,
+            });
+          }
+          return next;
+        });
         return { announcement: hydrateOne(updated, access) };
       },
       { church: true, params: churchIdParamsSchema, body: pinAnnouncementBodySchema },
@@ -350,7 +363,8 @@ export const announcementsModule = (deps: Deps) => {
       '/:id/read',
       ({ church, access, params }) => {
         const row = loadVisible(church, access, params.id);
-        if (row.status === 'published') {
+        // Managers can open scheduled and expired posts; only a live post counts as read.
+        if (announcementStateOf(row) === 'published') {
           db.insert(announcementReads)
             .values({
               announcementId: row.id,

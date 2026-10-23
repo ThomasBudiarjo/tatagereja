@@ -1,4 +1,4 @@
-import { can, churchParamsSchema, fullName } from '@tatagereja/shared';
+import { churchParamsSchema, fullName } from '@tatagereja/shared';
 import { and, asc, count, desc, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import {
@@ -13,7 +13,10 @@ import {
 import type { Deps } from '../deps';
 import { nowIso } from '../lib/time';
 import { authPlugin } from '../plugins/auth';
-import { hydrateAnnouncements } from '../services/announcements';
+import {
+  announcementVisibility as announcementVisibilityFor,
+  hydrateAnnouncements,
+} from '../services/announcements';
 import { hydrateEvents } from '../services/events';
 
 export const dashboardModule = (deps: Deps) => {
@@ -56,9 +59,11 @@ export const dashboardModule = (deps: Deps) => {
         db.select().from(events).where(upcomingWhere).orderBy(asc(events.startsAt)).limit(5).all(),
       );
 
-      const announcementVisibility = can.viewAllAnnouncementDrafts(access)
-        ? eq(announcements.churchId, church.id)
-        : and(eq(announcements.churchId, church.id), eq(announcements.status, 'published'));
+      // Audience, schedule and expiry rules of the announcements list apply here too.
+      const announcementVisibility = and(
+        eq(announcements.churchId, church.id),
+        announcementVisibilityFor(db, church.id, access, now),
+      );
       const recentAnnouncements = hydrateAnnouncements(
         db,
         db
