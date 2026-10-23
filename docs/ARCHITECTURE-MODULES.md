@@ -262,7 +262,9 @@ parallel, so migration numbers and the journal will clash when branches are inte
 happens, keep the other branch's migrations, delete your own generated migration and snapshot,
 and run `bun run db:generate` again on top: your schema files are unchanged, so the new migration
 contains exactly your tables. Data backfills that SQL cannot express are written in code and must
-be idempotent (see `seedRoleTemplates`).
+be idempotent (see `seedRoleTemplates`). A column that copies a value from another table for speed (such as
+`attendance_records.session_at`) is backfilled in `backfillCopiedColumns` (`db/client.ts`) for
+the same reason: migrations may be regenerated, code is not.
 
 ## API modules
 
@@ -450,6 +452,21 @@ enforceRateLimit(deps.limiters, 'checkin.checkout', `${church.id}:${ip}`, {
 
 Limiters are created on first use and shared by the process. Tests that exercise a limit can
 register a strict limiter under the same name in `createTestApp(..., { limiters })`.
+
+### Performance
+
+Modules are measured against a large church (`scripts/seed-large.ts`, `scripts/bench-api.ts`);
+[PERFORMANCE.md](./PERFORMANCE.md) has the numbers and the rules. In short:
+
+- Count, sum and group in SQL, over an index that covers the query (`EXPLAIN QUERY PLAN`).
+- Hydrate a page with one query per related table (`inArray`); never query inside a loop over rows.
+- Every list has a maximum (`LIMITS.pageSizeMax`, `LIMITS.listMax`); tables that grow without
+  bound page with a cursor (`lib/cursor.ts`: `decodeCursor`, `afterCursor`, `keysetPage`).
+- Expensive read-only results (reports, overviews) go through
+  `cachedReport(deps, { churchId, userId, limiter }, key, compute)` from
+  `services/report-cache.ts`. The key names every input, including the caller's scope. Writes
+  need nothing: every mutating request under `/api/churches/:churchId` drops the church's entries.
+- Create date formatters with `dateTimeFormat()` from the shared package, not `new Intl.DateTimeFormat`.
 
 ### Security checklist
 

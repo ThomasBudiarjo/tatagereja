@@ -139,6 +139,20 @@ public registration. Dates are relative to today in the church time zone (Asia/J
 Each module also has a smaller seed for reviewing its own screens in
 `apps/api/src/modules/<id>/scripts/seed-demo.ts`.
 
+## Performance
+
+`scripts/seed-large.ts` writes a large church (8,000 people, two years of weekly attendance,
+~50k ledger entries, 50k audit rows and more) into a SQLite file in about twenty seconds, and
+`scripts/bench-api.ts` measures the latency of the most used endpoints against a running server:
+
+```sh
+bun scripts/seed-large.ts --db /tmp/large.db --reset
+PORT=3202 DATABASE_PATH=/tmp/large.db bun run start
+bun scripts/bench-api.ts --port 3202
+```
+
+The results, and what keeps the API fast, are in [docs/PERFORMANCE.md](./docs/PERFORMANCE.md).
+
 ## Screenshots
 
 `scripts/screenshots.ts` signs in to a running server with Playwright and captures each route at
