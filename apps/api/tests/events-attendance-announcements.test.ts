@@ -261,8 +261,8 @@ describe('events, attendance, announcements and dashboard', () => {
     const mine = await t.request('GET', `/api/churches/${s.church.id}/attendance/me`, {
       token: s.member.token,
     });
-    expect(mine.json.items).toHaveLength(1);
-    expect(mine.json.items[0].status).toBe('present');
+    expect(mine.json.history.items).toHaveLength(1);
+    expect(mine.json.history.items[0].status).toBe('present');
     const personHistory = await t.request(
       'GET',
       `/api/churches/${s.church.id}/people/${s.memberPerson.id}/attendance`,
@@ -408,7 +408,9 @@ describe('events, attendance, announcements and dashboard', () => {
     expect(dashboard.json.stats.upcomingEvents).toBe(2);
     expect(dashboard.json.upcomingEvents).toHaveLength(2);
     expect(
-      dashboard.json.recentAnnouncements.every((a: { status: string }) => a.status === 'published'),
+      dashboard.json.announcements.latest.every(
+        (a: { status: string }) => a.status === 'published',
+      ),
     ).toBe(true);
     const leaderDashboard = await t.request('GET', `/api/churches/${s.church.id}/dashboard`, {
       token: s.leader.token,
