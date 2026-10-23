@@ -10,6 +10,7 @@ import {
   isoDateTimeSchema,
   moneySchema,
   optionalDate,
+  optionalEmail,
   optionalText,
   paginatedSchema,
   paginationQuerySchema,
@@ -162,6 +163,22 @@ export const DIAKONIA_FORM_LABELS: Record<DiakoniaForm, LocalizedText> = {
 // Access rules
 // ---------------------------------------------------------------------------------------------
 
+/** The care team: anyone who may see normal care cases, visits and follow-ups. */
+export const CARE_TEAM_PERMISSIONS = ['care.view', 'care.manage', 'care.confidential'] as const;
+
+export const isCareTeam = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  hasAny(access, CARE_TEAM_PERMISSIONS);
+
+/** Prayer moderators approve requests before the whole church sees them. */
+export const canModeratePrayer = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  hasAny(access, ['prayer.moderate', 'care.manage']);
+
+export const canViewDiakonia = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  hasAny(access, ['diakonia.view', 'diakonia.manage']);
+
+export const canManageDiakonia = (access: Pick<AccessLike, 'permissions'>): boolean =>
+  has(access, 'diakonia.manage');
+
 /**
  * Who may open a care case and read its notes. Confidential cases are limited to their assigned
  * caregivers and `care.confidential` holders; administrators get no exception.
@@ -173,10 +190,10 @@ export const canReadCareCase = (
 ): boolean => {
   if (caregiverUserIds.includes(access.userId)) return true;
   if (careCase.confidentiality === 'confidential') return has(access, 'care.confidential');
-  return hasAny(access, ['care.view', 'care.manage', 'care.confidential']);
+  return isCareTeam(access);
 };
 
-/** Who may change a case, add notes and assign caregivers. */
+/** Who may change a case, add notes and record visits for it. */
 export const canManageCareCase = (
   access: AccessLike,
   careCase: { confidentiality: CareConfidentiality },
@@ -185,6 +202,65 @@ export const canManageCareCase = (
   caregiverUserIds.includes(access.userId) ||
   (has(access, 'care.manage') &&
     (careCase.confidentiality === 'normal' || has(access, 'care.confidential')));
+
+/**
+ * Who may assign caregivers and delete the case. Assigning grants access to the case, so it
+ * needs `care.manage` as well as access to the case itself.
+ */
+export const canAdministerCareCase = (
+  access: AccessLike,
+  careCase: { confidentiality: CareConfidentiality },
+  caregiverUserIds: readonly string[],
+): boolean =>
+  has(access, 'care.manage') &&
+  (careCase.confidentiality === 'normal' ||
+    has(access, 'care.confidential') ||
+    caregiverUserIds.includes(access.userId));
+
+/**
+ * Lowering a confidential case to the care team exposes its notes to everyone holding
+ * `care.view`, so only `care.confidential` holders may do it.
+ */
+export const canChangeCareConfidentiality = (
+  access: AccessLike,
+  from: CareConfidentiality,
+  to: CareConfidentiality,
+): boolean => from === to || to === 'confidential' || has(access, 'care.confidential');
+
+/**
+ * Who may read a visit and its summary. A visit is readable by the care team (confidential ones
+ * only by `care.confidential` holders), by whoever recorded it, by the visitors themselves and by
+ * the caregivers of its case.
+ */
+export const canReadCareVisit = (
+  access: AccessLike,
+  visit: {
+    confidentiality: CareConfidentiality;
+    createdBy: string | null;
+    visitorPersonIds: readonly string[];
+  },
+  caseCaregiverUserIds: readonly string[] = [],
+): boolean => {
+  if (visit.createdBy === access.userId) return true;
+  if (access.personId && visit.visitorPersonIds.includes(access.personId)) return true;
+  if (caseCaregiverUserIds.includes(access.userId)) return true;
+  if (visit.confidentiality === 'confidential') return has(access, 'care.confidential');
+  return isCareTeam(access);
+};
+
+/**
+ * Who may change or delete a visit: whoever recorded it, the caregivers of its case, and care
+ * managers (for confidential visits only with `care.confidential`).
+ */
+export const canManageCareVisit = (
+  access: AccessLike,
+  visit: { confidentiality: CareConfidentiality; createdBy: string | null },
+  caseCaregiverUserIds: readonly string[] = [],
+): boolean =>
+  visit.createdBy === access.userId ||
+  caseCaregiverUserIds.includes(access.userId) ||
+  (has(access, 'care.manage') &&
+    (visit.confidentiality === 'normal' || has(access, 'care.confidential')));
 
 /** Whether a prayer request is visible to the caller. */
 export const canViewPrayerRequest = (
@@ -198,10 +274,10 @@ export const canViewPrayerRequest = (
   if (request.submittedBy === access.userId) return true;
   if (request.visibility === 'pastors') return has(access, 'care.confidential');
   if (request.visibility === 'care_team') {
-    return hasAny(access, ['care.view', 'care.manage', 'care.confidential', 'prayer.moderate']);
+    return hasAny(access, [...CARE_TEAM_PERMISSIONS, 'prayer.moderate']);
   }
   if (request.moderationStatus === 'approved') return true;
-  return has(access, 'prayer.moderate');
+  return canModeratePrayer(access);
 };
 
 /** Anonymous requests show the requester only to moderators and the requester. */
@@ -209,10 +285,37 @@ export const canSeePrayerRequester = (
   access: AccessLike,
   request: { submittedBy: string | null; isAnonymous: boolean },
 ): boolean =>
-  !request.isAnonymous || request.submittedBy === access.userId || has(access, 'prayer.moderate');
+  !request.isAnonymous || request.submittedBy === access.userId || canModeratePrayer(access);
+
+/** Requesters edit, answer and withdraw their own requests; moderators any they can see. */
+export const canManagePrayerRequest = (
+  access: AccessLike,
+  request: { submittedBy: string | null },
+): boolean => request.submittedBy === access.userId || canModeratePrayer(access);
+
+/** Whether a request is shown to the whole church (approved and public). */
+export const isPrayerRequestPublic = (request: {
+  visibility: PrayerVisibility;
+  moderationStatus: PrayerModerationStatus;
+}): boolean => request.visibility === 'church' && request.moderationStatus === 'approved';
+
+/** Who may move a visitor through the pipeline: care managers and the assigned person. */
+export const canManageFollowUp = (
+  access: AccessLike,
+  followUp: { assignedUserId: string | null },
+): boolean => has(access, 'care.manage') || followUp.assignedUserId === access.userId;
+
+/** Who may edit or delete a task; assignees may only mark it done or reopen it. */
+export const canEditCareTask = (access: AccessLike, task: { createdBy: string | null }): boolean =>
+  has(access, 'care.manage') || task.createdBy === access.userId;
+
+export const canCompleteCareTask = (
+  access: AccessLike,
+  task: { createdBy: string | null; assignedUserId: string | null },
+): boolean => task.assignedUserId === access.userId || canEditCareTask(access, task);
 
 // ---------------------------------------------------------------------------------------------
-// Care cases and notes
+// Shared pieces
 // ---------------------------------------------------------------------------------------------
 
 export const caregiverSchema = z.object({
@@ -222,11 +325,52 @@ export const caregiverSchema = z.object({
 });
 export type Caregiver = z.infer<typeof caregiverSchema>;
 
+export const householdRefSchema = z.object({ id: idSchema, name: z.string() });
+export type HouseholdRef = z.infer<typeof householdRefSchema>;
+
+/** A member who can be assigned as caregiver, visitor follow-up owner or task assignee. */
+export const careTeamMemberSchema = caregiverSchema.extend({
+  personId: idSchema.nullable(),
+  /** Holds a care permission (sees normal cases); others only see what they are assigned. */
+  isCareTeam: z.boolean(),
+  canReadConfidential: z.boolean(),
+});
+export type CareTeamMember = z.infer<typeof careTeamMemberSchema>;
+
+export const careTeamListSchema = z.object({ items: z.array(careTeamMemberSchema) });
+
+export const householdLookupQuerySchema = z.object({
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
+});
+
+export const householdLookupListSchema = z.object({ items: z.array(householdRefSchema) });
+
+export const careTeamQuerySchema = z.object({
+  /** `all` lists every active member (care managers only); `team` the care team. */
+  scope: z.enum(['team', 'all']).default('team'),
+});
+export type CareTeamQuery = z.infer<typeof careTeamQuerySchema>;
+
+export const careNoteParamsSchema = z.object({
+  churchId: idSchema,
+  id: idSchema,
+  noteId: idSchema,
+});
+
+const booleanQuery = z
+  .enum(['true', 'false'])
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value === 'true'));
+
+// ---------------------------------------------------------------------------------------------
+// Care cases and notes
+// ---------------------------------------------------------------------------------------------
+
 /** List rows never carry the description or notes. */
 export const careCaseSummarySchema = z.object({
   id: idSchema,
   person: personSummarySchema.nullable(),
-  householdId: idSchema.nullable(),
+  household: householdRefSchema.nullable(),
   category: z.enum(CARE_CATEGORIES),
   priority: z.enum(CARE_PRIORITIES),
   status: z.enum(CARE_STATUSES),
@@ -245,7 +389,13 @@ export const careCaseSchema = careCaseSummarySchema.extend({
   nextActionNote: z.string().nullable(),
   closedAt: isoDateTimeSchema.nullable(),
   closedReason: z.string().nullable(),
+  openedBy: caregiverSchema.nullable(),
+  /** Change the case, add notes, record visits. */
   canManage: z.boolean(),
+  /** Assign caregivers and delete the case. */
+  canAdminister: z.boolean(),
+  /** Make a confidential case visible to the whole care team. */
+  canLowerConfidentiality: z.boolean(),
 });
 export type CareCase = z.infer<typeof careCaseSchema>;
 
@@ -269,21 +419,29 @@ export const careCaseUpdateSchema = careCaseInputSchema
   .extend({ closedReason: optionalText(LIMITS.shortTextMax) });
 export type CareCaseUpdate = z.infer<typeof careCaseUpdateSchema>;
 
+export const CARE_CASE_SORTS = ['updated', 'next_action', 'priority'] as const;
+export type CareCaseSort = (typeof CARE_CASE_SORTS)[number];
+
 export const careCaseListQuerySchema = paginationQuerySchema.extend({
-  status: z.enum(CARE_STATUSES).optional(),
+  /** `active` is every status except closed. */
+  status: z.enum([...CARE_STATUSES, 'active']).optional(),
   category: z.enum(CARE_CATEGORIES).optional(),
   priority: z.enum(CARE_PRIORITIES).optional(),
+  confidentiality: z.enum(CARE_CONFIDENTIALITY_LEVELS).optional(),
   personId: idSchema.optional(),
   /** Only cases assigned to the caller. */
   mine: z
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  sort: z.enum(CARE_CASE_SORTS).default('updated'),
 });
 export type CareCaseListQuery = z.infer<typeof careCaseListQuerySchema>;
 
 export const careCaseListSchema = paginatedSchema(careCaseSummarySchema);
 export type CareCaseList = z.infer<typeof careCaseListSchema>;
+
+export const careCaseResponseSchema = z.object({ case: careCaseSchema });
 
 export const setCaregiversBodySchema = z.object({
   userIds: z.array(idSchema).max(CARE_LIMITS.caregiversMax),
@@ -294,20 +452,30 @@ export const careNoteSchema = z.object({
   id: idSchema,
   caseId: idSchema,
   kind: z.enum(CARE_NOTE_KINDS),
+  /** For `status_change` notes, the new status. */
   body: z.string(),
   author: caregiverSchema.nullable(),
+  canEdit: z.boolean(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
 export type CareNote = z.infer<typeof careNoteSchema>;
 
+/** People write notes, calls, visits and meetings; status changes are recorded automatically. */
+export const CARE_NOTE_INPUT_KINDS = ['note', 'call', 'visit', 'meeting'] as const;
+
 export const careNoteInputSchema = z.object({
-  kind: z.enum(CARE_NOTE_KINDS).default('note'),
+  kind: z.enum(CARE_NOTE_INPUT_KINDS).default('note'),
   body: requiredText(1, CARE_LIMITS.noteBodyMax),
 });
 export type CareNoteInput = z.infer<typeof careNoteInputSchema>;
 
+export const careNoteUpdateSchema = z.object({ body: requiredText(1, CARE_LIMITS.noteBodyMax) });
+export type CareNoteUpdate = z.infer<typeof careNoteUpdateSchema>;
+
 export const careNoteListSchema = z.object({ items: z.array(careNoteSchema) });
+
+export const careNoteResponseSchema = z.object({ note: careNoteSchema });
 
 // ---------------------------------------------------------------------------------------------
 // Visits (perkunjungan)
@@ -317,16 +485,18 @@ export const careVisitSchema = z.object({
   id: idSchema,
   caseId: idSchema.nullable(),
   person: personSummarySchema.nullable(),
-  householdId: idSchema.nullable(),
+  household: householdRefSchema.nullable(),
   visitDate: isoDateSchema,
   location: z.string().nullable(),
-  /** Null in lists and for callers who may not read the linked confidential case. */
+  /** Null in lists; only the detail carries it, for callers who may read the visit. */
   summary: z.string().nullable(),
   confidentiality: z.enum(CARE_CONFIDENTIALITY_LEVELS),
   followUpNeeded: z.boolean(),
   followUpNote: z.string().nullable(),
   visitors: z.array(personSummarySchema),
   otherVisitors: z.string().nullable(),
+  createdBy: caregiverSchema.nullable(),
+  canManage: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type CareVisit = z.infer<typeof careVisitSchema>;
@@ -354,16 +524,22 @@ export type CareVisitInput = z.infer<typeof careVisitInputSchema>;
 export const careVisitListQuerySchema = paginationQuerySchema.extend({
   personId: idSchema.optional(),
   householdId: idSchema.optional(),
+  caseId: idSchema.optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
-  followUpNeeded: z
+  followUpNeeded: booleanQuery,
+  /** Only visits the caller made. */
+  mine: z
     .enum(['true', 'false'])
-    .optional()
-    .transform((value) => (value === undefined ? undefined : value === 'true')),
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 export type CareVisitListQuery = z.infer<typeof careVisitListQuerySchema>;
 
 export const careVisitListSchema = paginatedSchema(careVisitSchema);
+export type CareVisitList = z.infer<typeof careVisitListSchema>;
+
+export const careVisitResponseSchema = z.object({ visit: careVisitSchema });
 
 // ---------------------------------------------------------------------------------------------
 // Prayer requests (pokok doa)
@@ -377,13 +553,19 @@ export const prayerRequestSchema = z.object({
   isAnonymous: z.boolean(),
   /** Null when anonymous and the caller may not see the requester. */
   requesterName: z.string().nullable(),
+  requesterAvatarUrl: z.string().nullable(),
   moderationStatus: z.enum(PRAYER_MODERATION_STATUSES),
+  /** Shown to the requester and moderators only. */
+  moderationNote: z.string().nullable(),
   prayedCount: z.number().int().nonnegative(),
   prayedByMe: z.boolean(),
   answeredAt: isoDateTimeSchema.nullable(),
   testimony: z.string().nullable(),
   isMine: z.boolean(),
+  canManage: z.boolean(),
+  canModerate: z.boolean(),
   createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
 });
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
 
@@ -395,14 +577,20 @@ export const prayerRequestInputSchema = z.object({
 });
 export type PrayerRequestInput = z.infer<typeof prayerRequestInputSchema>;
 
+export const PRAYER_SCOPES = ['wall', 'mine', 'answered', 'moderation'] as const;
+export type PrayerScope = (typeof PRAYER_SCOPES)[number];
+
 export const prayerRequestListQuerySchema = paginationQuerySchema.extend({
   status: z.enum(PRAYER_MODERATION_STATUSES).optional(),
-  scope: z.enum(['wall', 'mine', 'answered', 'moderation']).default('wall'),
+  scope: z.enum(PRAYER_SCOPES).default('wall'),
+  visibility: z.enum(PRAYER_VISIBILITIES).optional(),
 });
 export type PrayerRequestListQuery = z.infer<typeof prayerRequestListQuerySchema>;
 
 export const prayerRequestListSchema = paginatedSchema(prayerRequestSchema);
 export type PrayerRequestList = z.infer<typeof prayerRequestListSchema>;
+
+export const prayerRequestResponseSchema = z.object({ request: prayerRequestSchema });
 
 export const moderatePrayerRequestBodySchema = z.object({
   decision: z.enum(['approved', 'rejected']),
@@ -415,13 +603,27 @@ export const answerPrayerRequestBodySchema = z.object({
 });
 export type AnswerPrayerRequestBody = z.infer<typeof answerPrayerRequestBodySchema>;
 
+export const prayResultSchema = z.object({
+  prayedCount: z.number().int().nonnegative(),
+  prayedByMe: z.boolean(),
+});
+export type PrayResult = z.infer<typeof prayResultSchema>;
+
+/** One member's "I prayed" counts once per this many seconds, so a double tap is not two. */
+export const PRAYER_REPEAT_SECONDS = 60;
+
 // ---------------------------------------------------------------------------------------------
 // Visitor follow-up and tasks
 // ---------------------------------------------------------------------------------------------
 
+/** Stages still in the pipeline; joined and closed are its two endings. */
+export const FOLLOW_UP_ACTIVE_STAGES = ['new', 'contacted', 'visited'] as const;
+
 export const visitorFollowUpSchema = z.object({
   id: idSchema,
   person: personSummarySchema,
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
   stage: z.enum(FOLLOW_UP_STAGES),
   source: z.string().nullable(),
   firstVisitDate: isoDateSchema.nullable(),
@@ -431,19 +633,44 @@ export const visitorFollowUpSchema = z.object({
   stageChangedAt: isoDateTimeSchema,
   openTaskCount: z.number().int().nonnegative(),
   nextDueDate: isoDateSchema.nullable(),
+  hasOverdueTask: z.boolean(),
+  canManage: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type VisitorFollowUp = z.infer<typeof visitorFollowUpSchema>;
 
-export const visitorFollowUpInputSchema = z.object({
-  personId: idSchema,
-  stage: z.enum(FOLLOW_UP_STAGES).default('new'),
+/** A first-time guest without a person record yet; it is created as a visitor. */
+export const newVisitorSchema = z.object({
+  firstName: requiredText(LIMITS.nameMin, LIMITS.nameMax),
+  lastName: optionalText(LIMITS.nameMax),
+  phone: optionalText(LIMITS.phoneMax),
+  email: optionalEmail,
+});
+export type NewVisitor = z.infer<typeof newVisitorSchema>;
+
+export const visitorFollowUpInputSchema = z
+  .object({
+    personId: idSchema.nullable().default(null),
+    newVisitor: newVisitorSchema.nullable().default(null),
+    stage: z.enum(FOLLOW_UP_STAGES).default('new'),
+    source: optionalText(LIMITS.shortTextMax),
+    firstVisitDate: optionalDate,
+    assignedUserId: idSchema.nullable().default(null),
+    notes: optionalText(LIMITS.longTextMax),
+  })
+  .refine((value) => !!value.personId !== !!value.newVisitor, {
+    message: 'Choose a person or enter the new visitor',
+    path: ['personId'],
+  });
+export type VisitorFollowUpInput = z.infer<typeof visitorFollowUpInputSchema>;
+
+export const visitorFollowUpUpdateSchema = z.object({
   source: optionalText(LIMITS.shortTextMax),
   firstVisitDate: optionalDate,
   assignedUserId: idSchema.nullable().default(null),
   notes: optionalText(LIMITS.longTextMax),
 });
-export type VisitorFollowUpInput = z.infer<typeof visitorFollowUpInputSchema>;
+export type VisitorFollowUpUpdate = z.infer<typeof visitorFollowUpUpdateSchema>;
 
 export const moveFollowUpBodySchema = z
   .object({
@@ -456,14 +683,29 @@ export const moveFollowUpBodySchema = z
   });
 export type MoveFollowUpBody = z.infer<typeof moveFollowUpBodySchema>;
 
+/** Joined and closed follow-ups stay on the board this long. */
+export const FOLLOW_UP_ENDED_VISIBLE_DAYS = 60;
+
 export const visitorFollowUpListQuerySchema = z.object({
   stage: z.enum(FOLLOW_UP_STAGES).optional(),
   assignedUserId: idSchema.optional(),
+  /** Only follow-ups assigned to the caller. */
+  mine: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   q: z.string().trim().max(LIMITS.shortTextMax).optional(),
 });
 export type VisitorFollowUpListQuery = z.infer<typeof visitorFollowUpListQuerySchema>;
 
-export const visitorFollowUpListSchema = z.object({ items: z.array(visitorFollowUpSchema) });
+export const visitorFollowUpListSchema = z.object({
+  items: z.array(visitorFollowUpSchema),
+  /** Follow-ups per stage, ignoring the stage filter. */
+  counts: z.record(z.enum(FOLLOW_UP_STAGES), z.number().int().nonnegative()),
+});
+export type VisitorFollowUpList = z.infer<typeof visitorFollowUpListSchema>;
+
+export const visitorFollowUpResponseSchema = z.object({ followUp: visitorFollowUpSchema });
 
 export const careTaskSchema = z.object({
   id: idSchema,
@@ -475,8 +717,12 @@ export const careTaskSchema = z.object({
   assignee: caregiverSchema.nullable(),
   followUpId: idSchema.nullable(),
   caseId: idSchema.nullable(),
+  /** The linked case title, or null when the caller may not read the case. */
+  caseTitle: z.string().nullable(),
   person: personSummarySchema.nullable(),
   completedAt: isoDateTimeSchema.nullable(),
+  canEdit: z.boolean(),
+  canComplete: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type CareTask = z.infer<typeof careTaskSchema>;
@@ -492,6 +738,10 @@ export const careTaskInputSchema = z.object({
 });
 export type CareTaskInput = z.infer<typeof careTaskInputSchema>;
 
+/** A task stays linked to its case or follow-up; everything else can change. */
+export const careTaskUpdateSchema = careTaskInputSchema.omit({ followUpId: true, caseId: true });
+export type CareTaskUpdate = z.infer<typeof careTaskUpdateSchema>;
+
 export const updateCareTaskStatusBodySchema = z.object({ status: z.enum(CARE_TASK_STATUSES) });
 export type UpdateCareTaskStatusBody = z.infer<typeof updateCareTaskStatusBodySchema>;
 
@@ -502,10 +752,19 @@ export const careTaskListQuerySchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  followUpId: idSchema.optional(),
+  caseId: idSchema.optional(),
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
 });
 export type CareTaskListQuery = z.infer<typeof careTaskListQuerySchema>;
 
+/** Largest task list returned at once; open tasks first, by due date. */
+export const CARE_TASK_LIST_MAX = 200;
+
 export const careTaskListSchema = z.object({ items: z.array(careTaskSchema) });
+export type CareTaskList = z.infer<typeof careTaskListSchema>;
+
+export const careTaskResponseSchema = z.object({ task: careTaskSchema });
 
 /** Overdue when open and due before `today` (YYYY-MM-DD in the church time zone). */
 export const isCareTaskOverdue = (
@@ -520,7 +779,7 @@ export const isCareTaskOverdue = (
 export const diakoniaAidSchema = z.object({
   id: idSchema,
   person: personSummarySchema.nullable(),
-  householdId: idSchema.nullable(),
+  household: householdRefSchema.nullable(),
   caseId: idSchema.nullable(),
   recipientName: z.string().nullable(),
   category: z.enum(DIAKONIA_CATEGORIES),
@@ -531,6 +790,7 @@ export const diakoniaAidSchema = z.object({
   financeReference: z.string().nullable(),
   voidedAt: isoDateTimeSchema.nullable(),
   voidReason: z.string().nullable(),
+  createdBy: caregiverSchema.nullable(),
   createdAt: isoDateTimeSchema,
 });
 export type DiakoniaAid = z.infer<typeof diakoniaAidSchema>;
@@ -561,7 +821,9 @@ export type VoidDiakoniaAidBody = z.infer<typeof voidDiakoniaAidBodySchema>;
 
 export const diakoniaAidListQuerySchema = paginationQuerySchema.extend({
   category: z.enum(DIAKONIA_CATEGORIES).optional(),
+  form: z.enum(DIAKONIA_FORMS).optional(),
   personId: idSchema.optional(),
+  caseId: idSchema.optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
   includeVoided: z
@@ -571,4 +833,59 @@ export const diakoniaAidListQuerySchema = paginationQuerySchema.extend({
 });
 export type DiakoniaAidListQuery = z.infer<typeof diakoniaAidListQuerySchema>;
 
-export const diakoniaAidListSchema = paginatedSchema(diakoniaAidSchema);
+export const diakoniaAidListSchema = paginatedSchema(diakoniaAidSchema).extend({
+  /** Totals of the filtered, non-voided records (all pages). */
+  summary: z.object({
+    count: z.number().int().nonnegative(),
+    amount: z.number().int().nonnegative(),
+    recipients: z.number().int().nonnegative(),
+  }),
+});
+export type DiakoniaAidList = z.infer<typeof diakoniaAidListSchema>;
+
+export const diakoniaAidResponseSchema = z.object({ aid: diakoniaAidSchema });
+
+// ---------------------------------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------------------------------
+
+export const careOverviewSchema = z.object({
+  today: isoDateSchema,
+  cases: z.object({
+    active: z.number().int().nonnegative(),
+    urgent: z.number().int().nonnegative(),
+    mine: z.number().int().nonnegative(),
+    /** Next actions due today or earlier. */
+    due: z.number().int().nonnegative(),
+  }),
+  /** Readable active cases with a next action in the coming week (or overdue). */
+  upcoming: z.array(careCaseSummarySchema),
+  tasks: z.object({
+    open: z.number().int().nonnegative(),
+    overdue: z.number().int().nonnegative(),
+    dueToday: z.number().int().nonnegative(),
+  }),
+  prayer: z.object({
+    active: z.number().int().nonnegative(),
+    answered: z.number().int().nonnegative(),
+    mine: z.number().int().nonnegative(),
+    /** Null unless the caller moderates. */
+    pending: z.number().int().nonnegative().nullable(),
+  }),
+  /** Null unless the caller is on the care team. */
+  visits: z
+    .object({
+      thisMonth: z.number().int().nonnegative(),
+      followUpNeeded: z.number().int().nonnegative(),
+    })
+    .nullable(),
+  followUps: z.record(z.enum(FOLLOW_UP_STAGES), z.number().int().nonnegative()).nullable(),
+  /** Null unless the caller may view diakonia. */
+  diakonia: z
+    .object({
+      thisMonthCount: z.number().int().nonnegative(),
+      thisMonthAmount: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+export type CareOverview = z.infer<typeof careOverviewSchema>;
