@@ -1,15 +1,28 @@
-/** Best-effort client IP for rate limiting, honouring common proxy headers. */
+type ServerLike = { requestIP?: (req: Request) => { address: string } | null };
+
+/**
+ * Best-effort client IP for rate limiting and audit entries.
+ *
+ * `X-Forwarded-For` is only honoured when the server sits behind `trustedProxies` reverse
+ * proxies (`TRUST_PROXY`). Each proxy appends the address it saw, so the client address is the
+ * entry that many places from the right; anything further left was sent by the client and
+ * could be forged to dodge per-IP limits. Without trusted proxies the socket address is used.
+ */
 export function clientIp(
   request: Request,
-  server?: { requestIP?: (req: Request) => { address: string } | null },
+  server: ServerLike | undefined,
+  trustedProxies: number,
 ): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first;
+  if (trustedProxies > 0) {
+    const forwarded = (request.headers.get('x-forwarded-for') ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const hop = forwarded[Math.max(0, forwarded.length - trustedProxies)];
+    if (hop) return hop;
+    const real = request.headers.get('x-real-ip')?.trim();
+    if (real) return real;
   }
-  const real = request.headers.get('x-real-ip');
-  if (real) return real.trim();
   try {
     const address = server?.requestIP?.(request)?.address;
     if (address) return address;
@@ -24,9 +37,10 @@ export type RequestMeta = { ip: string | null; userAgent: string | null };
 /** Client IP and user agent for audit entries and login history, bounded in length. */
 export function requestMeta(
   request: Request,
-  server?: { requestIP?: (req: Request) => { address: string } | null },
+  server: ServerLike | undefined,
+  trustedProxies: number,
 ): RequestMeta {
-  const ip = clientIp(request, server);
+  const ip = clientIp(request, server, trustedProxies);
   const userAgent = request.headers.get('user-agent');
   return {
     ip: ip === 'unknown' ? null : ip.slice(0, 64),

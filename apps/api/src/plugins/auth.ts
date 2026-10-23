@@ -94,7 +94,7 @@ export function createAuthService(deps: Deps) {
     churchId: string | null,
     userId: string,
   ): AuditContext => ({
-    ...requestMeta(request, server ?? undefined),
+    ...requestMeta(request, server ?? undefined, deps.config.trustProxy),
     churchId,
     actorUserId: userId,
   });
@@ -127,16 +127,35 @@ export function applyChurchGuard(context: ChurchContext, guard: ChurchGuard): vo
  */
 export function authPlugin(deps: Deps) {
   const service = createAuthService(deps);
+  /*
+   * The session is checked in `transform`, which runs before body, query and params are
+   * validated, so a request without a valid session gets 401 and never learns the schema.
+   * The result is kept per request for `resolve`.
+   */
+  const verified = new WeakMap<Request, AuthContext>();
+  const authenticate = (request: Request, headers: Record<string, string | undefined>) => {
+    const known = verified.get(request);
+    if (known) return known;
+    const auth = service.authenticate(headers);
+    verified.set(request, auth);
+    return auth;
+  };
   return new Elysia().macro({
     auth: {
+      transform: ({ headers, request }) => {
+        authenticate(request, headers);
+      },
       resolve: ({ headers, request, server }) => {
-        const auth = service.authenticate(headers);
+        const auth = authenticate(request, headers);
         return { auth, audit: service.auditContext(request, server, null, auth.user.id) };
       },
     },
     church: (guard: ChurchGuard) => ({
+      transform: ({ headers, request }) => {
+        authenticate(request, headers);
+      },
       resolve: ({ headers, params, request, server }) => {
-        const auth = service.authenticate(headers);
+        const auth = authenticate(request, headers);
         const churchId = (params as Record<string, string | undefined>).churchId;
         if (!churchId) throw notFound('Church');
         const context = service.loadChurchContext(churchId, auth.user.id);

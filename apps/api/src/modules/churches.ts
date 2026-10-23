@@ -22,7 +22,10 @@ import { Elysia } from 'elysia';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import {
+  areaCoordinators,
   calendarFeedTokens,
+  careCaseCaregivers,
+  careTasks,
   churches,
   churchMemberships,
   churchRoles,
@@ -33,6 +36,7 @@ import {
   people,
   sessions,
   users,
+  visitorFollowUps,
 } from '../db/schema';
 import type { Deps } from '../deps';
 import {
@@ -125,6 +129,24 @@ export const churchesModule = (deps: Deps) => {
       .run();
     tx.delete(groupLeaders)
       .where(and(eq(groupLeaders.churchId, churchId), eq(groupLeaders.userId, userId)))
+      .run();
+    // Assignments that grant access in other modules go too, so rejoining later (even as a
+    // plain member) does not bring back an area to manage or a confidential care case.
+    tx.delete(areaCoordinators)
+      .where(and(eq(areaCoordinators.churchId, churchId), eq(areaCoordinators.userId, userId)))
+      .run();
+    tx.delete(careCaseCaregivers)
+      .where(and(eq(careCaseCaregivers.churchId, churchId), eq(careCaseCaregivers.userId, userId)))
+      .run();
+    tx.update(visitorFollowUps)
+      .set({ assignedUserId: null, updatedAt: nowIso() })
+      .where(
+        and(eq(visitorFollowUps.churchId, churchId), eq(visitorFollowUps.assignedUserId, userId)),
+      )
+      .run();
+    tx.update(careTasks)
+      .set({ assignedUserId: null, updatedAt: nowIso() })
+      .where(and(eq(careTasks.churchId, churchId), eq(careTasks.assignedUserId, userId)))
       .run();
     tx.update(people)
       .set({ userId: null, updatedAt: nowIso() })

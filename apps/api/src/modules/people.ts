@@ -6,6 +6,7 @@ import {
   churchIdParamsSchema,
   churchParamsSchema,
   directoryQuerySchema,
+  effectivePermissions,
   fullName,
   has,
   linkPersonUserBodySchema,
@@ -41,6 +42,7 @@ import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toPrivateDetails } from '../serializers';
+import { customRolesOf } from '../services/access';
 import { changes, recordAudit, redact } from '../services/audit';
 import { moduleEnabled } from '../services/modules';
 import {
@@ -80,13 +82,29 @@ export function editScopeOf(
   deps: Deps,
   church: Pick<ChurchRow, 'id'>,
   access: AccessLike,
-  person: Pick<PersonRow, 'id'>,
+  person: Pick<PersonRow, 'id' | 'userId'>,
 ) {
   const { db } = deps;
+  // The linked member's own permissions: scoped editors may not act on someone holding more.
+  const membership = person.userId
+    ? db
+        .select()
+        .from(churchMemberships)
+        .where(
+          and(
+            eq(churchMemberships.churchId, church.id),
+            eq(churchMemberships.userId, person.userId),
+          ),
+        )
+        .get()
+    : undefined;
   return {
     groupIds: groupIdsOfPerson(db, person.id),
     coordinatedAreaIds: coordinatedAreaIdsOf(db, church.id, access.userId),
     areaId: effectiveAreaOf(db, person.id).areaId,
+    linkedPermissions: membership
+      ? effectivePermissions(membership.role, customRolesOf(db, membership.id).permissionLists)
+      : null,
   };
 }
 

@@ -194,7 +194,7 @@ export const calendarFeedRouter = (deps: Deps) => {
       enforceRateLimit(
         deps.limiters,
         'comms.calendar_feed',
-        clientIp(request, server ?? undefined),
+        clientIp(request, server ?? undefined, config.trustProxy),
         FEED_LIMIT,
       );
       const token = params.token.replace(/\.ics$/, '');

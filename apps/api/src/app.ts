@@ -53,6 +53,10 @@ function normaliseIssues(all: unknown): { path: string; message: string }[] {
   });
 }
 
+/** Paths that carry a credential (private calendar feeds, invitation links) are logged without it. */
+const TOKEN_PATH = /^(\/api\/(?:calendar\/feeds|invitations)\/)[^/]+/;
+export const loggedPath = (pathname: string): string => pathname.replace(TOKEN_PATH, '$1[token]');
+
 /** Production rate limits. Registration is generous because many members share one IP (carrier NAT, church wifi). */
 export function defaultLimiters(): Limiters {
   return {
@@ -114,7 +118,7 @@ export function createApp(deps: Deps) {
     .onRequest(({ request, set }) => {
       if (config.logRequests) {
         console.log(
-          `${new Date().toISOString()} ${request.method} ${new URL(request.url).pathname}`,
+          `${new Date().toISOString()} ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
         );
       }
       Object.assign(set.headers, securityHeaders(request));
@@ -154,7 +158,10 @@ export function createApp(deps: Deps) {
         set.status = 400;
         return { error: { code: 'BAD_REQUEST', message: 'Malformed request body' } };
       }
-      console.error(`Unhandled error on ${request.method} ${new URL(request.url).pathname}`, error);
+      console.error(
+        `Unhandled error on ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
+        error,
+      );
       set.status = 500;
       return { error: { code: 'INTERNAL', message: 'Internal server error' } };
     })

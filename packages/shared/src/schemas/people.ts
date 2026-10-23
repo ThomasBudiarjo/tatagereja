@@ -11,7 +11,7 @@ import {
   type PersonMembershipStatus,
 } from '../constants';
 import type { LocalizedText } from '../localized';
-import { has, type AccessLike } from '../permissions';
+import { canGrant, has, type AccessLike, type Permission } from '../permissions';
 import {
   idSchema,
   isoDateSchema,
@@ -1008,7 +1008,10 @@ const isSelfPerson = (access: AccessLike, person: { id: string; userId: string |
 
 /**
  * Who may edit a person's basic profile: `people.edit`, the person themselves, leaders of their
- * groups, and coordinators of their area.
+ * groups, and coordinators of their area. Leaders can add anyone to their group, so the scoped
+ * rights stop at people whose account holds permissions the caller lacks (`linkedPermissions`,
+ * the effective permissions of the linked member account): a leader cannot rewrite the
+ * pastor's or an administrator's contact details by adding them to a group first.
  */
 export const canEditPersonProfile = (
   access: AccessLike,
@@ -1017,12 +1020,14 @@ export const canEditPersonProfile = (
     groupIds: readonly string[];
     coordinatedAreaIds: readonly string[];
     areaId: string | null;
+    linkedPermissions?: readonly Permission[] | null;
   },
 ): boolean =>
   has(access, 'people.edit') ||
   isSelfPerson(access, person) ||
-  scope.groupIds.some((groupId) => access.leaderGroupIds.includes(groupId)) ||
-  canManageAreaPerson(access, scope.coordinatedAreaIds, scope.areaId);
+  ((!scope.linkedPermissions || canGrant(access, scope.linkedPermissions)) &&
+    (scope.groupIds.some((groupId) => access.leaderGroupIds.includes(groupId)) ||
+      canManageAreaPerson(access, scope.coordinatedAreaIds, scope.areaId)));
 
 /** Each person controls their own directory privacy; `people.private.edit` can change it too. */
 export const canEditPersonPrivacy = (

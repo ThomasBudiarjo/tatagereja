@@ -24,6 +24,8 @@ services:
       # Browser origins allowed to call the API. Empty allows any origin.
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      # Reverse proxies in front of this container. Rate limits trust X-Forwarded-For only from them.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
     volumes:
       - tatagereja-data:/data
 

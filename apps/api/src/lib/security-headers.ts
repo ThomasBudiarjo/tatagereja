@@ -27,7 +27,10 @@ const SPA_CSP = [
 /** JSON responses never render, so they get a policy that allows nothing. */
 const API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
-/** Security headers added to every response. HSTS only when the request arrived over HTTPS. */
+/**
+ * Security headers added to every response. HSTS only when the request arrived over HTTPS;
+ * API responses are not stored by browsers or proxies unless a route allows it.
+ */
 export function securityHeaders(request: Request): Record<string, string> {
   const pathname = new URL(request.url).pathname;
   const isApi = pathname === '/api' || pathname.startsWith('/api/');
@@ -39,6 +42,8 @@ export function securityHeaders(request: Request): Record<string, string> {
     'cross-origin-opener-policy': 'same-origin',
     'permissions-policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
   };
+  // API answers carry member data; routes that may be cached (the iCal feed) say so themselves.
+  if (isApi) headers['cache-control'] = 'no-store';
   if (isHttpsRequest(request)) {
     headers['strict-transport-security'] = 'max-age=31536000; includeSubDomains';
   }

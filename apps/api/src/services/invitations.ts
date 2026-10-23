@@ -1,12 +1,13 @@
-import { invitationStatusOf } from '@tatagereja/shared';
+import { can, invitationStatusOf } from '@tatagereja/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Db, Queryable } from '../db/client';
 import type { InvitationRow } from '../db/schema';
-import { churchMemberships, invitations, users } from '../db/schema';
+import { churches, churchMemberships, invitations, users } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import type { RequestMeta } from '../lib/request';
 import { newId } from '../lib/tokens';
 import { nowIso } from '../lib/time';
+import { loadAccess } from './access';
 import { recordAudit } from './audit';
 import { notify } from './notifications';
 
@@ -14,7 +15,38 @@ export function findInvitationByToken(db: Queryable, token: string): InvitationR
   return db.select().from(invitations).where(eq(invitations.token, token)).get();
 }
 
-export function assertInvitationUsable(invitation: InvitationRow | undefined): InvitationRow {
+/**
+ * Whether the person who created an administrator invitation could still create it today. An
+ * administrator link must not outlive its creator's own rights (demoted, removed, suspended);
+ * member links keep working, since they are often printed in the Warta Jemaat.
+ */
+function inviterStillEntitled(db: Queryable, invitation: InvitationRow): boolean {
+  if (invitation.role === 'member') return true;
+  const church = db.select().from(churches).where(eq(churches.id, invitation.churchId)).get();
+  const membership = db
+    .select()
+    .from(churchMemberships)
+    .where(
+      and(
+        eq(churchMemberships.churchId, invitation.churchId),
+        eq(churchMemberships.userId, invitation.createdBy),
+      ),
+    )
+    .get();
+  if (!church || !membership || membership.status !== 'active') return false;
+  return can.inviteWithRole(loadAccess(db, church, membership), invitation.role);
+}
+
+/** The status people see: an administrator link whose creator lost the right reads as revoked. */
+export const effectiveInvitationStatus = (db: Queryable, invitation: InvitationRow) => {
+  const status = invitationStatusOf(invitation);
+  return status === 'active' && !inviterStillEntitled(db, invitation) ? 'revoked' : status;
+};
+
+export function assertInvitationUsable(
+  db: Queryable,
+  invitation: InvitationRow | undefined,
+): InvitationRow {
   if (!invitation) {
     throw new HttpError(404, 'INVITATION_INVALID', 'This invitation does not exist');
   }
@@ -26,6 +58,13 @@ export function assertInvitationUsable(invitation: InvitationRow | undefined): I
       revoked: 'This invitation has been revoked',
     } as const;
     throw new HttpError(410, 'INVITATION_INVALID', reasons[status]);
+  }
+  if (!inviterStillEntitled(db, invitation)) {
+    throw new HttpError(
+      410,
+      'INVITATION_INVALID',
+      'This invitation is no longer valid. Ask the church for a new one',
+    );
   }
   return invitation;
 }
@@ -42,7 +81,7 @@ export function acceptInvitation(
   meta: RequestMeta = { ip: null, userAgent: null },
 ): { churchId: string; alreadyMember: boolean; role: 'member' | 'administrator' } {
   return db.transaction((tx) => {
-    const invitation = assertInvitationUsable(findInvitationByToken(tx, token));
+    const invitation = assertInvitationUsable(tx, findInvitationByToken(tx, token));
     const existing = tx
       .select({ id: churchMemberships.id, role: churchMemberships.role })
       .from(churchMemberships)

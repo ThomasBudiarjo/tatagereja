@@ -3,7 +3,6 @@ import {
   churchIdParamsSchema,
   churchParamsSchema,
   createInvitationBodySchema,
-  invitationStatusOf,
   invitationTokenParamsSchema,
 } from '@tatagereja/shared';
 import { and, desc, eq } from 'drizzle-orm';
@@ -17,7 +16,11 @@ import { generateToken, newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
 import { toInvitation } from '../serializers';
 import { recordAudit } from '../services/audit';
-import { acceptInvitation, findInvitationByToken } from '../services/invitations';
+import {
+  acceptInvitation,
+  effectiveInvitationStatus,
+  findInvitationByToken,
+} from '../services/invitations';
 
 export const invitationsModule = (deps: Deps) => {
   const { db, config } = deps;
@@ -129,7 +132,9 @@ export const invitationsModule = (deps: Deps) => {
     .get(
       '/:token',
       ({ params, request, server }) => {
-        const wait = deps.limiters.invitation.check(clientIp(request, server ?? undefined));
+        const wait = deps.limiters.invitation.check(
+          clientIp(request, server ?? undefined, config.trustProxy),
+        );
         if (wait > 0) throw rateLimited(wait);
         const row = db
           .select({ invitation: invitations, church: churches })
@@ -147,7 +152,7 @@ export const invitationsModule = (deps: Deps) => {
             brandColor: row.church.brandColor,
           },
           role: row.invitation.role,
-          status: invitationStatusOf(row.invitation),
+          status: effectiveInvitationStatus(db, row.invitation),
           expiresAt: row.invitation.expiresAt,
         };
       },
@@ -156,12 +161,15 @@ export const invitationsModule = (deps: Deps) => {
     .post(
       '/:token/accept',
       ({ params, auth, request, server }) => {
+        // Per account, so a signed-in session cannot be used to try invitation tokens either.
+        const wait = deps.limiters.invitation.check(`accept:${auth.user.id}`);
+        if (wait > 0) throw rateLimited(wait);
         if (!findInvitationByToken(db, params.token)) throw notFound('Invitation');
         const result = acceptInvitation(
           db,
           params.token,
           auth.user.id,
-          requestMeta(request, server ?? undefined),
+          requestMeta(request, server ?? undefined, config.trustProxy),
         );
         return { churchId: result.churchId, alreadyMember: result.alreadyMember };
       },

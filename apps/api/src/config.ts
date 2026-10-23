@@ -22,6 +22,7 @@ const envSchema = z
     SERVER_NAME: z.string().trim().min(1).max(120).default('TataGereja'),
     LOG_REQUESTS: booleanString,
     MAX_BODY_KB: z.coerce.number().int().min(16).max(51200).default(LIMITS.bodyKbDefault),
+    TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
   })
   .superRefine((env, ctx) => {
     if (env.TURNSTILE_ENABLED && (!env.TURNSTILE_SITE_KEY || !env.TURNSTILE_SECRET_KEY)) {
@@ -54,6 +55,8 @@ export type AppConfig = {
   logRequests: boolean;
   /** Largest accepted request body, in bytes. Larger requests get 413 PAYLOAD_TOO_LARGE. */
   maxBodyBytes: number;
+  /** Reverse proxies in front of the server whose `X-Forwarded-For` entries are trusted. */
+  trustProxy: number;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -84,10 +87,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     serverName: value.SERVER_NAME,
     logRequests: value.LOG_REQUESTS,
     maxBodyBytes: value.MAX_BODY_KB * 1024,
+    trustProxy: value.TRUST_PROXY,
   };
 }
 
-/** Configuration used by tests: in-memory database, public registration, no Turnstile. */
+/**
+ * Configuration used by tests: in-memory database, public registration, no Turnstile. Tests
+ * act as one reverse proxy so they can set the client address with `X-Forwarded-For`.
+ */
 export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     host: '127.0.0.1',
@@ -102,6 +109,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     serverName: 'TataGereja Test',
     logRequests: false,
     maxBodyBytes: LIMITS.bodyKbDefault * 1024,
+    trustProxy: 1,
     ...overrides,
   };
 }

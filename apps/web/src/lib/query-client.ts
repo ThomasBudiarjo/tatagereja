@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { onSignOut } from '@/stores/auth';
 import { isApiClientError } from './api';
 
 export const queryClient = new QueryClient({
@@ -16,3 +17,6 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// A session the server ended must not leave the previous account's data in memory.
+onSignOut(() => queryClient.clear());

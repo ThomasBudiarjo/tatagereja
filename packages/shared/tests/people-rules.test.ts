@@ -44,6 +44,20 @@ describe('people rules', () => {
     );
   });
 
+  it('keeps scoped editors off people whose account holds more than they do', () => {
+    const leader = access(['people.view'], { leaderGroupIds: ['g1'] });
+    const linked = { id: 'p2', userId: 'u2' };
+    const peer = { ...scope, linkedPermissions: ['people.view'] as Permission[] };
+    const pastor = {
+      ...scope,
+      linkedPermissions: ['people.view', 'care.confidential'] as Permission[],
+    };
+    expect(canEditPersonProfile(leader, linked, peer)).toBe(true);
+    expect(canEditPersonProfile(leader, linked, pastor)).toBe(false);
+    expect(canEditPersonProfile(access(['people.edit']), linked, pastor)).toBe(true);
+    expect(canEditPersonProfile(access([], { userId: 'u2' }), linked, pastor)).toBe(true);
+  });
+
   it('lets people and private editors change directory privacy', () => {
     expect(canEditPersonPrivacy(access([]), person)).toBe(false);
     expect(canEditPersonPrivacy(access(['people.private.edit']), person)).toBe(true);

@@ -94,9 +94,15 @@ server with a clear message. See `apps/api/.env.example` for the full list.
 | `APP_URL`                                     | `http://localhost:5173` | Public web address used in invitation links     |
 | `SERVER_NAME`                                 | `TataGereja`            | Name shown to people choosing this server       |
 | `MAX_BODY_KB`                                 | `2048`                  | Largest accepted request body                   |
+| `TRUST_PROXY`                                 | `0`                     | Reverse proxies in front of the API (see below) |
 
 Registration mode, invitation validity, Turnstile verification and rate limits are all enforced by the API,
 so they cannot be bypassed by calling it directly.
+
+Rate limits and sign-in history use the client address. Behind a reverse proxy, set `TRUST_PROXY` to the
+number of proxies in front of the API (usually `1`) so the address the proxy saw is used; the API then reads
+it from the right-hand end of `X-Forwarded-For`, so a client cannot dodge a limit by sending its own header.
+With `0` the header is ignored and the connection address is used.
 
 ## Self-hosting
 

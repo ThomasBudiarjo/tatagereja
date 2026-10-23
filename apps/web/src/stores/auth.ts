@@ -46,9 +46,25 @@ export const currentToken = (): string | undefined => {
   return isExpired(session) ? undefined : session?.token;
 };
 
+const signOutListeners = new Set<() => void>();
+
+/** Runs `listener` whenever the current session ends locally (e.g. to drop cached data). */
+export const onSignOut = (listener: () => void) => {
+  signOutListeners.add(listener);
+  return () => {
+    signOutListeners.delete(listener);
+  };
+};
+
+/**
+ * Forgets the current server's session after the server ended it (expired, revoked from
+ * another device, password changed). Listeners drop everything cached for that account.
+ */
 export const signOutLocally = () => {
   const serverUrl = useServerStore.getState().currentUrl;
+  if (!useAuthStore.getState().sessions[serverUrl]) return;
   useAuthStore.getState().clearSession(serverUrl);
+  for (const listener of signOutListeners) listener();
 };
 
 /** Reactive view of the current server's session. */

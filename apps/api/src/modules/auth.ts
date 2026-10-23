@@ -97,7 +97,7 @@ export const authModule = (deps: Deps) => {
     .post(
       '/register',
       async ({ body, request, server, set }) => {
-        const ip = clientIp(request, server ?? undefined);
+        const ip = clientIp(request, server ?? undefined, config.trustProxy);
         const wait = deps.limiters.register.check(ip);
         if (wait > 0) throw rateLimited(wait);
 
@@ -109,7 +109,7 @@ export const authModule = (deps: Deps) => {
           );
         }
         if (body.invitationToken) {
-          assertInvitationUsable(findInvitationByToken(db, body.invitationToken));
+          assertInvitationUsable(db, findInvitationByToken(db, body.invitationToken));
         } else if (config.registrationMode === 'invite_only') {
           throw new HttpError(
             403,
@@ -155,11 +155,14 @@ export const authModule = (deps: Deps) => {
             db,
             body.invitationToken,
             user.id,
-            requestMeta(request, server ?? undefined),
+            requestMeta(request, server ?? undefined, config.trustProxy),
           ).churchId;
         }
         // Sign-in history starts with the first login; registering is not one.
-        const session = createSession(user.id, requestMeta(request, server ?? undefined));
+        const session = createSession(
+          user.id,
+          requestMeta(request, server ?? undefined, config.trustProxy),
+        );
         set.status = 201;
         return {
           user: toUser(user),
@@ -173,10 +176,10 @@ export const authModule = (deps: Deps) => {
     .post(
       '/login',
       async ({ body, request, server }) => {
-        const ip = clientIp(request, server ?? undefined);
+        const ip = clientIp(request, server ?? undefined, config.trustProxy);
         const wait = deps.limiters.login.check(`${ip}:${body.email}`);
         if (wait > 0) throw rateLimited(wait);
-        const meta = requestMeta(request, server ?? undefined);
+        const meta = requestMeta(request, server ?? undefined, config.trustProxy);
 
         const user = db.select().from(users).where(eq(users.email, body.email)).get();
         const lockedUntil = user ? lockedUntilOf(user) : null;
@@ -240,7 +243,7 @@ export const authModule = (deps: Deps) => {
     .post(
       '/login/two-factor',
       ({ body, request, server }) => {
-        const meta = requestMeta(request, server ?? undefined);
+        const meta = requestMeta(request, server ?? undefined, config.trustProxy);
         enforceRateLimit(deps.limiters, 'auth.two_factor', meta.ip ?? 'unknown', {
           windowMs: 15 * 60_000,
           max: 30,

@@ -56,6 +56,12 @@ const LOGIN_EVENT_ORDER = sql`${loginEvents}.rowid`;
 const PERSONAL_EXPORT_EXCLUDED = /^(care_|visitor_follow_ups$|diakonia_aid$|absence_alerts$)/;
 
 /**
+ * Tables whose rows belong to whoever wrote them rather than to the person they are about: a
+ * prayer request someone else submitted for this person (for pastors only, say) is not theirs.
+ */
+const PERSONAL_EXPORT_AUTHOR_COLUMN: Record<string, string> = { prayer_requests: 'submitted_by' };
+
+/**
  * Account security: two-step verification, sign-in history, signing out other devices, and
  * data rights (download my data, delete my account). Everyone manages their own account; no
  * church permission is involved.
@@ -342,11 +348,13 @@ export const accountSecurityRouter = (deps: Deps) => {
               const churchColumn = info.columns.get('church_id');
               if (!churchColumn) continue;
               const owners: SQL[] = [];
+              const authorColumn = info.columns.get(PERSONAL_EXPORT_AUTHOR_COLUMN[info.name] ?? '');
+              if (authorColumn) owners.push(eq(authorColumn, user.id));
               const personColumn = info.name === 'people' ? info.columns.get('id') : null;
               if (personColumn && personIds.length > 0) {
                 owners.push(inArray(personColumn, personIds));
               }
-              const personRef = info.columns.get('person_id');
+              const personRef = authorColumn ? undefined : info.columns.get('person_id');
               if (personRef && personIds.length > 0) owners.push(inArray(personRef, personIds));
               const userRef = info.columns.get('user_id');
               if (userRef && info.name !== 'people') owners.push(eq(userRef, user.id));
