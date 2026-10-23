@@ -37,6 +37,9 @@ export type ChurchGuard =
   | ModuleId
   | { module?: ModuleId; permission?: Permission | readonly Permission[]; message?: string };
 
+/** Key of a church route's `detail` that holds its `ChurchGuard`. */
+export const CHURCH_GUARD_DETAIL = 'x-church-guard';
+
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -194,6 +197,8 @@ export function authPlugin(deps: Deps) {
       },
     },
     church: (guard: ChurchGuard) => ({
+      // Route tests read each route's requirement from its `detail` (kept out of the types).
+      ...({ detail: { [CHURCH_GUARD_DETAIL]: guard } } as object),
       transform: ({ headers, request }) => {
         authenticate(request, headers);
       },
