@@ -149,8 +149,15 @@ export function useWindowVirtualizer({
       if (!list.current || !enabled) return;
       const top = list.current.getBoundingClientRect().top + window.scrollY + (offsets[index] ?? 0);
       window.scrollTo({ top: top - window.innerHeight / 3 });
+      // Mount the row with this event's render: the scroll's own update comes a frame later,
+      // after the caller wants to focus the row (arrow keys, marking row after row).
+      setRange((current) =>
+        index >= current.start && index < current.end
+          ? current
+          : { start: Math.max(0, index - overscan), end: Math.min(count, index + overscan + 1) },
+      );
     },
-    [enabled, offsets],
+    [enabled, offsets, overscan, count],
   );
 
   if (!enabled) {
