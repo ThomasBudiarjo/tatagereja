@@ -258,9 +258,14 @@ export const canUseFinance = (access: Pick<AccessLike, 'permissions'>) =>
 export const canViewAllExpenses = (access: Pick<AccessLike, 'permissions'>) =>
   hasAny(access, ['finance.view', 'finance.approve', 'finance.manage']);
 
-/** Segregation of duties: nobody approves an expense they requested. */
-export const canApproveExpense = (access: AccessLike, expense: { requestedBy: string | null }) =>
-  has(access, 'finance.approve') && expense.requestedBy !== access.userId;
+/** Segregation of duties: nobody approves an expense they requested or changed. */
+export const canApproveExpense = (
+  access: AccessLike,
+  expense: { requestedBy: string | null; editorUserIds?: readonly string[] },
+) =>
+  has(access, 'finance.approve') &&
+  expense.requestedBy !== access.userId &&
+  !(expense.editorUserIds ?? []).includes(access.userId);
 
 type ExpenseLike = { status: ExpenseStatus; requestedBy: string | null };
 
@@ -281,6 +286,10 @@ export const canCancelExpense = (access: AccessLike, expense: ExpenseLike) =>
   EXPENSE_TRANSITIONS[expense.status].includes('cancelled') &&
   (isRequester(access, expense) || has(access, 'finance.manage'));
 
+/** A payment recorded by mistake is reversed by the finance managers (the request is approved again). */
+export const canReversePayment = (access: AccessLike, expense: ExpenseLike) =>
+  expense.status === 'paid' && has(access, 'finance.manage');
+
 type BatchLike = {
   status: OfferingBatchStatus;
   counter1UserId: string | null;
@@ -288,11 +297,12 @@ type BatchLike = {
   createdBy: string | null;
   submittedBy?: string | null;
   updatedBy?: string | null;
+  editorUserIds?: readonly string[];
 };
 
 /**
  * The verifier of an offering count must not be one of its counters, its creator, the person
- * who submitted it or the last person who edited it.
+ * who submitted it or anyone who edited it.
  */
 export const canVerifyOfferingBatch = (access: AccessLike, batch: Omit<BatchLike, 'status'>) =>
   has(access, 'finance.approve') &&
@@ -302,6 +312,7 @@ export const canVerifyOfferingBatch = (access: AccessLike, batch: Omit<BatchLike
     batch.createdBy,
     batch.submittedBy ?? null,
     batch.updatedBy ?? null,
+    ...(batch.editorUserIds ?? []),
   ].includes(access.userId);
 
 export const canEditOfferingBatch = (access: AccessLike, batch: BatchLike) =>
@@ -318,6 +329,18 @@ export const canVoidOfferingBatch = (access: AccessLike, batch: BatchLike) =>
     (batch.status !== 'verified' &&
       batch.createdBy === access.userId &&
       has(access, 'finance.record')));
+
+/**
+ * Corrections re-post a gift, so they belong to whoever recorded it or to the finance managers
+ * (who can also void it).
+ */
+export const canCorrectContribution = (
+  access: AccessLike,
+  contribution: { recordedBy: string | null; voidedAt: string | null },
+) =>
+  !contribution.voidedAt &&
+  ((has(access, 'finance.record') && contribution.recordedBy === access.userId) ||
+    has(access, 'finance.manage'));
 
 /** Giving of a person: finance reports, or the person themselves ("my giving"). */
 export const canViewGivingOf = (access: AccessLike, personId: string) =>
@@ -356,7 +379,8 @@ export const financeAccountSchema = z.object({
   type: z.enum(FINANCE_ACCOUNT_TYPES),
   bankName: z.string().nullable(),
   accountNumber: z.string().nullable(),
-  openingBalance: signedMoneySchema,
+  /** Null for callers without `finance.view` or `finance.manage`. */
+  openingBalance: signedMoneySchema.nullable(),
   openingDate: isoDateSchema,
   isActive: z.boolean(),
   /** Null for callers without `finance.view`. */
@@ -532,6 +556,9 @@ export const offeringBatchLineSchema = z.object({
   categoryId: idSchema.nullable(),
   categoryName: z.string().nullable(),
   method: z.enum(PAYMENT_METHODS),
+  /** The account a non-cash line was posted to; null means the batch account. */
+  accountId: idSchema.nullable(),
+  accountName: z.string().nullable(),
   amount: moneySchema,
   denominations: z.record(z.string(), z.number()),
   note: z.string().nullable(),
@@ -543,6 +570,8 @@ export const offeringBatchLineInputSchema = z
     fundId: idSchema,
     categoryId: idSchema.nullable().default(null),
     method: z.enum(PAYMENT_METHODS).default('cash'),
+    /** Transfers and QRIS land in a bank or e-wallet; null uses the batch account. */
+    accountId: idSchema.nullable().default(null),
     amount: moneySchema,
     denominations: denominationsSchema.default({}),
     note: optionalText(LIMITS.shortTextMax),
@@ -645,6 +674,19 @@ export const returnOfferingBatchBodySchema = z.object({
   reason: optionalText(LIMITS.shortTextMax),
 });
 
+/** Worship services on a day, to link an offering count to the service it was collected in. */
+export const offeringServiceQuerySchema = z.object({ date: isoDateSchema });
+
+export const offeringServiceOptionSchema = z.object({
+  id: idSchema,
+  title: z.string(),
+  startsAt: z.string(),
+  location: z.string().nullable(),
+});
+export type OfferingServiceOption = z.infer<typeof offeringServiceOptionSchema>;
+
+export const offeringServiceListSchema = z.object({ items: z.array(offeringServiceOptionSchema) });
+
 // ---------------------------------------------------------------------------------------------
 // Contributions, campaigns and pledges
 // ---------------------------------------------------------------------------------------------
@@ -668,6 +710,7 @@ export const financeContributionSchema = z.object({
   reference: z.string().nullable(),
   receiptNumber: z.string().nullable(),
   note: z.string().nullable(),
+  recordedBy: idSchema.nullable(),
   recordedByName: z.string().nullable(),
   voidedAt: isoDateTimeSchema.nullable(),
   voidReason: z.string().nullable(),

@@ -1,5 +1,5 @@
 import { financePeriodOf, periodKey, type FinanceCategoryKind } from '@tatagereja/shared';
-import { and, eq, inArray, isNull, like, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Queryable } from '../db/client';
 import type {
@@ -19,6 +19,7 @@ import {
   users,
 } from '../db/schema';
 import { HttpError, badRequest, notFound } from '../lib/errors';
+import { enforceRateLimit, type Limiters } from '../lib/rate-limit';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 
@@ -47,19 +48,23 @@ const MONTHS_EN = [
 export const periodLabel = (year: number, month: number): string =>
   `${MONTHS_EN[month - 1] ?? month} ${year}`;
 
-/** Today's calendar day (YYYY-MM-DD) in the church time zone. */
-export function todayIn(timeZone: string): string {
+/** The calendar day (YYYY-MM-DD) of an instant in the church time zone. */
+export function dayIn(instant: string | Date, timeZone: string): string {
+  const date = typeof instant === 'string' ? new Date(instant) : instant;
   try {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).format(new Date());
+    }).format(date);
   } catch {
-    return new Date().toISOString().slice(0, 10);
+    return date.toISOString().slice(0, 10);
   }
 }
+
+/** Today's calendar day (YYYY-MM-DD) in the church time zone. */
+export const todayIn = (timeZone: string): string => dayIn(new Date(), timeZone);
 
 /** A coalesced integer sum, so empty sets read as 0 instead of null. */
 export const sumOf = (column: SQL | SQLiteColumn) =>
@@ -99,6 +104,36 @@ export function assertPeriodOpen(db: Queryable, churchId: string, ...dates: (str
         `The books for ${periodLabel(year, month)} are closed. Reopen the period to change entries dated in it.`,
       );
     }
+  }
+}
+
+/**
+ * Throws 409 PERIOD_CLOSED when any month from `date` on is closed. Opening balances feed every
+ * later balance, so they only change while none of those months is closed.
+ */
+export function assertNoClosedPeriodFrom(db: Queryable, churchId: string, date: string) {
+  const { year, month } = financePeriodOf(date);
+  const closed = db
+    .select({ year: financePeriods.year, month: financePeriods.month })
+    .from(financePeriods)
+    .where(
+      and(
+        eq(financePeriods.churchId, churchId),
+        eq(financePeriods.status, 'closed'),
+        or(
+          gt(financePeriods.year, year),
+          and(eq(financePeriods.year, year), gte(financePeriods.month, month)),
+        ),
+      ),
+    )
+    .orderBy(desc(financePeriods.year), desc(financePeriods.month))
+    .get();
+  if (closed) {
+    throw new HttpError(
+      409,
+      'PERIOD_CLOSED',
+      `The books for ${periodLabel(closed.year, closed.month)} are closed. Opening balances dated before a closed month cannot change; use a later opening date or reopen the month.`,
+    );
   }
 }
 
@@ -142,19 +177,29 @@ export function loadCategory(
   return row;
 }
 
-/** Loads a fund, account and optional category for a new posting; inactive ones are refused. */
+type PostingIds = { fundId: string; accountId: string; categoryId?: string | null };
+
+/**
+ * Loads a fund, account and optional category for a posting. Inactive ones are refused, except
+ * those a correction keeps from the row it corrects (`current`).
+ */
 export function loadPostingTargets(
   db: Queryable,
   churchId: string,
-  ids: { fundId: string; accountId: string; categoryId?: string | null },
+  ids: PostingIds,
   kind?: FinanceCategoryKind,
+  current?: PostingIds,
 ) {
   const fund = loadFund(db, churchId, ids.fundId);
   const account = loadAccount(db, churchId, ids.accountId);
   const category = ids.categoryId ? loadCategory(db, churchId, ids.categoryId, kind) : null;
-  if (!fund.isActive) throw badRequest(`The fund ${fund.name} is no longer active`);
-  if (!account.isActive) throw badRequest(`The account ${account.name} is no longer active`);
-  if (category && !category.isActive) {
+  if (!fund.isActive && fund.id !== current?.fundId) {
+    throw badRequest(`The fund ${fund.name} is no longer active`);
+  }
+  if (!account.isActive && account.id !== current?.accountId) {
+    throw badRequest(`The account ${account.name} is no longer active`);
+  }
+  if (category && !category.isActive && category.id !== current?.categoryId) {
     throw badRequest(`The category ${category.name} is no longer active`);
   }
   return { fund, account, category };
@@ -333,6 +378,13 @@ export function toCsv(rows: readonly (readonly (string | number | null | undefin
   };
   return `\uFEFF${rows.map((row) => row.map(cell).join(',')).join('\r\n')}\r\n`;
 }
+
+/** CSV exports read whole ledgers: a handful per person every few minutes is plenty. */
+export const enforceExportLimit = (limiters: Limiters, churchId: string, userId: string) =>
+  enforceRateLimit(limiters, 'finance.export', `${churchId}:${userId}`, {
+    windowMs: 10 * 60_000,
+    max: 30,
+  });
 
 /** Headers for a CSV download. */
 export const csvHeaders = (filename: string) => ({

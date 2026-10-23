@@ -2,12 +2,15 @@ import { describe, expect, it } from 'bun:test';
 import {
   shiftDate,
   budgetUsage,
+  canApproveExpense,
   canCancelExpense,
+  canCorrectContribution,
   canDecideExpense,
   canEditExpense,
   canEditOfferingBatch,
   canPayExpense,
   canReturnOfferingBatch,
+  canReversePayment,
   canVerifyOfferingBatch,
   canViewAllExpenses,
   canViewGivingOf,
@@ -123,5 +126,39 @@ describe('finance helpers and schemas', () => {
       expenseRequestInputSchema.safeParse({ ...expense, reimbursePersonId: crypto.randomUUID() })
         .success,
     ).toBe(true);
+  });
+});
+
+describe('finance controls', () => {
+  it('keeps every earlier editor from verifying a count or approving a request', () => {
+    const verifier = access(['finance.approve'], 'u9');
+    expect(canVerifyOfferingBatch(verifier, { ...batch, editorUserIds: ['u9'] })).toBe(false);
+    expect(canVerifyOfferingBatch(verifier, { ...batch, editorUserIds: ['u2'] })).toBe(true);
+    expect(canApproveExpense(verifier, { requestedBy: 'u1', editorUserIds: ['u1', 'u9'] })).toBe(
+      false,
+    );
+    expect(canApproveExpense(verifier, { requestedBy: 'u1', editorUserIds: ['u1'] })).toBe(true);
+  });
+
+  it('lets the recorder or a manager correct a gift that is not voided', () => {
+    const gift = { recordedBy: 'u1', voidedAt: null };
+    expect(canCorrectContribution(access(['finance.record'], 'u1'), gift)).toBe(true);
+    expect(canCorrectContribution(access(['finance.record'], 'u2'), gift)).toBe(false);
+    expect(canCorrectContribution(access(['finance.manage'], 'u2'), gift)).toBe(true);
+    expect(
+      canCorrectContribution(access(['finance.manage'], 'u2'), {
+        ...gift,
+        voidedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    ).toBe(false);
+  });
+
+  it('reverses payments of paid requests for managers only', () => {
+    const paid = { status: 'paid' as const, requestedBy: 'u1' };
+    expect(canReversePayment(access(['finance.manage']), paid)).toBe(true);
+    expect(canReversePayment(access(['finance.record', 'finance.approve']), paid)).toBe(false);
+    expect(canReversePayment(access(['finance.manage']), { ...paid, status: 'approved' })).toBe(
+      false,
+    );
   });
 });

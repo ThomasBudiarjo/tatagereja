@@ -54,13 +54,18 @@ export const toFund = (row: FinanceFundRow, balance: number | null): FinanceFund
   balance,
 });
 
-export const toAccount = (row: FinanceAccountRow, balance: number | null): FinanceAccount => ({
+/** `balance` is null for callers without `finance.view`, the opening balance unless `showOpening`. */
+export const toAccount = (
+  row: FinanceAccountRow,
+  balance: number | null,
+  showOpening: boolean,
+): FinanceAccount => ({
   id: row.id,
   name: row.name,
   type: row.type,
   bankName: row.bankName,
   accountNumber: row.accountNumber,
-  openingBalance: row.openingBalance,
+  openingBalance: showOpening ? row.openingBalance : null,
   openingDate: row.openingDate,
   isActive: row.isActive,
   balance,
@@ -195,6 +200,8 @@ export function hydrateBatches(
         categoryId: line.categoryId,
         categoryName: line.categoryId ? (names.categories.get(line.categoryId) ?? null) : null,
         method: line.method,
+        accountId: line.accountId,
+        accountName: line.accountId ? (names.accounts.get(line.accountId) ?? null) : null,
         amount: line.amount,
         denominations: line.denominations ?? {},
         note: line.note,
@@ -268,6 +275,7 @@ export function hydrateContributions(
     reference: row.reference,
     receiptNumber: row.receiptNumber,
     note: row.note,
+    recordedBy: row.recordedBy,
     recordedByName: row.recordedBy ? (recorders.get(row.recordedBy) ?? null) : null,
     voidedAt: row.voidedAt,
     voidReason: row.voidReason,

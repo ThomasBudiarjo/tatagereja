@@ -9,12 +9,14 @@ import {
   localize,
   offeringBatchInputSchema,
   offeringBatchListQuerySchema,
+  offeringServiceQuerySchema,
   returnOfferingBatchBodySchema,
+  shiftDate,
   voidFinanceBodySchema,
   type AccessLike,
   type OfferingBatchInput,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gte, like, lte, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, like, lt, lte, ne, or, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { ChurchRow, OfferingBatchRow } from '../../db/schema';
@@ -33,10 +35,12 @@ import { authPlugin } from '../../plugins/auth';
 import { recordAudit } from '../../services/audit';
 import {
   assertPeriodOpen,
+  dayIn,
   loadPostingTargets,
   postEntry,
   voidEntriesOf,
 } from '../../services/finance';
+import { moduleEnabled } from '../../services/modules';
 import { notify } from '../../services/notifications';
 import { hydrateBatches } from './serializers';
 
@@ -45,7 +49,7 @@ const VIEWERS = ['finance.view', 'finance.record', 'finance.approve'] as const;
 /** What the audit log keeps of a count: totals per line, not the banknote detail. */
 const snapshot = (
   row: OfferingBatchRow,
-  lines: { fundId: string; method: string; amount: number }[],
+  lines: { fundId: string; method: string; accountId?: string | null; amount: number }[],
 ) => ({
   serviceDate: row.serviceDate,
   serviceLabel: row.serviceLabel,
@@ -54,8 +58,21 @@ const snapshot = (
   totalAmount: row.totalAmount,
   counter1: row.counter1Name ?? row.counter1UserId,
   counter2: row.counter2Name ?? row.counter2UserId,
-  lines: lines.map((line) => ({ fundId: line.fundId, method: line.method, amount: line.amount })),
+  lines: lines.map((line) => ({
+    fundId: line.fundId,
+    method: line.method,
+    accountId: line.accountId ?? null,
+    amount: line.amount,
+  })),
 });
+
+/** Cash stays in the batch account; transfers and QRIS may name the account they landed in. */
+const lineAccountOf = (line: { method: string; accountId?: string | null }) =>
+  line.method === 'cash' ? null : (line.accountId ?? null);
+
+/** Adds a user to the people who changed a count (none of them may verify it). */
+const withEditor = (editors: readonly string[], userId: string) =>
+  editors.includes(userId) ? [...editors] : [...editors, userId];
 
 const serviceName = (row: Pick<OfferingBatchRow, 'serviceLabel' | 'serviceDate'>) =>
   row.serviceLabel ? `${row.serviceLabel} (${row.serviceDate})` : `Ibadah ${row.serviceDate}`;
@@ -93,7 +110,11 @@ export const offeringsRouter = (deps: Deps) => {
       loadPostingTargets(
         db,
         churchId,
-        { fundId: line.fundId, accountId: body.accountId, categoryId: line.categoryId },
+        {
+          fundId: line.fundId,
+          accountId: lineAccountOf(line) ?? body.accountId,
+          categoryId: line.categoryId,
+        },
         'income',
       );
     }
@@ -137,6 +158,7 @@ export const offeringsRouter = (deps: Deps) => {
           fundId: line.fundId,
           categoryId: line.categoryId,
           method: line.method,
+          accountId: lineAccountOf(line),
           amount: line.amount,
           denominations: line.method === 'cash' ? line.denominations : {},
           note: line.note,
@@ -155,9 +177,13 @@ export const offeringsRouter = (deps: Deps) => {
     notify(tx, {
       churchId: church.id,
       audience: { kind: 'permission', permission: 'finance.approve' },
-      excludeUserIds: [actorId, row.counter1UserId, row.counter2UserId, row.createdBy].filter(
-        (id): id is string => !!id,
-      ),
+      excludeUserIds: [
+        actorId,
+        row.counter1UserId,
+        row.counter2UserId,
+        row.createdBy,
+        ...row.editorUserIds,
+      ].filter((id): id is string => !!id),
       type: 'finance.offering_submitted',
       title: 'Hitungan persembahan menunggu verifikasi',
       body: serviceName(row),
@@ -219,6 +245,40 @@ export const offeringsRouter = (deps: Deps) => {
         query: offeringBatchListQuerySchema,
       },
     )
+    .get(
+      '/services',
+      ({ church, query }) => {
+        if (!moduleEnabled(church, 'worship')) return { items: [] };
+        // Services are stored in UTC; keep the ones that fall on the day in the church time zone.
+        const rows = db
+          .select()
+          .from(worshipServices)
+          .where(
+            and(
+              eq(worshipServices.churchId, church.id),
+              ne(worshipServices.status, 'cancelled'),
+              gte(worshipServices.startsAt, shiftDate(query.date, -1)),
+              lt(worshipServices.startsAt, shiftDate(query.date, 2)),
+            ),
+          )
+          .orderBy(asc(worshipServices.startsAt))
+          .all()
+          .filter((row) => dayIn(row.startsAt, church.timezone) === query.date);
+        return {
+          items: rows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            startsAt: row.startsAt,
+            location: row.location,
+          })),
+        };
+      },
+      {
+        church: { module: 'finance', permission: 'finance.record' },
+        params: churchParamsSchema,
+        query: offeringServiceQuerySchema,
+      },
+    )
     .post(
       '/',
       ({ church, access, auth, audit, body, set }) => {
@@ -245,6 +305,7 @@ export const offeringsRouter = (deps: Deps) => {
               ...(body.submit ? submitFields(auth.user.id) : {}),
               createdBy: auth.user.id,
               updatedBy: auth.user.id,
+              editorUserIds: [auth.user.id],
               createdAt: now,
               updatedAt: now,
             })
@@ -307,6 +368,7 @@ export const offeringsRouter = (deps: Deps) => {
               notes: body.notes,
               ...(body.submit ? submitFields(auth.user.id) : {}),
               updatedBy: auth.user.id,
+              editorUserIds: withEditor(batch.editorUserIds, auth.user.id),
               updatedAt: nowIso(),
             })
             .where(eq(offeringBatches.id, batch.id))
@@ -345,7 +407,11 @@ export const offeringsRouter = (deps: Deps) => {
         const row = db.transaction((tx) => {
           const updated = tx
             .update(offeringBatches)
-            .set({ ...submitFields(auth.user.id), updatedAt: nowIso() })
+            .set({
+              ...submitFields(auth.user.id),
+              editorUserIds: withEditor(batch.editorUserIds, auth.user.id),
+              updatedAt: nowIso(),
+            })
             .where(eq(offeringBatches.id, batch.id))
             .returning()
             .get();
@@ -455,7 +521,7 @@ export const offeringsRouter = (deps: Deps) => {
             postEntry(tx, {
               churchId: church.id,
               entryDate: batch.serviceDate,
-              accountId: batch.accountId,
+              accountId: line.accountId ?? batch.accountId,
               fundId: line.fundId,
               categoryId: line.categoryId,
               amount: line.amount,

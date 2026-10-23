@@ -37,6 +37,7 @@ import {
   addMonths,
   assertPeriodOpen,
   csvHeaders,
+  enforceExportLimit,
   expenseSum,
   incomeSum,
   liveEntry,
@@ -81,7 +82,10 @@ export function pendingFor(db: Queryable, churchId: string, access: AccessLike):
     .all()
     .filter((row) => canVerifyOfferingBatch(access, row)).length;
   const expenses = db
-    .select({ requestedBy: expenseRequests.requestedBy })
+    .select({
+      requestedBy: expenseRequests.requestedBy,
+      editorUserIds: expenseRequests.editorUserIds,
+    })
     .from(expenseRequests)
     .where(and(eq(expenseRequests.churchId, churchId), eq(expenseRequests.status, 'submitted')))
     .all()
@@ -202,7 +206,7 @@ export const ledgerRouter = (deps: Deps) => {
       })
       .get(
         '/entries',
-        ({ church, query, set }) => {
+        ({ church, auth, query, set }) => {
           const conditions: SQL[] = [eq(financeEntries.churchId, church.id)];
           if (!query.includeVoided) conditions.push(liveEntry);
           if (query.from) conditions.push(gte(financeEntries.entryDate, query.from));
@@ -231,6 +235,7 @@ export const ledgerRouter = (deps: Deps) => {
             : undefined;
 
           if (query.format === 'csv') {
+            enforceExportLimit(deps.limiters, church.id, auth.user.id);
             const items = hydrateEntries(
               db,
               church.id,

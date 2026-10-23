@@ -395,8 +395,14 @@ describe('finance income: offerings and contributions', () => {
         token: viewer.token,
       });
       expect(search.json.total).toBe(1);
+      // Recorders without finance.view only review the gifts they recorded themselves.
+      const recorded = await t.request('GET', `${f.base}/contributions`, { token: counter.token });
+      expect(recorded.status).toBe(200);
+      for (const item of recorded.json.items) expect(item.recordedBy).toBe(counter.user.id);
+      const all = await t.request('GET', `${f.base}/contributions`, { token: viewer.token });
+      expect(recorded.json.total).toBeLessThanOrEqual(all.json.total);
       expect(
-        (await t.request('GET', `${f.base}/contributions`, { token: counter.token })).status,
+        (await t.request('GET', `${f.base}/contributions`, { token: s.member.token })).status,
       ).toBe(403);
     });
 

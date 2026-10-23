@@ -3,6 +3,7 @@ import {
   CONTRIBUTION_KIND_CATEGORY,
   CONTRIBUTION_KIND_LABELS,
   LIMITS,
+  canCorrectContribution,
   canViewGivingOf,
   churchIdParamsSchema,
   churchParamsSchema,
@@ -54,6 +55,7 @@ import { changes, recordAudit } from '../../services/audit';
 import {
   assertPeriodOpen,
   csvHeaders,
+  enforceExportLimit,
   loadPersonInChurch,
   loadPostingTargets,
   nextReceiptNumber,
@@ -151,8 +153,12 @@ export const contributionsRouter = (deps: Deps) => {
   };
 
   /** Checks every reference and fills in the suggested category of the kind. */
-  const resolve = (churchId: string, body: FinanceContributionInput) => {
-    const targets = loadPostingTargets(db, churchId, body, 'income');
+  const resolve = (
+    churchId: string,
+    body: FinanceContributionInput,
+    current?: FinanceContributionRow,
+  ) => {
+    const targets = loadPostingTargets(db, churchId, body, 'income', current);
     const person = body.personId ? loadPersonInChurch(db, churchId, body.personId) : null;
     if (body.campaignId) {
       const campaign = db
@@ -163,7 +169,10 @@ export const contributionsRouter = (deps: Deps) => {
         )
         .get();
       if (!campaign) throw notFound('Campaign');
-      if (campaign.status !== 'active') throw badRequest(`The campaign ${campaign.name} is closed`);
+      // A correction may keep the campaign it was given to after the campaign closed.
+      if (campaign.status !== 'active' && campaign.id !== current?.campaignId) {
+        throw badRequest(`The campaign ${campaign.name} is closed`);
+      }
     }
     let categoryId = body.categoryId;
     const suggested = CONTRIBUTION_KIND_CATEGORY[body.kind];
@@ -226,8 +235,12 @@ export const contributionsRouter = (deps: Deps) => {
       .use(authPlugin(deps))
       .get(
         '/contributions',
-        ({ church, query }) => {
+        ({ church, access, query }) => {
           const conditions: SQL[] = [eq(financeContributions.churchId, church.id)];
+          // Recorders without `finance.view` review only the gifts they recorded themselves.
+          if (!has(access, 'finance.view')) {
+            conditions.push(eq(financeContributions.recordedBy, access.userId));
+          }
           if (!query.includeVoided) conditions.push(live);
           if (query.personId) conditions.push(eq(financeContributions.personId, query.personId));
           if (query.kind) conditions.push(eq(financeContributions.kind, query.kind));
@@ -291,7 +304,7 @@ export const contributionsRouter = (deps: Deps) => {
           };
         },
         {
-          church: { module: 'finance', permission: 'finance.view' },
+          church: { module: 'finance', permission: ['finance.view', 'finance.record'] },
           params: churchParamsSchema,
           query: financeContributionListQuerySchema,
         },
@@ -351,19 +364,25 @@ export const contributionsRouter = (deps: Deps) => {
         '/contributions/:id',
         ({ church, access, params }) => {
           const row = loadContribution(church.id, params.id);
-          // A receipt: finance viewers, or the giver themselves.
+          // A receipt: finance viewers, the giver themselves, or whoever recorded it.
           const own = !!row.personId && row.personId === access.personId;
-          if (!has(access, 'finance.view') && !own) throw notFound('Contribution');
+          const recorded = row.recordedBy === access.userId && has(access, 'finance.record');
+          if (!has(access, 'finance.view') && !own && !recorded) throw notFound('Contribution');
           return { contribution: hydrateOne(church.id, row) };
         },
         { church: 'finance', params: churchIdParamsSchema },
       )
       .patch(
         '/contributions/:id',
-        ({ church, auth, audit, params, body }) => {
+        ({ church, access, auth, audit, params, body }) => {
           const current = loadContribution(church.id, params.id);
           if (current.voidedAt) throw conflict('A voided contribution cannot be corrected');
-          const resolved = resolve(church.id, body);
+          if (!canCorrectContribution(access, current)) {
+            throw forbidden(
+              'Only the person who recorded this gift or a finance manager can correct it',
+            );
+          }
+          const resolved = resolve(church.id, body, current);
           assertPeriodOpen(db, church.id, current.receivedAt, body.receivedAt);
           const row = db.transaction((tx) => {
             const updated = tx
@@ -409,7 +428,7 @@ export const contributionsRouter = (deps: Deps) => {
           return { contribution: hydrateOne(church.id, row) };
         },
         {
-          church: { module: 'finance', permission: 'finance.record' },
+          church: { module: 'finance', permission: ['finance.record', 'finance.manage'] },
           params: churchIdParamsSchema,
           body: financeContributionInputSchema,
         },
@@ -475,7 +494,7 @@ export const contributionsRouter = (deps: Deps) => {
       )
       .get(
         '/giving-statements',
-        ({ church, query, set }) => {
+        ({ church, auth, query, set }) => {
           const range = and(
             eq(financeContributions.churchId, church.id),
             live,
@@ -517,6 +536,7 @@ export const contributionsRouter = (deps: Deps) => {
             lastGiftAt: row.lastGiftAt,
           });
           if (query.format === 'csv') {
+            enforceExportLimit(deps.limiters, church.id, auth.user.id);
             Object.assign(set.headers, csvHeaders(`rekap-persembahan-${query.year}.csv`));
             return toCsv([
               ['Nama', 'Jumlah pemberian', 'Total', 'Terakhir'],

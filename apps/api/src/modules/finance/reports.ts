@@ -18,6 +18,7 @@ import type { Deps } from '../../deps';
 import { authPlugin } from '../../plugins/auth';
 import {
   csvHeaders,
+  enforceExportLimit,
   expenseSum,
   incomeSum,
   liveEntry,
@@ -26,6 +27,7 @@ import {
   monthsBetween,
   sumOf,
   toCsv,
+  todayIn,
 } from '../../services/finance';
 
 type Totals = { income: number; expense: number };
@@ -83,13 +85,17 @@ export function buildReport(
         .map((item) => [item.key ?? '', { income: item.income, expense: item.expense }]),
     );
 
+  // Months and weeks that have not started yet stay out of the series instead of reading as 0.
+  const today = todayIn(church.timezone);
+  const lastDay = query.to < today ? query.to : today;
   let rows: FinanceReportRow[] = [];
   switch (kind) {
     case 'income_expense': {
       const totals = totalsBy(sql`substr(${financeEntries.entryDate}, 1, 7)`, earnings);
-      rows = monthsBetween(query.from, query.to).map((month) =>
-        row(month, month, totals.get(month)),
-      );
+      rows =
+        query.from > lastDay
+          ? []
+          : monthsBetween(query.from, lastDay).map((month) => row(month, month, totals.get(month)));
       break;
     }
     case 'trend': {
@@ -97,7 +103,7 @@ export function buildReport(
         sql`date(${financeEntries.entryDate}, '-' || strftime('%w', ${financeEntries.entryDate}) || ' days')`,
         earnings,
       );
-      for (let week = weekStart(query.from); week <= query.to; week = shiftDate(week, 7)) {
+      for (let week = weekStart(query.from); week <= lastDay; week = shiftDate(week, 7)) {
         rows.push(row(week, week, totals.get(week)));
       }
       break;
@@ -194,11 +200,12 @@ export const reportsRouter = (deps: Deps) => {
   const { db } = deps;
   return new Elysia({ prefix: '/churches/:churchId/finance/reports' }).use(authPlugin(deps)).get(
     '/:kind',
-    ({ church, params, query, set }) => {
+    ({ church, auth, params, query, set }) => {
       if (query.fundId) loadFund(db, church.id, query.fundId);
       if (query.accountId) loadAccount(db, church.id, query.accountId);
       const report = buildReport(db, church, params.kind, query);
       if (query.format === 'csv') {
+        enforceExportLimit(deps.limiters, church.id, auth.user.id);
         const cashFlow = params.kind === 'cash_flow';
         Object.assign(
           set.headers,

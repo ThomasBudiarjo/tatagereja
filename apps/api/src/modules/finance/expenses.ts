@@ -3,6 +3,7 @@ import {
   canCancelExpense,
   canEditExpense,
   canPayExpense,
+  canReversePayment,
   canViewAllExpenses,
   cancelExpenseBodySchema,
   churchIdParamsSchema,
@@ -12,6 +13,7 @@ import {
   expenseRequestListQuerySchema,
   fullName,
   payExpenseBodySchema,
+  voidFinanceBodySchema,
   type AccessLike,
   type ExpenseRequestInput,
 } from '@tatagereja/shared';
@@ -34,6 +36,7 @@ import {
   loadPersonInChurch,
   loadPostingTargets,
   postEntry,
+  voidEntriesOf,
 } from '../../services/finance';
 import { notify } from '../../services/notifications';
 import { hydrateExpenses } from './serializers';
@@ -106,7 +109,7 @@ export const expensesRouter = (deps: Deps) => {
     notify(tx, {
       churchId: church.id,
       audience: { kind: 'permission', permission: 'finance.approve' },
-      excludeUserIds: row.requestedBy ? [row.requestedBy] : [],
+      excludeUserIds: [row.requestedBy, ...row.editorUserIds].filter((id): id is string => !!id),
       type: 'finance.expense_submitted',
       title: row.isReimbursement
         ? 'Penggantian biaya menunggu persetujuan'
@@ -204,6 +207,7 @@ export const expensesRouter = (deps: Deps) => {
               status: 'draft',
               ...(body.submit ? submitted() : {}),
               requestedBy: auth.user.id,
+              editorUserIds: [auth.user.id],
               createdAt: now,
               updatedAt: now,
             })
@@ -238,7 +242,7 @@ export const expensesRouter = (deps: Deps) => {
     )
     .patch(
       '/:id',
-      ({ church, access, audit, params, body }) => {
+      ({ church, access, auth, audit, params, body }) => {
         const expense = loadExpense(church.id, access, params.id);
         if (expense.status !== 'draft') throw conflict('Only drafts can be edited');
         if (!canEditExpense(access, expense)) throw forbidden('You cannot edit this request');
@@ -246,7 +250,15 @@ export const expensesRouter = (deps: Deps) => {
         const row = db.transaction((tx) => {
           const updated = tx
             .update(expenseRequests)
-            .set({ ...values, ...(body.submit ? submitted() : {}), updatedAt: nowIso() })
+            .set({
+              ...values,
+              ...(body.submit ? submitted() : {}),
+              // Whoever changes a request can no longer approve it.
+              editorUserIds: expense.editorUserIds.includes(auth.user.id)
+                ? expense.editorUserIds
+                : [...expense.editorUserIds, auth.user.id],
+              updatedAt: nowIso(),
+            })
             .where(eq(expenseRequests.id, expense.id))
             .returning()
             .get();
@@ -416,6 +428,62 @@ export const expensesRouter = (deps: Deps) => {
         church: { module: 'finance', permission: ['finance.record', 'finance.manage'] },
         params: churchIdParamsSchema,
         body: payExpenseBodySchema,
+      },
+    )
+    .post(
+      '/:id/reverse-payment',
+      ({ church, access, auth, audit, params, body }) => {
+        const expense = loadExpense(church.id, access, params.id);
+        if (!canReversePayment(access, expense)) {
+          throw conflict('Only paid requests can have their payment reversed');
+        }
+        assertPeriodOpen(db, church.id, expense.paidAt);
+        const row = db.transaction((tx) => {
+          const updated = tx
+            .update(expenseRequests)
+            .set({
+              status: 'approved',
+              paidAt: null,
+              paidBy: null,
+              paidFromAccountId: null,
+              paymentReference: null,
+              updatedAt: nowIso(),
+            })
+            .where(and(eq(expenseRequests.id, expense.id), eq(expenseRequests.status, 'paid')))
+            .returning()
+            .get();
+          if (!updated) throw conflict('This request changed; reload it');
+          // The ledger keeps the payment, voided, so the correction stays visible.
+          const voided = voidEntriesOf(
+            tx,
+            church.id,
+            { type: 'expense', id: expense.id },
+            auth.user.id,
+            body.reason,
+          );
+          recordAudit(tx, audit, {
+            module: 'finance',
+            action: 'expense.reverse_payment',
+            entityType: 'expense_request',
+            entityId: expense.id,
+            summary: `Reversed the payment of ${expense.title}`,
+            before: {
+              status: expense.status,
+              accountId: expense.paidFromAccountId,
+              paidAt: expense.paidAt,
+              paymentReference: expense.paymentReference,
+              amount: expense.amount,
+            },
+            after: { status: updated.status, reason: body.reason, voidedEntries: voided },
+          });
+          return updated;
+        });
+        return { expense: hydrateOne(church.id, access, row) };
+      },
+      {
+        church: { module: 'finance', permission: 'finance.manage' },
+        params: churchIdParamsSchema,
+        body: voidFinanceBodySchema,
       },
     )
     .post(

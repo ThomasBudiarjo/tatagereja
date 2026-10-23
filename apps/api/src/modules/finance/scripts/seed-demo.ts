@@ -4,9 +4,12 @@
  *   bun scripts/screenshots.ts --port 3102 --seed --routes /churches   # demo account + church
  *   bun apps/api/src/modules/finance/scripts/seed-demo.ts --port 3102
  *
- * Signs in as the screenshot demo account (owner), adds a second member who verifies and
- * approves (segregation of duties), and records a few months of offerings, giving, expenses,
- * a budget, a campaign with pledges and a closed month. Safe to run once per database.
+ * Signs in as the screenshot demo account (owner) and adds three members, all with the
+ * password `demo-password`: penatua@tatagereja.test verifies and approves (segregation of
+ * duties), penghitung@tatagereja.test only records (a custom role), and
+ * anggota@tatagereja.test is a plain member who sees only their own giving. Then it records a
+ * few months of offerings, giving, expenses, a budget, a campaign with pledges and a closed
+ * month. Safe to run once per database.
  */
 export {};
 
@@ -100,30 +103,41 @@ const account = (name: string) => setup.accounts.find((item) => item.name === na
 const category = (name: string) =>
   setup.categories.find((item) => item.name === name)!.id as string;
 
-// A second member: Penatua who verifies counts and approves requests.
+// Members: a Penatua who verifies and approves, a counter who only records, and a member.
 const invitation = await api<{ invitation: { token: string } }>(`${at}/invitations`, {
   token,
   body: { expiresInDays: 7 },
 });
-const elderEmail = `penatua-${Date.now()}@tatagereja.test`;
-const elder = await api<{ token: string; user: { id: string } }>('/auth/register', {
-  body: { name: 'Pnt. Yohanes Tambunan', email: elderEmail, password: 'demo-password' },
-});
-await api(`/invitations/${invitation.invitation.token}/accept`, {
-  method: 'POST',
-  token: elder.token,
-});
-const role = await api<{ role: { id: string } }>(`${at}/roles`, {
-  token,
-  body: {
-    name: 'Penatua Bidang Keuangan',
-    description: null,
-    permissions: ['finance.view', 'finance.approve', 'finance.reports', 'finance.record'],
-  },
-});
-const members = await api<{ items: { id: string; userId: string }[] }>(`${at}/members`, { token });
-const membership = members.items.find((item) => item.userId === elder.user.id)!;
-await api(`${at}/members/${membership.id}/roles`, { token, body: { roleId: role.role.id } });
+const join = async (name: string, email: string, permissions: string[]) => {
+  const user = await api<{ token: string; user: { id: string } }>('/auth/register', {
+    body: { name, email, password: 'demo-password' },
+  });
+  await api(`/invitations/${invitation.invitation.token}/accept`, {
+    method: 'POST',
+    token: user.token,
+  });
+  if (permissions.length > 0) {
+    const role = await api<{ role: { id: string } }>(`${at}/roles`, {
+      token,
+      body: { name: `Peran ${name}`, description: null, permissions },
+    });
+    const members = await api<{ items: { id: string; userId: string }[] }>(`${at}/members`, {
+      token,
+    });
+    const membership = members.items.find((item) => item.userId === user.user.id)!;
+    await api(`${at}/members/${membership.id}/roles`, { token, body: { roleId: role.role.id } });
+  }
+  return user;
+};
+const elderEmail = 'penatua@tatagereja.test';
+const elder = await join('Pnt. Yohanes Tambunan', elderEmail, [
+  'finance.view',
+  'finance.approve',
+  'finance.reports',
+  'finance.record',
+]);
+await join('Dkn. Ruth Siregar', 'penghitung@tatagereja.test', ['finance.record']);
+const member = await join('Andreas Wijaya', 'anggota@tatagereja.test', []);
 
 // Service offerings for the last ten Sundays.
 const notes = (total: number) => {
@@ -164,6 +178,7 @@ for (let week = 10; week >= 0; week -= 1) {
             fundId: fund('Kas Umum'),
             categoryId: category('Persembahan Ibadah'),
             method: 'qris',
+            accountId: account('QRIS Gereja'),
             amount: qris,
           },
           ...(label === 'Ibadah Umum 1'
@@ -181,14 +196,31 @@ for (let week = 10; week >= 0; week -= 1) {
   }
 }
 
-// Individual giving.
+// Individual giving, including a long Batak name to check how lists wrap it.
+await api(`${at}/people`, {
+  token,
+  body: {
+    firstName: 'Theodorus Hasiholan',
+    lastName: 'Lumbantobing Simatupang Panggabean',
+    membershipStatus: 'member',
+  },
+});
 const people = await api<{ items: { id: string; firstName: string }[] }>(`${at}/people?limit=50`, {
   token,
 });
+// The plain member sees their own giving under "My giving".
+const andreas = people.items.find((person) => person.firstName === 'Andreas');
+if (andreas) {
+  await api(`${at}/people/${andreas.id}/user`, {
+    method: 'PUT',
+    token,
+    body: { userId: member.user.id },
+  });
+}
 const kinds = ['tithe', 'tithe', 'thanksgiving', 'tithe', 'donation', 'special'] as const;
 let index = 0;
 for (let month = 5; month >= 0; month -= 1) {
-  for (const person of people.items.slice(0, 6)) {
+  for (const person of people.items) {
     index += 1;
     const kind = kinds[index % kinds.length]!;
     await api(`${fin}/contributions`, {
@@ -415,4 +447,4 @@ await api(`${fin}/periods/${closing.getFullYear()}/${closing.getMonth() + 1}/clo
   method: 'POST',
   token,
 }).catch((error) => console.warn(`Could not close a month: ${(error as Error).message}`));
-console.info(`Seeded finance for ${churchId}; verifier ${elderEmail} / demo-password`);
+console.info(`Seeded finance for ${churchId}; members ${elderEmail}, penghitung@ and anggota@`);

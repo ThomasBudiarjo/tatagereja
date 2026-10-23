@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "73a4b489-1394-4289-8706-439446018492",
+  "id": "a920aba4-cb5b-4ee1-a1a2-204e69ff6b4e",
   "prevId": "8d1db1ff-9713-40bb-9092-622397e85f53",
   "tables": {
     "announcements": {
@@ -8945,6 +8945,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "editor_user_ids": {
+          "name": "editor_user_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
         "submitted_at": {
           "name": "submitted_at",
           "type": "text",
@@ -10727,6 +10735,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "amount": {
           "name": "amount",
           "type": "integer",
@@ -10814,6 +10829,19 @@
           "tableTo": "finance_categories",
           "columnsFrom": [
             "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "offering_batch_lines_account_id_finance_accounts_id_fk": {
+          "name": "offering_batch_lines_account_id_finance_accounts_id_fk",
+          "tableFrom": "offering_batch_lines",
+          "tableTo": "finance_accounts",
+          "columnsFrom": [
+            "account_id"
           ],
           "columnsTo": [
             "id"
@@ -10942,6 +10970,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "editor_user_ids": {
+          "name": "editor_user_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
         },
         "verified_by": {
           "name": "verified_by",

@@ -11,6 +11,7 @@ import {
   financeDonorQuerySchema,
   financeFundInputSchema,
   has,
+  hasAny,
   type AccessLike,
   type FinanceSetup,
   type Permission,
@@ -45,7 +46,7 @@ import { toPersonSummary } from '../../serializers';
 import { changes, recordAudit } from '../../services/audit';
 import {
   accountBalances,
-  assertPeriodOpen,
+  assertNoClosedPeriodFrom,
   fundBalances,
   loadAccount,
   loadCategory,
@@ -65,6 +66,7 @@ export const FINANCE_ANY: readonly Permission[] = [
 /** Funds, accounts and categories; balances only for callers holding `finance.view`. */
 export function loadSetup(db: Queryable, churchId: string, access: AccessLike): FinanceSetup {
   const showBalances = has(access, 'finance.view');
+  const showOpening = hasAny(access, ['finance.view', 'finance.manage']);
   const accounts = showBalances ? accountBalances(db, churchId) : null;
   const funds = showBalances ? fundBalances(db, churchId) : null;
   return {
@@ -81,7 +83,7 @@ export function loadSetup(db: Queryable, churchId: string, access: AccessLike): 
       .where(eq(financeAccounts.churchId, churchId))
       .orderBy(asc(financeAccounts.name))
       .all()
-      .map((row) => toAccount(row, accounts ? (accounts.get(row.id) ?? 0) : null)),
+      .map((row) => toAccount(row, accounts ? (accounts.get(row.id) ?? 0) : null, showOpening)),
     categories: db
       .select()
       .from(financeCategories)
@@ -349,7 +351,7 @@ export const setupRouter = (deps: Deps) => {
         '/accounts',
         ({ church, access, audit, body, set }) => {
           assertUniqueAccount(church.id, body.name);
-          assertPeriodOpen(db, church.id, body.openingDate);
+          assertNoClosedPeriodFrom(db, church.id, body.openingDate);
           const now = nowIso();
           const row = db.transaction((tx) => {
             const inserted = tx
@@ -369,7 +371,7 @@ export const setupRouter = (deps: Deps) => {
           });
           set.status = 201;
           return {
-            account: toAccount(row, has(access, 'finance.view') ? row.openingBalance : null),
+            account: toAccount(row, has(access, 'finance.view') ? row.openingBalance : null, true),
           };
         },
         {
@@ -383,12 +385,17 @@ export const setupRouter = (deps: Deps) => {
         ({ church, access, audit, params, body }) => {
           const account = loadAccount(db, church.id, params.id);
           assertUniqueAccount(church.id, body.name, account.id);
-          // The opening balance is part of every later balance: it changes only in open months.
+          // The opening balance is part of every later balance: it changes only while no month
+          // from the opening date on has been closed.
           if (
             body.openingBalance !== account.openingBalance ||
             body.openingDate !== account.openingDate
           ) {
-            assertPeriodOpen(db, church.id, account.openingDate, body.openingDate);
+            assertNoClosedPeriodFrom(
+              db,
+              church.id,
+              account.openingDate < body.openingDate ? account.openingDate : body.openingDate,
+            );
           }
           const row = db.transaction((tx) => {
             const updated = tx
@@ -411,7 +418,7 @@ export const setupRouter = (deps: Deps) => {
           const balance = has(access, 'finance.view')
             ? (accountBalances(db, church.id).get(row.id) ?? 0)
             : null;
-          return { account: toAccount(row, balance) };
+          return { account: toAccount(row, balance, true) };
         },
         {
           church: { module: 'finance', permission: 'finance.manage' },
@@ -426,6 +433,7 @@ export const setupRouter = (deps: Deps) => {
           const used = isUsed([
             { table: financeEntries, where: eq(financeEntries.accountId, account.id) },
             { table: offeringBatches, where: eq(offeringBatches.accountId, account.id) },
+            { table: offeringBatchLines, where: eq(offeringBatchLines.accountId, account.id) },
             { table: financeContributions, where: eq(financeContributions.accountId, account.id) },
             { table: expenseRequests, where: eq(expenseRequests.paidFromAccountId, account.id) },
             {
@@ -497,6 +505,11 @@ export const setupRouter = (deps: Deps) => {
           if (body.kind !== category.kind) {
             const used = isUsed([
               { table: financeEntries, where: eq(financeEntries.categoryId, category.id) },
+              { table: offeringBatchLines, where: eq(offeringBatchLines.categoryId, category.id) },
+              {
+                table: financeContributions,
+                where: eq(financeContributions.categoryId, category.id),
+              },
               { table: expenseRequests, where: eq(expenseRequests.categoryId, category.id) },
               { table: financeBudgets, where: eq(financeBudgets.categoryId, category.id) },
             ]);
