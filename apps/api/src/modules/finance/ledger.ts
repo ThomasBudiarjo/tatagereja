@@ -16,7 +16,7 @@ import {
   type FinancePending,
   type FinanceSummary,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gt, gte, like, lt, lte, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, like, lt, lte, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { ChurchRow, FinanceEntryRow } from '../../db/schema';
@@ -53,26 +53,35 @@ import {
 import { hydrateEntries, hydrateTransfers } from './serializers';
 import { loadSetup } from './setup';
 
-/** Income and expense of live entries, transfers left out (they move money, not earn it). */
-const earningsBetween = (db: Queryable, churchId: string, from: string, to: string) =>
-  db
-    .select({ income: incomeSum, expense: expenseSum })
-    .from(financeEntries)
-    .where(
-      and(
-        eq(financeEntries.churchId, churchId),
-        liveEntry,
-        gte(financeEntries.entryDate, from),
-        lte(financeEntries.entryDate, to),
-        or(
-          eq(financeEntries.sourceType, 'offering'),
-          eq(financeEntries.sourceType, 'contribution'),
-          eq(financeEntries.sourceType, 'expense'),
-          eq(financeEntries.sourceType, 'adjustment'),
+/**
+ * Income and expense of live entries per month (`YYYY-MM`), transfers left out (they move money,
+ * not earn it). One grouped scan of the covering ledger index for the whole range.
+ */
+const earningsByMonth = (db: Queryable, churchId: string, from: string, to: string) => {
+  const month = sql<string>`substr(${financeEntries.entryDate}, 1, 7)`;
+  return new Map(
+    db
+      .select({ month, income: incomeSum, expense: expenseSum })
+      .from(financeEntries)
+      .where(
+        and(
+          eq(financeEntries.churchId, churchId),
+          liveEntry,
+          gte(financeEntries.entryDate, from),
+          lte(financeEntries.entryDate, to),
+          or(
+            eq(financeEntries.sourceType, 'offering'),
+            eq(financeEntries.sourceType, 'contribution'),
+            eq(financeEntries.sourceType, 'expense'),
+            eq(financeEntries.sourceType, 'adjustment'),
+          ),
         ),
-      ),
-    )
-    .get() ?? { income: 0, expense: 0 };
+      )
+      .groupBy(month)
+      .all()
+      .map((row) => [row.month, { income: row.income, expense: row.expense }]),
+  );
+};
 
 /** Counts the caller can act on now: offering counts to verify and requests to decide. */
 export function pendingFor(db: Queryable, churchId: string, access: AccessLike): FinancePending {
@@ -126,12 +135,13 @@ export function financeSummary(
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthOf = (key: string) => monthRange(Number(key.slice(0, 4)), Number(key.slice(5, 7)));
   const thisMonth = monthOf(monthStart);
-  const lastMonth = monthOf(addMonths(monthStart, -1));
-  const current = earningsBetween(db, church.id, thisMonth.from, thisMonth.to);
-  const previous = earningsBetween(db, church.id, lastMonth.from, lastMonth.to);
-  const trend = monthsBetween(addMonths(monthStart, -5), today).map((month) => {
-    const range = monthOf(month);
-    const totals = earningsBetween(db, church.id, range.from, range.to);
+  const trendStart = addMonths(monthStart, -5);
+  const earnings = earningsByMonth(db, church.id, monthOf(trendStart).from, thisMonth.to);
+  const none = { income: 0, expense: 0 };
+  const current = earnings.get(monthStart.slice(0, 7)) ?? none;
+  const previous = earnings.get(addMonths(monthStart, -1).slice(0, 7)) ?? none;
+  const trend = monthsBetween(trendStart, today).map((month) => {
+    const totals = earnings.get(month.slice(0, 7)) ?? none;
     return { month, income: totals.income, expense: totals.expense };
   });
   const recent = db
