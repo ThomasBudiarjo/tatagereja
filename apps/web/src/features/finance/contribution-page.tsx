@@ -8,16 +8,17 @@ import {
   type FinanceContribution,
 } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Ban, Pencil, Receipt } from 'lucide-react';
+import { Ban, Pencil, Receipt, SearchX } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Alert } from '@/components/ui/misc';
 import { PrintButton, PrintSheet } from '@/components/ui/print';
 import { SkeletonText } from '@/components/ui/skeleton';
-import { ErrorState, NoAccessState } from '@/components/ui/states';
+import { ErrorState } from '@/components/ui/states';
 import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
@@ -54,9 +55,17 @@ export function ContributionPage() {
             breadcrumbs={[...crumbs, { label: t('finance.receipt') }]}
           />
           {isApiClientError(query.error) && query.error.status === 404 ? (
-            <NoAccessState
+            // The same framed "not found" card as the other modules' detail pages.
+            <EmptyState
+              icon={SearchX}
+              tone="slate"
               title={t('common.notFoundTitle')}
               description={t('finance.receiptMissing')}
+              action={
+                <Button asChild variant="outline">
+                  <Link to={crumbs[crumbs.length - 1]!.to}>{crumbs[crumbs.length - 1]!.label}</Link>
+                </Button>
+              }
             />
           ) : (
             <ErrorState
