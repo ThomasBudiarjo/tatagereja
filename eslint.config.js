@@ -51,6 +51,15 @@ export default tseslint.config(
     rules: { 'react-refresh/only-export-components': 'off' },
   },
   {
+    // Plain JavaScript run as the service worker (vite.config.ts fills in the precache list).
+    files: ['apps/web/service-worker.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'script',
+      globals: { ...globals.serviceworker, __TG_PRECACHE__: 'readonly' },
+    },
+  },
+  {
     files: ['apps/api/**/*.ts'],
     rules: { 'no-console': 'off' },
   },

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -100,6 +101,64 @@ function precompress(): Plugin {
 }
 
 /**
+ * Builds `dist/sw.js` from `service-worker.js`: the version (a hash of the build) and the
+ * files to precache, which are the app shell: `index.html`, the entry with every chunk and
+ * stylesheet it imports, the church shell (`church-routes.tsx`), the home screen and the
+ * messages of both languages. Every other chunk is cached the first time it loads.
+ */
+function serviceWorker(): Plugin {
+  const SHELL_ENTRIES = [
+    /[\\/]src[\\/]church-routes\.tsx$/,
+    /[\\/]src[\\/]features[\\/]dashboard[\\/]home-page\.tsx$/,
+    /^\0virtual:locale-messages\//,
+  ];
+  return {
+    name: 'tatagereja-service-worker',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const chunks = new Map(
+        Object.values(bundle).flatMap((item) =>
+          item.type === 'chunk' ? [[item.fileName, item]] : [],
+        ),
+      );
+      const files = new Set<string>(['index.html']);
+      const visit = (fileName: string) => {
+        const chunk = chunks.get(fileName);
+        if (!chunk || files.has(fileName)) return;
+        files.add(fileName);
+        for (const css of chunk.viteMetadata?.importedCss ?? []) files.add(css);
+        for (const imported of chunk.imports) visit(imported);
+      };
+      for (const chunk of chunks.values()) {
+        const id = chunk.facadeModuleId ?? '';
+        if (chunk.isEntry || SHELL_ENTRIES.some((pattern) => pattern.test(id)))
+          visit(chunk.fileName);
+      }
+      for (const name of ['favicon.svg', 'csp-setup.js', 'manifest.webmanifest']) files.add(name);
+      const precache = [...files].sort().map((file) => `/${file}`);
+      const template = readFileSync(
+        fileURLToPath(new URL('./service-worker.js', import.meta.url)),
+        'utf8',
+      );
+      // Any changed file of the build (their names carry content hashes) or of the worker
+      // itself is a new version.
+      const version = createHash('sha256')
+        .update(Object.keys(bundle).sort().join('\n'))
+        .update(template)
+        .digest('hex')
+        .slice(0, 12);
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: template
+          .replace("'__TG_VERSION__'", JSON.stringify(version))
+          .replace('__TG_PRECACHE__', JSON.stringify(precache)),
+      });
+    },
+  };
+}
+
+/**
  * With `BUNDLE_REPORT=<file>`, writes every chunk of the build with its imports and the size
  * of each module in it, for `scripts/bundle-report.ts`.
  */
@@ -131,7 +190,14 @@ function bundleReport(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), localeMessages(), precompress(), bundleReport()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    localeMessages(),
+    serviceWorker(),
+    precompress(),
+    bundleReport(),
+  ],
   resolve: {
     alias: {
       '@': srcDir,

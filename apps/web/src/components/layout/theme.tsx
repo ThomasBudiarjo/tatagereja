@@ -9,9 +9,10 @@ export function ThemeEffect() {
     const apply = () => {
       const dark = resolveTheme(theme) === 'dark';
       document.documentElement.classList.toggle('dark', dark);
-      document
-        .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', dark ? '#1c1815' : '#fbf8f3');
+      // Both media-specific tags follow the chosen theme, not only the system one.
+      for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+        meta.setAttribute('content', dark ? '#1c1815' : '#fbf8f3');
+      }
     };
     apply();
     if (theme !== 'system') return;
@@ -38,6 +39,9 @@ export function AppToaster() {
         classNames: {
           toast: 'rounded-xl! font-sans! shadow-overlay! border-border!',
           title: 'font-semibold!',
+          // A thumb-sized action button ("Muat ulang"), not the 24 px default.
+          actionButton:
+            'h-10! rounded-lg! bg-primary! px-3.5! text-sm! font-semibold! text-primary-foreground!',
         },
       }}
     />

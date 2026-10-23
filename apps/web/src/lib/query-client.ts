@@ -2,6 +2,7 @@ import { QueryClient, type Query, type QueryKey } from '@tanstack/react-query';
 import { onSignOut } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { isApiClientError } from './api';
+import { clearOfflineData } from './service-worker';
 
 /*
  * How long data stays fresh depends on what it is. Church keys read
@@ -57,6 +58,9 @@ export const queryClient = new QueryClient({
         return failureCount < 2;
       },
       refetchOnWindowFocus: (query: Query) => !isHeavyQuery(query.queryKey),
+      // Ask even when the browser reports no network: the service worker answers from the
+      // screens viewed last, and a real network error still shows the error state.
+      networkMode: 'offlineFirst',
     },
     mutations: {
       retry: false,
@@ -64,9 +68,10 @@ export const queryClient = new QueryClient({
   },
 });
 
-// A session that ended must not leave the previous account's data in memory, nor the church
-// it last opened in storage.
+// A session that ended must not leave the previous account's data in memory, in the service
+// worker's offline copies, nor the church it last opened in storage.
 onSignOut(() => {
   queryClient.clear();
+  void clearOfflineData();
   useUiStore.getState().setLastChurchId(null);
 });

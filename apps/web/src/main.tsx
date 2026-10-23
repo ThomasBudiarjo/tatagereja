@@ -6,8 +6,11 @@ import { AppErrorBoundary } from '@/components/layout/error-boundary';
 import { LocaleEffect } from '@/components/layout/locale-effect';
 import { AppToaster, ThemeEffect } from '@/components/layout/theme';
 import { queryClient } from '@/lib/query-client';
+import { registerServiceWorker } from '@/lib/service-worker';
 import { router } from '@/router';
 import './index.css';
+
+registerServiceWorker();
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element not found');
