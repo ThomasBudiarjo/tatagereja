@@ -47,7 +47,7 @@ functions only to hide what a person cannot do.
   be edited freely: **Pendeta**, **Majelis / Penatua**, **Bendahara**, **Sekretaris**,
   **Koordinator Pelayanan** and **Guru Sekolah Minggu**.
 - **Group leaders** are a scoped assignment: a leader manages only their own groups' members,
-  events, announcements and attendance.
+  events, announcements and attendance, and sees a person's attendance only for those groups.
 - **Own data** needs no permission: everyone sees their own profile, giving, registry records,
   children's check-ins and serving schedule.
 - **Anti-escalation.** Nobody grants, edits or removes a permission they do not hold, the owner's
@@ -55,7 +55,9 @@ functions only to hide what a person cannot do.
 - **Segregation of duties** in finance: an offering is verified, and an expense approved, by someone
   other than the person who entered it.
 
-Sensitive changes are written to an audit log with redacted values. The full catalog, the
+Sensitive changes are written to an audit log with redacted values; finance and pastoral care
+entries show their content only to people who also hold finance or care access. Directory
+privacy choices (phone, email, address, birthday) hold on every screen, list and export. The full catalog, the
 permissions of each suggested role and the security model are in [PLAN.md](./PLAN.md).
 
 ## Stack
@@ -187,7 +189,7 @@ server with a clear message. See `apps/api/.env.example` for the full list.
 | `WEB_DIST_DIR`                                | empty                   | Serve a built web app from this directory       |
 | `APP_URL`                                     | `http://localhost:5173` | Public web address used in invitation links     |
 | `SERVER_NAME`                                 | `TataGereja`            | Name shown to people choosing this server       |
-| `MAX_BODY_KB`                                 | `2048`                  | Largest accepted request body                   |
+| `MAX_BODY_KB`                                 | `2048`                  | Largest accepted request body (imports)         |
 | `TRUST_PROXY`                                 | `0`                     | Reverse proxies in front of the API (see below) |
 | `ENCRYPTION_KEY`                              | empty (key file)        | Field encryption key (see below)                |
 | `ENCRYPTION_PREVIOUS_KEYS`                    | empty                   | Older keys still read while rotating            |
@@ -211,6 +213,9 @@ it from the right-hand end of `X-Forwarded-For`, so a client cannot dodge a limi
 With `0` the header is ignored and the connection address is used.
 
 ## Self-hosting
+
+Go through the [self-hosting checklist](./docs/SECURITY.md#self-hosting-checklist) (HTTPS,
+`TRUST_PROXY`, `ENCRYPTION_KEY`, backups) before inviting the congregation.
 
 ```sh
 cp deploy/.env.example deploy/.env      # set APP_URL, SERVER_NAME, REGISTRATION_MODE

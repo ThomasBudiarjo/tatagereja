@@ -369,7 +369,8 @@ unknown churches (`404`), suspended members (`403 MEMBERSHIP_SUSPENDED`), switch
 | `church: { module: 'care', permission: ['care.view', 'care.manage'] }`           | the module and any one of the permissions |
 | `church: { permission: 'audit.view', message: 'You cannot view the audit log' }` | custom 403 message                        |
 
-Guards cover route-level requirements. Rules that depend on the row (leader scope, own data,
+The guard runs before the body, query and parameters are validated, so a caller who may not use
+a route gets `403`, not a `422` that reveals its schema. Guards cover route-level requirements. Rules that depend on the row (leader scope, own data,
 confidentiality, segregation of duties) are checked in the handler after loading the row, with
 `forbidden(...)` or a specific `HttpError`. Optional modules must declare their module on every
 route. `requirePermission(access, permission)` and `requireAnyPermission` in
@@ -475,7 +476,12 @@ Modules are measured against a large church (`scripts/seed-large.ts`, `scripts/b
 - Scope every query by `church_id`; load referenced rows inside the church before using them.
 - Check permissions on every write and on every read of sensitive data, in the API.
 - Strip fields the caller may not see before serializing (private contact fields, confidential
-  notes). Never return password hashes, token hashes or secrets.
+  notes). Never return password hashes, token hashes or secrets. Any list of people that carries
+  a phone, email, address or birthday goes through `withPrivacy(db, access, rows)`; a search or
+  filter on one of them is wrapped in `onVisibleContact(access, column, condition)` (both in
+  `services/people.ts`), so a hidden value never finds its owner.
+- Leader scope is per group: a leader reads a person's attendance only through
+  `personAttendanceScope` (`attendanceScopeCondition` in SQL), never through the person.
 - Compare secrets with `safeEqual`; generate codes with `generateCode` (CSPRNG, unambiguous
   alphabet) and tokens with `generateToken`. Store bearer-style tokens only as `hashToken(...)`
   and show links that carry one only in the answer that made them.
@@ -483,7 +489,15 @@ Modules are measured against a large church (`scripts/seed-large.ts`, `scripts/b
   `encryptedText(table, column)` from `db/encrypted.ts`; never filter or sort on such a column.
   See [SECURITY.md](./SECURITY.md).
 - Audit sensitive writes; rate-limit guessable inputs (codes, tokens, logins).
-- Request bodies over `MAX_BODY_KB` (default 2 MiB) are refused with `413 PAYLOAD_TOO_LARGE`.
+- Request bodies are limited by kind of route (`lib/abuse.ts`: 32 KB for auth, 1 MB for long
+  documents, 256 KB otherwise, imports up to `MAX_BODY_KB`) and refused with
+  `413 PAYLOAD_TOO_LARGE`. Every account has generous limits on writes, exports and searches
+  (`account.*` limiters); route-specific limits come on top.
+- Give audit entries `params` with the names the summary uses (`name`, `member`, `person`,
+  counts) so the viewer can describe them in Indonesian; entries of the finance and care modules
+  are redacted for viewers without that access (`auditRedactionFor`).
+- `bun test tests/security-matrix.test.ts` must stay green: it calls your routes as every
+  kind of caller and searches the answers for planted canaries.
 - Security headers (CSP, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS behind HTTPS)
   are set for every response in `app.ts`; do not override them.
 
