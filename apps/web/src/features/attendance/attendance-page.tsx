@@ -94,18 +94,22 @@ function SessionsPage() {
         actions={
           <>
             {seesAbsences(access) ? (
-              <Button asChild variant="outline" size="sm">
-                <Link to={`${base}/attendance/absences`}>
+              <Button asChild variant="outline" size="sm" className="max-sm:size-11 max-sm:px-0">
+                <Link to={`${base}/attendance/absences`} aria-label={t('attendance.absences')}>
                   <BellRing />
                   <span className="hidden sm:inline">{t('attendance.absences')}</span>
-                  <span className="sm:hidden">{t('attendance.absencesShort')}</span>
                 </Link>
               </Button>
             ) : null}
             {canCreate ? (
-              <Button size="sm" onClick={() => setState({ new: true }, { push: true })}>
+              <Button
+                size="sm"
+                className="max-sm:size-11 max-sm:px-0"
+                aria-label={t('attendance.newSession')}
+                onClick={() => setState({ new: true }, { push: true })}
+              >
                 <Plus />
-                {t('attendance.newSession')}
+                <span className="hidden sm:inline">{t('attendance.newSession')}</span>
               </Button>
             ) : null}
           </>
@@ -239,7 +243,7 @@ function SessionRow({ session }: { session: AttendanceSessionView }) {
         <span className="flex items-center gap-2">
           <span className="truncate">{session.title}</span>
           {headcount ? (
-            <StatusBadge tone="sky" size="sm" icon={Users}>
+            <StatusBadge tone="sky" size="sm" icon={Users} className="hidden sm:inline-flex">
               {t('attendance.headcountTitle')}
             </StatusBadge>
           ) : null}
@@ -247,7 +251,7 @@ function SessionRow({ session }: { session: AttendanceSessionView }) {
       }
       subtitle={`${formatDateTime(session.sessionAt)} · ${session.groupName ?? t('attendance.churchWide')}`}
       trailing={
-        <span className="flex w-24 flex-col items-end gap-1.5 sm:w-32">
+        <span className="flex flex-col items-end gap-1.5 sm:w-32">
           <span className="font-semibold text-foreground tabular">
             {headcount
               ? t('attendance.counted', { count: formatNumber(session.attendeeCount) })
@@ -255,6 +259,7 @@ function SessionRow({ session }: { session: AttendanceSessionView }) {
           </span>
           {!headcount && session.totalCount > 0 ? (
             <MarkBar
+              className="hidden sm:flex"
               present={session.presentCount}
               absent={session.absentCount}
               excused={session.excusedCount}

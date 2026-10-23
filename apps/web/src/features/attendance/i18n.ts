@@ -20,7 +20,6 @@ export const attendanceDictionary = defineDictionary('attendance', {
     attendees: { one: '{count} present', other: '{count} present' },
     counted: { one: '{count} counted', other: '{count} counted' },
     absences: 'Absences',
-    absencesShort: 'Absences',
     myAttendance: 'My attendance',
     // New session dialog
     newTitle: 'New attendance session',
@@ -150,7 +149,6 @@ export const attendanceDictionary = defineDictionary('attendance', {
     attendees: '{count} hadir',
     counted: '{count} terhitung',
     absences: 'Ketidakhadiran',
-    absencesShort: 'Absen',
     myAttendance: 'Kehadiran saya',
     newTitle: 'Sesi kehadiran baru',
     newDescription:

@@ -725,7 +725,7 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
                       max={HEADCOUNT_MAX}
                       readOnly={!canManage}
                       aria-invalid={!!error}
-                      className="h-11 w-20 min-w-0 text-center text-xl font-bold tabular sm:h-12 sm:w-auto sm:flex-1 sm:text-2xl"
+                      className="h-11 w-24 min-w-0 [appearance:textfield] px-1 text-center text-xl font-bold tabular sm:h-12 sm:w-auto sm:flex-1 sm:text-2xl [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       value={field.value ?? 0}
                       onFocus={(event) => event.currentTarget.select()}
                       onChange={(event) =>
