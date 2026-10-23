@@ -199,7 +199,8 @@ apps/api/src/db/schema/
 ├── access.ts         church_roles, membership_roles
 ├── audit.ts          audit_logs
 ├── notifications.ts  notifications, notification_preferences
-└── <module>.ts       one file per module, empty until the module adds tables
+└── <module>.ts       one file per module (admin-security, people, comms, insights, worship,
+                      care, records, finance, facilities, checkin)
 ```
 
 ### Table rules
@@ -223,8 +224,10 @@ cascade`, and every query filters by it. Child rows also carry `church_id`.
 
 ### Module tables
 
-Migration `0002_modules_data_model` creates every module's tables up front, so modules can be
-built in parallel. Shared Zod schemas, enums, labels and pure rules for them are in
+Migration `0002_modules_data_model` created every module's tables up front, so modules could be
+built in parallel; later migrations only add columns and indexes (`0003_finance` for offering and
+expense editors, `0004_care` for task reminders, `0005_notifications_english_text` for the English
+copy of notifications). Shared Zod schemas, enums, labels and pure rules for them are in
 `packages/shared/src/schemas/<module>.ts`; module agents own and may extend both files.
 
 | Module           | Tables                                                                                                                                                                                                                                                                                                                 |
@@ -606,8 +609,8 @@ formatDate(service.date, 'dateLong'); // church time zone; `YYYY-MM-DD` days nev
 - Outside components use `t()` from `@/lib/i18n`. `getErrorMessage(error)` translates generic
   errors (network, rate limit, module off, suspended); specific server messages are shown as sent.
 - Form validation messages follow the language (zod's locale is switched with the interface).
-- The screens still in English (people, groups, events, announcements, attendance, church
-  settings, invitations) are converted by their module owners into their own dictionaries.
+- Every screen, including the older folders, reads its strings from a dictionary; a new screen
+  never ships hard-coded text.
 
 ### Components
 

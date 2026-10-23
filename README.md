@@ -11,40 +11,52 @@ use (Jemaat, Majelis, Komisi, Wilayah, Warta Jemaat, Persembahan, Atestasi and s
 
 ## Features
 
-| Module                   | What it does                                                                                                                                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Accounts                 | Email and password sign-up, per-server sessions, password change with a strength meter, session list and revocation                                                                                                                  |
-| Account security         | Two-step sign-in with an authenticator app (TOTP) and recovery codes, progressive lockout after failed sign-ins, sign-in history                                                                                                     |
-| Data rights              | Download everything stored about your account, delete your account (after handing over any church you own)                                                                                                                           |
-| Servers                  | Choose the hosted server or enter a self-hosted address; the app verifies it before showing login                                                                                                                                    |
-| Churches                 | Church profile, logo and colour, members and suspension, custom roles, invitations, module switches, audit log, ownership transfer, deletion                                                                                         |
-| Church security          | Security overview, a policy requiring 2FA for everyone with management permissions, owner-only church backup                                                                                                                         |
-| Invitations              | Invitation links and QR codes with expiry, usage limits and revocation                                                                                                                                                               |
-| People (Jemaat)          | Directory with search, filters and pagination, profiles with family and timeline, private details, privacy settings, tags, custom fields, import/export, merge                                                                       |
-| Households and areas     | Families (keluarga) with their members, Wilayah/Sektor with coordinators                                                                                                                                                             |
-| Groups (Komisi)          | Ministries and small groups, assigned leaders, membership and join requests                                                                                                                                                          |
-| Events and calendar      | Church-wide and group events, recurring series, registration and RSVP, a church calendar with private iCal feeds                                                                                                                     |
-| Announcements and Warta  | Scheduled, pinned and targeted announcements with read tracking; the weekly Warta Jemaat, printable                                                                                                                                  |
-| Notifications            | In-app notifications in the reader's language, per-person preferences                                                                                                                                                                |
-| Attendance               | Sessions from an event or standalone, a fast present/absent/excused sheet or a headcount, absence alerts, personal history                                                                                                           |
-| Home and reports         | A home dashboard with widgets chosen per person; reports on membership growth, demographics, attendance, visitor conversion, volunteers and giving                                                                                   |
-| Worship (Ibadah)         | Services and service types, liturgy (Liturgi) editor and print, song library, serving teams and Jadwal Pelayanan with blockout dates, "my schedule"                                                                                  |
-| Pastoral care            | Care cases (pendampingan) with confidentiality, Perkunjungan, prayer requests with moderation, visitor follow-up, tasks and diakonia aid                                                                                             |
-| Church registry          | Baptis, Sidi, Pemberkatan Nikah, Penyerahan Anak, Atestasi and Kedukaan in a numbered register book, corrections and voiding, certificates                                                                                           |
-| Finance (Keuangan)       | Ledger, funds and accounts, offerings counted by two counters and a verifier, Persembahan and Perpuluhan with receipts, expenses with approval, budgets (RAPB), campaigns and pledges, closed periods, reports and giving statements |
-| Facilities and inventory | Rooms and resources with booking and conflict detection, inventory with labels, loans and maintenance                                                                                                                                |
-| Kids check-in            | Sekolah Minggu classes, check-in stations, printed labels with a security code for pick-up, allergy and custody alerts, authorised pick-ups                                                                                          |
+Five modules are always on; the six marked _optional_ can be switched off per church (their menus
+disappear and their API routes answer `403 MODULE_DISABLED`).
+
+| Module                                | What it does                                                                                                                                                                                                                                                                   | Typical use                                                                                                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accounts and servers                  | Email and password sign-up, the hosted server or a self-hosted address (verified before login), per-server sessions, password change with a strength meter, session list and revocation                                                                                        | A jemaat signs up on their phone and joins two churches with one account; a self-hosted church points the app at its own server                                                             |
+| Church (`core`)                       | Church profile, logo, colour, currency and time zone, members and suspension, custom roles, invitation links and QR codes with expiry and usage limits, module switches, audit log, ownership transfer, deletion                                                               | The Sekretaris shows an invitation QR code at the Rapat Majelis; the owner hands the church over to the next Ketua Majelis                                                                  |
+| Administration and security           | Two-step sign-in (TOTP) with recovery codes, progressive lockout, sign-in history, data export and account deletion; the church security overview, a 2FA policy for managers and the owner-only church backup                                                                  | The Bendahara turns on two-step sign-in; the owner requires it for every member who holds a management permission and keeps a monthly backup                                                |
+| People and groups (Jemaat, Komisi)    | Directory with search, filters and pagination, profiles with family and timeline, private details, privacy settings, households (keluarga), Wilayah/Sektor with coordinators, tags, custom fields, CSV import/export, duplicate merging, groups with leaders and join requests | The Sekretaris imports the old buku induk, finds every jemaat of Wilayah 3 over seventy for Perkunjungan, and merges a family entered twice; the Komisi Pemuda leader accepts join requests |
+| Communication and events              | Scheduled, pinned and targeted announcements with read tracking; events with recurring series, registration, waitlist and RSVP; the church calendar with private iCal feeds; the weekly Warta Jemaat, printable; in-app notifications in the reader's language                 | The Sekretaris publishes Sunday's Warta Jemaat, sends a notice only to Majelis, and opens registration for the Natal retreat with a waitlist                                                |
+| Home, attendance and reports          | A home dashboard with widgets chosen per person, attendance sheets (present, absent, excused) or headcounts, absence alerts, personal history, and reports on membership, demographics, attendance, visitors, volunteers and giving                                            | An usher records the headcount of each Ibadah; a Penatua sees who has missed three Sundays in a row; the Majelis reviews the year's growth                                                  |
+| Worship (Ibadah) — _optional_         | Service types and services, the Liturgi editor with printing, a song library, serving teams and positions, Jadwal Pelayanan with blockout dates, accept or decline, and each person's schedule                                                                                 | The Koordinator Pelayanan builds Sunday's liturgy, schedules the song leader and musicians around their blockout dates, and a musician accepts from "my schedule"                           |
+| Pastoral care — _optional_            | Care cases (pendampingan) with caregivers, notes and confidentiality; Perkunjungan; prayer requests (pokok doa) with moderation; visitor follow-up; tasks; diakonia aid                                                                                                        | The Pendeta records counselling only she can read; Majelis plan and log hospital visits; a prayer request is moderated before the church sees it                                            |
+| Church registry — _optional_          | The numbered register (buku induk) of Baptis, Sidi, Pemberkatan Nikah, Penyerahan Anak, Atestasi masuk/keluar and Kedukaan, with corrections, voiding, certificates and the membership changes a record implies                                                                | The Sekretaris records a Baptis Anak with the next register number, prints the certificate, and an Atestasi keluar marks the family as moved                                                |
+| Finance (Keuangan) — _optional_       | Ledger with funds, accounts and categories; offerings counted by two counters and verified by a third person; Persembahan and Perpuluhan with receipts; expenses with approval; budgets (RAPB); campaigns and pledges; closed periods; reports and giving statements           | Two counters enter Sunday's kolekte and a Penatua verifies it; the Bendahara records a Perpuluhan with a receipt; a building campaign tracks pledges against gifts                          |
+| Facilities and inventory — _optional_ | Rooms and resources with one-off or recurring bookings, conflict detection and approval; inventory with labels, loans and maintenance                                                                                                                                          | A family books the aula for a wedding reception without clashing with choir practice; Komisi Remaja borrows the projector and its return is tracked                                         |
+| Kids check-in — _optional_            | Sekolah Minggu classes and teachers, check-in sessions with staff, kiosk or guardian self check-in, printed labels with a security code that check-out requires, allergy, medical and custody alerts, authorised pick-ups                                                      | A parent checks two children in at the kiosk by the door; the teacher sees an allergy alert, and only an authorised adult with the code from the guardian tag can pick them up              |
 
 Every church amount is stored in integer minor units of the church currency (IDR by default, shown
 without decimals).
 
-Every member has a base role (`owner`, `administrator` or `member`) and any number of church-defined
-**custom roles** built from a catalog of granular permissions. Suggested roles for Pendeta, Majelis,
-Bendahara, Sekretaris, Koordinator Pelayanan and Guru Sekolah Minggu are created with every church.
-A scoped **group leader** assignment lets a leader manage only their own groups' members, events,
-announcements and attendance. Nobody can grant a permission they do not hold, sensitive changes are
-recorded in an audit log, and optional modules can be switched off per church. Management actions appear
-where the data lives, for the people allowed to use them.
+## Permissions
+
+The API is the security boundary: every write and every read of sensitive data is checked on the
+server with the shared permission functions (`packages/shared`), and the interface uses the same
+functions only to hide what a person cannot do.
+
+- **Base roles.** Every member has one: `owner` (every permission), `administrator` (everything
+  except the owner-only permissions and confidential pastoral care) or `member` (viewing the
+  directory, groups, events, announcements, Warta Jemaat, services and facilities, booking requests
+  and prayer requests).
+- **Custom roles** are built from a catalog of 64 granular permissions such as `finance.record`,
+  `care.confidential` or `records.manage`. Six suggested roles are created with every church and can
+  be edited freely: **Pendeta**, **Majelis / Penatua**, **Bendahara**, **Sekretaris**,
+  **Koordinator Pelayanan** and **Guru Sekolah Minggu**.
+- **Group leaders** are a scoped assignment: a leader manages only their own groups' members,
+  events, announcements and attendance.
+- **Own data** needs no permission: everyone sees their own profile, giving, registry records,
+  children's check-ins and serving schedule.
+- **Anti-escalation.** Nobody grants, edits or removes a permission they do not hold, the owner's
+  roles cannot be edited, and nobody can remove their own ability to manage roles.
+- **Segregation of duties** in finance: an offering is verified, and an expense approved, by someone
+  other than the person who entered it.
+
+Sensitive changes are written to an audit log with redacted values. The full catalog, the
+permissions of each suggested role and the security model are in [PLAN.md](./PLAN.md).
 
 ## Stack
 
@@ -95,22 +107,52 @@ bun run check       # all of the above
 
 ## Demo data
 
-`scripts/seed-demo.ts` fills a fresh server with a complete demo church through the public API:
-GKI Kebon Jati with about seventy people in households and areas, komisi, worship services with
-rosters, events, Warta Jemaat, pastoral care, records, Sekolah Minggu check-in, finance,
-facilities and attendance history.
+`scripts/seed-demo.ts` fills a fresh server with a complete demo church through the public API, so
+every permission, audit and notification rule applies: GKI Kebon Jati, Bandung, with about seventy
+people in households and four areas, komisi and small groups with leaders, worship services with
+liturgy and rosters, events with RSVPs and registrations, announcements and two Warta Jemaat issues,
+pastoral care and prayer requests, registry records, Sekolah Minggu classes and check-in sessions,
+ten Sundays of counted offerings with giving, expenses, a budget and a campaign, rooms with bookings,
+inventory with loans, and half a year of attendance.
 
 ```sh
 bun run build
 WEB_DIST_DIR=$PWD/apps/web/dist PORT=3950 DATABASE_PATH=/tmp/demo.db bun run start
-bun scripts/seed-demo.ts --port 3950
+bun scripts/seed-demo.ts --port 3950        # in a second terminal; once per database
 ```
 
-Every account uses the password `demo-password`: `demo@tatagereja.test` (owner),
-`admin@tatagereja.test` (administrator and Sekretaris), `bendahara@tatagereja.test` (Bendahara),
-`penatua@tatagereja.test` (Majelis / Penatua), `pendeta@tatagereja.test` (Pendeta),
-`guru@tatagereja.test` (Guru Sekolah Minggu) and `jemaat@tatagereja.test` (member).
-`bun scripts/screenshots.ts --port 3950 --email <account>` captures the screens as any of them.
+Open <http://localhost:3950> (the app uses the server it is served from by default) and sign in.
+Every account uses the password `demo-password`:
+
+| Account                     | Role in the demo church                                       |
+| --------------------------- | ------------------------------------------------------------- |
+| `demo@tatagereja.test`      | Owner (and a parent of three Sekolah Minggu children)         |
+| `admin@tatagereja.test`     | Administrator with the Sekretaris role                        |
+| `bendahara@tatagereja.test` | Member with the Bendahara role (counts and records offerings) |
+| `penatua@tatagereja.test`   | Member with the Majelis / Penatua role (verifies, approves)   |
+| `pendeta@tatagereja.test`   | Member with the Pendeta role (including confidential care)    |
+| `guru@tatagereja.test`      | Member with the Guru Sekolah Minggu role (operates check-in)  |
+| `jemaat@tatagereja.test`    | Plain member with two children                                |
+
+The script accepts `--port <n>` or `--base <url>` and `--password <secret>`; the server must accept
+public registration. Dates are relative to today in the church time zone (Asia/Jakarta).
+Each module also has a smaller seed for reviewing its own screens in
+`apps/api/src/modules/<id>/scripts/seed-demo.ts`.
+
+## Screenshots
+
+`scripts/screenshots.ts` signs in to a running server with Playwright and captures each route at
+390×844 and 1440×900, in light and dark:
+
+```sh
+bun scripts/screenshots.ts --port 3950 --email jemaat@tatagereja.test --out /tmp/shots \
+  --routes "/c/:church,/c/:church/people,/c/:church/finance" --locales id,en
+```
+
+`:church` stands for the first church of the account. Other options are `--viewports`, `--themes`,
+`--full` (whole page), `--anonymous` (also the welcome, login and registration screens) and `--seed`
+(create the account and a small sample church when missing). It uses the preinstalled Chromium
+(`PLAYWRIGHT_BROWSERS_PATH`).
 
 ## Configuration
 

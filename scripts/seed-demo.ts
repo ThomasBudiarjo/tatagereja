@@ -6,7 +6,7 @@
  *   bun scripts/seed-demo.ts --port 3950
  *   bun scripts/screenshots.ts --port 3950 --email jemaat@tatagereja.test
  *
- * GKI Kebon Jati, Bandung: about sixty people in households and four areas (a few of them through
+ * GKI Kebon Jati, Bandung: about seventy people in households and four areas (a few of them through
  * the CSV import), komisi and small groups with leaders, a worship calendar with liturgy, rosters
  * and replies, events with RSVPs and registrations, announcements and two Warta Jemaat issues,
  * pastoral care and prayer requests, church records, Sekolah Minggu classes with past and open
