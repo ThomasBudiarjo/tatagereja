@@ -20,4 +20,5 @@ export const toMemberListItem = (row: MemberRow, showSecurity: boolean): MemberL
   manager: row.manager,
   isLeader: row.isLeader,
   personId: row.personId,
+  permissions: row.permissions,
 });

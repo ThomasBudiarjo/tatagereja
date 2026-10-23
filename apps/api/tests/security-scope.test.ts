@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { can, type MemberListItem } from '@tatagereja/shared';
 import { memberWithRole, setupFinance } from './finance-helpers';
 import { createTestApp, seedChurch } from './helpers';
 import { OPTIONAL_MODULES } from './route-world';
@@ -200,6 +201,40 @@ describe('data scope', () => {
         if (entry.module === 'finance' || entry.module === 'care')
           expect(entry.redacted).not.toBe(null);
       }
+    });
+  });
+
+  describe('member row actions', () => {
+    it('lists effective permissions, so hidden actions match what the API refuses', async () => {
+      const roles = await get('/roles', s.owner.token);
+      const pastorRole = roles.json.items.find(
+        (role: { templateKey: string | null }) => role.templateKey === 'pastor',
+      );
+      const pastor = await t.register('Pdt. Yohanes');
+      await t.join(pastor.token, s.invitation.token);
+      const listed = async () =>
+        (await get('/members?limit=100', s.admin.token)).json.items as (MemberListItem & {
+          id: string;
+        })[];
+      const before = (await listed()).find((item) => item.userId === pastor.user.id)!;
+      await t.request('POST', `${church}/members/${before.id}/roles`, {
+        token: s.owner.token,
+        body: { roleId: pastorRole.id },
+      });
+      const item = (await listed()).find((entry) => entry.userId === pastor.user.id)!;
+      expect(item.permissions).toContain('care.confidential');
+
+      const adminAccess = (await get('', s.admin.token)).json.access;
+      for (const rule of [can.removeMember, can.suspendMember, can.resetMemberPassword]) {
+        expect(rule(adminAccess, item)).toBe(false);
+      }
+      const removed = await t.request('DELETE', `${church}/members/${item.id}`, {
+        token: s.admin.token,
+      });
+      expect(removed.status).toBe(403);
+      expect(removed.json.error.code).toBe('ESCALATION_DENIED');
+      const ownerAccess = (await get('', s.owner.token)).json.access;
+      expect(can.removeMember(ownerAccess, item)).toBe(true);
     });
   });
 

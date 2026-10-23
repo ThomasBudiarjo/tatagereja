@@ -26,8 +26,11 @@ export type MemberTarget = {
   role: ChurchRole;
   status: MembershipStatus;
   user: { name: string };
-  /** Effective permissions, when known: hides actions the API would refuse as escalation. */
-  permissions?: readonly Permission[];
+  /**
+   * Effective permissions (the list and the detail both send them): actions on someone who
+   * holds permissions the caller lacks are hidden, as the API refuses them as escalation.
+   */
+  permissions: readonly Permission[];
 };
 
 type Pending =
