@@ -4,30 +4,33 @@ import * as React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
+/*
+ * The element focused last outside any dialog or menu, tracked for the whole page. A dialog
+ * opened from a menu item mounts after the item is gone, and focus stays trapped while a dialog
+ * is open, so this is the element that opened it (the menu's trigger, say).
+ */
+let lastFocusedOutside: HTMLElement | null = null;
+if (typeof document !== 'undefined') {
+  document.addEventListener('focusin', (event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      !target.closest('[role="dialog"],[role="alertdialog"],[role="menu"]')
+    ) {
+      lastFocusedOutside = target;
+    }
+  });
+}
+
 /**
  * Radix returns focus to a `Trigger`; dialogs opened from state have none, so focus would fall
- * back to the page. Focus stays trapped while a dialog is open, so the last element focused
- * outside any dialog is the one that opened it: refocus it on close. Pass the result as the
- * primitive Content's `onCloseAutoFocus`.
+ * back to the page: refocus the element that opened the dialog on close instead. Pass the
+ * result as the primitive Content's `onCloseAutoFocus`.
  */
 function useReturnFocus(onCloseAutoFocus?: (event: Event) => void) {
-  const lastOutside = React.useRef<HTMLElement | null>(null);
-  React.useEffect(() => {
-    const track = (event: FocusEvent) => {
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        !target.closest('[role="dialog"],[role="alertdialog"]')
-      ) {
-        lastOutside.current = target;
-      }
-    };
-    document.addEventListener('focusin', track);
-    return () => document.removeEventListener('focusin', track);
-  }, []);
   return (event: Event) => {
     onCloseAutoFocus?.(event);
-    const opener = lastOutside.current;
+    const opener = lastFocusedOutside;
     if (event.defaultPrevented || !opener?.isConnected || opener === document.body) return;
     event.preventDefault();
     opener.focus();
