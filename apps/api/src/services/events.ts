@@ -102,7 +102,9 @@ export function waitlistPositionsOf(db: Queryable, eventId: string): Map<string,
   const rows = db
     .select({ id: eventRegistrations.id })
     .from(eventRegistrations)
-    .where(and(eq(eventRegistrations.eventId, eventId), eq(eventRegistrations.status, 'waitlisted')))
+    .where(
+      and(eq(eventRegistrations.eventId, eventId), eq(eventRegistrations.status, 'waitlisted')),
+    )
     .orderBy(asc(eventRegistrations.createdAt), asc(eventRegistrations.id))
     .all();
   return new Map(rows.map((row, index) => [row.id, index + 1]));
@@ -133,7 +135,9 @@ export function hydrateEventDetails(
   const base = hydrateEvents(db, rows);
   const ids = rows.map((row) => row.id);
   const counts = registrationCountsOf(db, ids);
-  const seriesIds = [...new Set(rows.map((row) => row.seriesId).filter((id): id is string => !!id))];
+  const seriesIds = [
+    ...new Set(rows.map((row) => row.seriesId).filter((id): id is string => !!id)),
+  ];
   const series = new Map(
     seriesIds.length > 0
       ? db
@@ -207,7 +211,10 @@ export function hydrateEventDetails(
       goingCount: going.get(row.id) ?? 0,
       myRegistration:
         own && own.status !== 'cancelled'
-          ? toMyRegistration(own, own.status === 'waitlisted' ? waitlistPositionsOf(db, row.id) : new Map())
+          ? toMyRegistration(
+              own,
+              own.status === 'waitlisted' ? waitlistPositionsOf(db, row.id) : new Map(),
+            )
           : null,
       myRsvp: rsvps.get(row.id) ?? null,
     };
@@ -291,7 +298,9 @@ export function organiserUserIds(db: Queryable, event: EventRow): string[] {
     ? db
         .select({ userId: groupLeaders.userId })
         .from(groupLeaders)
-        .where(and(eq(groupLeaders.groupId, event.groupId), eq(groupLeaders.churchId, event.churchId)))
+        .where(
+          and(eq(groupLeaders.groupId, event.groupId), eq(groupLeaders.churchId, event.churchId)),
+        )
         .all()
         .map((row) => row.userId)
     : [];
@@ -301,9 +310,14 @@ export function organiserUserIds(db: Queryable, event: EventRow): string[] {
 /** Everyone who expects to attend: active registrations and "going" RSVPs, as accounts. */
 export function attendeeUserIds(db: Queryable, event: EventRow): string[] {
   const registered = db
-    .select({ personId: eventRegistrations.personId, registeredBy: eventRegistrations.registeredBy })
+    .select({
+      personId: eventRegistrations.personId,
+      registeredBy: eventRegistrations.registeredBy,
+    })
     .from(eventRegistrations)
-    .where(and(eq(eventRegistrations.eventId, event.id), ne(eventRegistrations.status, 'cancelled')))
+    .where(
+      and(eq(eventRegistrations.eventId, event.id), ne(eventRegistrations.status, 'cancelled')),
+    )
     .all();
   const going = db
     .select({ personId: eventParticipants.personId })
@@ -359,7 +373,9 @@ export function promoteWaitlist(
   const waiting = tx
     .select()
     .from(eventRegistrations)
-    .where(and(eq(eventRegistrations.eventId, event.id), eq(eventRegistrations.status, 'waitlisted')))
+    .where(
+      and(eq(eventRegistrations.eventId, event.id), eq(eventRegistrations.status, 'waitlisted')),
+    )
     .orderBy(asc(eventRegistrations.createdAt), asc(eventRegistrations.id))
     .all();
   const promoted: EventRegistrationRow[] = [];

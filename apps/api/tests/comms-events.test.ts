@@ -88,23 +88,43 @@ describe('comms events: series, registration, waitlist and check-in', () => {
     it('validates series', async () => {
       const before = await t.request('POST', `${url}/series`, {
         token: c.s.admin.token,
-        body: { title: 'Mundur', startsAt: inDays(5), frequency: 'weekly', untilDate: dayOf(inDays(1)) },
+        body: {
+          title: 'Mundur',
+          startsAt: inDays(5),
+          frequency: 'weekly',
+          untilDate: dayOf(inDays(1)),
+        },
       });
       expect(before.status).toBe(422);
       expect(before.json.error.issues[0].path).toBe('untilDate');
       const tooLong = await t.request('POST', `${url}/series`, {
         token: c.s.admin.token,
-        body: { title: 'Terlalu lama', startsAt: inDays(1), frequency: 'weekly', untilDate: dayOf(inDays(800)) },
+        body: {
+          title: 'Terlalu lama',
+          startsAt: inDays(1),
+          frequency: 'weekly',
+          untilDate: dayOf(inDays(800)),
+        },
       });
       expect(tooLong.status).toBe(422);
       const member = await t.request('POST', `${url}/series`, {
         token: c.s.member.token,
-        body: { title: 'Tidak boleh', startsAt: inDays(1), frequency: 'weekly', untilDate: dayOf(inDays(10)) },
+        body: {
+          title: 'Tidak boleh',
+          startsAt: inDays(1),
+          frequency: 'weekly',
+          untilDate: dayOf(inDays(10)),
+        },
       });
       expect(member.status).toBe(403);
       const plain = await t.request('POST', `${url}/series`, {
         token: c.plain.token,
-        body: { title: 'Tidak boleh', startsAt: inDays(1), frequency: 'weekly', untilDate: dayOf(inDays(10)) },
+        body: {
+          title: 'Tidak boleh',
+          startsAt: inDays(1),
+          frequency: 'weekly',
+          untilDate: dayOf(inDays(10)),
+        },
       });
       expect(plain.status).toBe(403);
     });
@@ -249,7 +269,8 @@ describe('comms events: series, registration, waitlist and check-in', () => {
 
     it('shows registrations to organisers only', async () => {
       expect(
-        (await t.request('GET', `${url}/${eventId}/registrations`, { token: c.s.member.token })).status,
+        (await t.request('GET', `${url}/${eventId}/registrations`, { token: c.s.member.token }))
+          .status,
       ).toBe(403);
       const list = await t.request('GET', `${url}/${eventId}/registrations`, {
         token: c.coordinator.token,
@@ -313,8 +334,12 @@ describe('comms events: series, registration, waitlist and check-in', () => {
       });
       const fullId = full.json.event.id as string;
       expect(
-        (await t.request('POST', `${url}/${fullId}/registrations`, { token: c.s.member.token, body: {} }))
-          .status,
+        (
+          await t.request('POST', `${url}/${fullId}/registrations`, {
+            token: c.s.member.token,
+            body: {},
+          })
+        ).status,
       ).toBe(201);
       const refused = await t.request('POST', `${url}/${fullId}/registrations`, {
         token: c.plain.token,
@@ -333,8 +358,12 @@ describe('comms events: series, registration, waitlist and check-in', () => {
         },
       });
       expect(
-        (await t.request('POST', `${url}/${closed.json.event.id}/registrations`, { token: c.plain.token, body: {} }))
-          .status,
+        (
+          await t.request('POST', `${url}/${closed.json.event.id}/registrations`, {
+            token: c.plain.token,
+            body: {},
+          })
+        ).status,
       ).toBe(409);
 
       const open = await t.request('POST', url, {
@@ -342,8 +371,12 @@ describe('comms events: series, registration, waitlist and check-in', () => {
         body: { title: 'Tanpa pendaftaran', startsAt: inDays(6) },
       });
       expect(
-        (await t.request('POST', `${url}/${open.json.event.id}/registrations`, { token: c.plain.token, body: {} }))
-          .status,
+        (
+          await t.request('POST', `${url}/${open.json.event.id}/registrations`, {
+            token: c.plain.token,
+            body: {},
+          })
+        ).status,
       ).toBe(409);
 
       const bad = await t.request('POST', `${url}/${fullId}/registrations`, {
@@ -443,10 +476,15 @@ describe('comms events: series, registration, waitlist and check-in', () => {
         token: c.plain.token,
         body: { partySize: 2 },
       });
-      const notes = await notificationsOf(t, c.coordinator.token, c.s.church.id, 'event.registrations');
-      expect(notes.some((note) => note.title === 'Seminar Pernikahan' && note.body?.includes('Ruth'))).toBe(
-        true,
+      const notes = await notificationsOf(
+        t,
+        c.coordinator.token,
+        c.s.church.id,
+        'event.registrations',
       );
+      expect(
+        notes.some((note) => note.title === 'Seminar Pernikahan' && note.body?.includes('Ruth')),
+      ).toBe(true);
     });
 
     it('lists the events I signed up for', async () => {
@@ -485,18 +523,27 @@ describe('comms events: series, registration, waitlist and check-in', () => {
       });
       expect(checked.status).toBe(200);
       expect(checked.json.checkedIn).toBe(2);
-      const session = await t.request('GET', `${c.church}/attendance/sessions/${checked.json.sessionId}`, {
-        token: c.s.owner.token,
-      });
+      const session = await t.request(
+        'GET',
+        `${c.church}/attendance/sessions/${checked.json.sessionId}`,
+        {
+          token: c.s.owner.token,
+        },
+      );
       expect(session.status).toBe(200);
       expect(session.json.session.presentCount).toBe(2);
       expect(session.json.session.eventId).toBe(eventId);
 
-      const list = await t.request('GET', `${url}/${eventId}/check-in`, { token: c.coordinator.token });
+      const list = await t.request('GET', `${url}/${eventId}/check-in`, {
+        token: c.coordinator.token,
+      });
       expect(list.status).toBe(200);
       expect(list.json.checkedInCount).toBe(2);
       const sources = Object.fromEntries(
-        list.json.items.map((item: { person: { id: string }; source: string }) => [item.person.id, item.source]),
+        list.json.items.map((item: { person: { id: string }; source: string }) => [
+          item.person.id,
+          item.source,
+        ]),
       );
       expect(sources[c.s.memberPerson.id]).toBe('rsvp');
       expect(sources[c.s.bob.id]).toBe('walk_in');
@@ -509,7 +556,9 @@ describe('comms events: series, registration, waitlist and check-in', () => {
         token: c.coordinator.token,
       });
       expect(afterUndo.json.checkedInCount).toBe(1);
-      const foreignPerson = await t.createPerson(c.other.token, c.otherChurch.id, { firstName: 'Asing' });
+      const foreignPerson = await t.createPerson(c.other.token, c.otherChurch.id, {
+        firstName: 'Asing',
+      });
       expect(
         (
           await t.request('POST', `${url}/${eventId}/check-in`, {
@@ -583,34 +632,61 @@ describe('comms events: series, registration, waitlist and check-in', () => {
       });
       expect(moved.status).toBe(200);
       const changed = await notificationsOf(t, c.plain.token, c.s.church.id, 'event.changed');
-      expect(changed.some((note) => note.title === 'Kebaktian Padang' && note.body?.startsWith('Jadwal berubah'))).toBe(
-        true,
-      );
+      expect(
+        changed.some(
+          (note) => note.title === 'Kebaktian Padang' && note.body?.startsWith('Jadwal berubah'),
+        ),
+      ).toBe(true);
 
-      expect((await t.request('POST', `${url}/${id}/cancel`, { token: c.s.member.token, body: {} })).status).toBe(403);
+      expect(
+        (await t.request('POST', `${url}/${id}/cancel`, { token: c.s.member.token, body: {} }))
+          .status,
+      ).toBe(403);
       const cancelled = await t.request('POST', `${url}/${id}/cancel`, {
         token: c.coordinator.token,
         body: { reason: 'Cuaca buruk' },
       });
       expect(cancelled.status).toBe(200);
       expect(cancelled.json.event.cancelledAt).toBeString();
-      const memberNotes = await notificationsOf(t, c.s.member.token, c.s.church.id, 'event.changed');
+      const memberNotes = await notificationsOf(
+        t,
+        c.s.member.token,
+        c.s.church.id,
+        'event.changed',
+      );
       expect(memberNotes.some((note) => note.body?.includes('Cuaca buruk'))).toBe(true);
-      expect((await t.request('POST', `${url}/${id}/cancel`, { token: c.coordinator.token, body: {} })).status).toBe(409);
       expect(
-        (await t.request('POST', `${url}/${id}/registrations`, { token: c.s.leader.token, body: {} })).status,
+        (await t.request('POST', `${url}/${id}/cancel`, { token: c.coordinator.token, body: {} }))
+          .status,
       ).toBe(409);
-      const restored = await t.request('POST', `${url}/${id}/restore`, { token: c.coordinator.token });
+      expect(
+        (
+          await t.request('POST', `${url}/${id}/registrations`, {
+            token: c.s.leader.token,
+            body: {},
+          })
+        ).status,
+      ).toBe(409);
+      const restored = await t.request('POST', `${url}/${id}/restore`, {
+        token: c.coordinator.token,
+      });
       expect(restored.status).toBe(200);
       expect(restored.json.event.cancelledAt).toBeNull();
-      expect((await commsAudit(t, c, 'event.cancel')).some((entry) => entry.entityId === id)).toBe(true);
+      expect((await commsAudit(t, c, 'event.cancel')).some((entry) => entry.entityId === id)).toBe(
+        true,
+      );
     });
   });
 
   it('refuses ids from another church', async () => {
     const foreign = await t.request('POST', `/api/churches/${c.otherChurch.id}/events`, {
       token: c.other.token,
-      body: { title: 'Acara lain', startsAt: inMinutes(10), registrationRequired: true, checkInEnabled: true },
+      body: {
+        title: 'Acara lain',
+        startsAt: inMinutes(10),
+        registrationRequired: true,
+        checkInEnabled: true,
+      },
     });
     expect(foreign.status).toBe(201);
     const id = foreign.json.event.id as string;
@@ -627,10 +703,14 @@ describe('comms events: series, registration, waitlist and check-in', () => {
       const response = await t.request(method, path, { token: c.s.owner.token, body });
       expect(`${method} ${path} ${response.status}`).toBe(`${method} ${path} 404`);
     }
-    const registration = await t.request('POST', `/api/churches/${c.otherChurch.id}/events/${id}/registrations`, {
-      token: c.other.token,
-      body: {},
-    });
+    const registration = await t.request(
+      'POST',
+      `/api/churches/${c.otherChurch.id}/events/${id}/registrations`,
+      {
+        token: c.other.token,
+        body: {},
+      },
+    );
     // The other owner has no person yet, so they register nobody.
     expect(registration.status).toBe(400);
   });

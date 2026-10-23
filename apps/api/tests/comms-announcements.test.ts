@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { announcements } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
-import { commsAudit, inMinutes, notificationsOf, seedComms, type CommsSeed } from './comms-fixtures';
+import {
+  commsAudit,
+  inMinutes,
+  notificationsOf,
+  seedComms,
+  type CommsSeed,
+} from './comms-fixtures';
 import { createTestApp } from './helpers';
 
 describe('comms announcements', () => {
@@ -58,10 +64,18 @@ describe('comms announcements', () => {
 
   it('enforces the posting matrix', async () => {
     const churchWide = { title: 'Rapat Majelis', body: 'Kamis malam', status: 'published' };
-    expect((await t.request('POST', url, { token: c.s.member.token, body: churchWide })).status).toBe(403);
-    expect((await t.request('POST', url, { token: c.plain.token, body: churchWide })).status).toBe(403);
-    expect((await t.request('POST', url, { token: c.coordinator.token, body: churchWide })).status).toBe(403);
-    expect((await t.request('POST', url, { token: c.s.leader.token, body: churchWide })).status).toBe(403);
+    expect(
+      (await t.request('POST', url, { token: c.s.member.token, body: churchWide })).status,
+    ).toBe(403);
+    expect((await t.request('POST', url, { token: c.plain.token, body: churchWide })).status).toBe(
+      403,
+    );
+    expect(
+      (await t.request('POST', url, { token: c.coordinator.token, body: churchWide })).status,
+    ).toBe(403);
+    expect(
+      (await t.request('POST', url, { token: c.s.leader.token, body: churchWide })).status,
+    ).toBe(403);
     expect(
       (
         await t.request('POST', url, {
@@ -80,10 +94,18 @@ describe('comms announcements', () => {
     ).toBe(403);
     const leaderPost = await t.request('POST', url, {
       token: c.s.leader.token,
-      body: { title: 'Latihan Pemuda', body: 'Sabtu sore', status: 'draft', audience: 'group', groupId: c.s.group.id },
+      body: {
+        title: 'Latihan Pemuda',
+        body: 'Sabtu sore',
+        status: 'draft',
+        audience: 'group',
+        groupId: c.s.group.id,
+      },
     });
     expect(leaderPost.status).toBe(201);
-    expect((await t.request('POST', url, { token: c.s.admin.token, body: churchWide })).status).toBe(201);
+    expect(
+      (await t.request('POST', url, { token: c.s.admin.token, body: churchWide })).status,
+    ).toBe(201);
   });
 
   it('validates the form', async () => {
@@ -190,11 +212,21 @@ describe('comms announcements', () => {
       token: c.s.member.token,
     });
     expect(count.status).toBe(200);
-    const notes = await notificationsOf(t, c.s.member.token, c.s.church.id, 'announcement.published');
+    const notes = await notificationsOf(
+      t,
+      c.s.member.token,
+      c.s.church.id,
+      'announcement.published',
+    );
     expect(notes.filter((item) => item.title === 'Persiapan Natal')).toHaveLength(1);
     // A second read does not notify again.
     await t.request('GET', url, { token: c.s.member.token });
-    const again = await notificationsOf(t, c.s.member.token, c.s.church.id, 'announcement.published');
+    const again = await notificationsOf(
+      t,
+      c.s.member.token,
+      c.s.church.id,
+      'announcement.published',
+    );
     expect(again.filter((item) => item.title === 'Persiapan Natal')).toHaveLength(1);
     expect(await titles(c.s.member.token)).toContain('Persiapan Natal');
   });
@@ -229,8 +261,12 @@ describe('comms announcements', () => {
     });
     expect((await titles(c.s.member.token))[0]).toBe('Kabar Terbaru');
     expect(
-      (await t.request('PUT', `${url}/${id}/pin`, { token: c.s.member.token, body: { pinned: true } }))
-        .status,
+      (
+        await t.request('PUT', `${url}/${id}/pin`, {
+          token: c.s.member.token,
+          body: { pinned: true },
+        })
+      ).status,
     ).toBe(403);
     const pinned = await t.request('PUT', `${url}/${id}/pin`, {
       token: c.announcer.token,
@@ -264,14 +300,23 @@ describe('comms announcements', () => {
     expect(readers.json.items.map((item: { name: string }) => item.name).sort()).toEqual(
       ['Anggota Biasa', 'Member'].sort(),
     );
-    expect((await t.request('GET', `${url}/${id}/readers`, { token: c.s.member.token })).status).toBe(403);
-    expect((await t.request('GET', `${url}/${id}/readers`, { token: c.s.leader.token })).status).toBe(403);
+    expect(
+      (await t.request('GET', `${url}/${id}/readers`, { token: c.s.member.token })).status,
+    ).toBe(403);
+    expect(
+      (await t.request('GET', `${url}/${id}/readers`, { token: c.s.leader.token })).status,
+    ).toBe(403);
   });
 
   it('lets leaders edit their group posts but not move them church-wide', async () => {
     const created = await t.request('POST', url, {
       token: c.s.leader.token,
-      body: { title: 'Doa Pagi Pemuda', body: 'Setiap Selasa', status: 'draft', groupId: c.s.group.id },
+      body: {
+        title: 'Doa Pagi Pemuda',
+        body: 'Setiap Selasa',
+        status: 'draft',
+        groupId: c.s.group.id,
+      },
     });
     expect(created.status).toBe(201);
     expect(created.json.announcement.audience).toBe('group');
@@ -298,11 +343,15 @@ describe('comms announcements', () => {
       body: { title: 'Ubah', body: 'x', status: 'draft' },
     });
     expect(editByMember.status).toBe(403);
-    const deleteByCoordinator = await t.request('DELETE', `${url}/${id}`, { token: c.coordinator.token });
+    const deleteByCoordinator = await t.request('DELETE', `${url}/${id}`, {
+      token: c.coordinator.token,
+    });
     expect(deleteByCoordinator.status).toBe(403);
     const deleted = await t.request('DELETE', `${url}/${id}`, { token: c.s.leader.token });
     expect(deleted.status).toBe(200);
-    expect((await commsAudit(t, c, 'announcement.delete')).some((entry) => entry.entityId === id)).toBe(true);
+    expect(
+      (await commsAudit(t, c, 'announcement.delete')).some((entry) => entry.entityId === id),
+    ).toBe(true);
   });
 
   it('refuses ids from another church', async () => {
@@ -312,7 +361,9 @@ describe('comms announcements', () => {
     });
     expect(foreign.status).toBe(201);
     const foreignId = foreign.json.announcement.id as string;
-    expect((await t.request('GET', `${url}/${foreignId}`, { token: c.s.owner.token })).status).toBe(404);
+    expect((await t.request('GET', `${url}/${foreignId}`, { token: c.s.owner.token })).status).toBe(
+      404,
+    );
     expect(
       (
         await t.request('PATCH', `${url}/${foreignId}`, {
@@ -321,10 +372,16 @@ describe('comms announcements', () => {
         })
       ).status,
     ).toBe(404);
-    expect((await t.request('DELETE', `${url}/${foreignId}`, { token: c.s.owner.token })).status).toBe(404);
-    expect((await t.request('POST', `${url}/${foreignId}/read`, { token: c.s.owner.token })).status).toBe(404);
+    expect(
+      (await t.request('DELETE', `${url}/${foreignId}`, { token: c.s.owner.token })).status,
+    ).toBe(404);
+    expect(
+      (await t.request('POST', `${url}/${foreignId}/read`, { token: c.s.owner.token })).status,
+    ).toBe(404);
     // Another church's group or role cannot be targeted.
-    const otherGroup = await t.createGroup(c.other.token, c.otherChurch.id, { name: 'Pemuda Lain' });
+    const otherGroup = await t.createGroup(c.other.token, c.otherChurch.id, {
+      name: 'Pemuda Lain',
+    });
     expect(
       (
         await t.request('POST', url, {

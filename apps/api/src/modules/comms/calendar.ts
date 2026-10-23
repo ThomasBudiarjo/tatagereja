@@ -51,7 +51,9 @@ const feedPath = (token: string) => `/api/calendar/feeds/${token}.ics`;
 /** The public origin of the request, honouring a TLS-terminating proxy. */
 const originOf = (request: Request): string => {
   const url = new URL(request.url);
-  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || url.protocol.replace(':', '');
+  const proto =
+    request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ||
+    url.protocol.replace(':', '');
   const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || url.host;
   return `${proto}://${host}`;
 };
@@ -189,7 +191,12 @@ export const calendarFeedRouter = (deps: Deps) => {
   return new Elysia({ prefix: '/calendar/feeds' }).get(
     '/:token',
     ({ params, request, server, set }) => {
-      enforceRateLimit(deps.limiters, 'comms.calendar_feed', clientIp(request, server ?? undefined), FEED_LIMIT);
+      enforceRateLimit(
+        deps.limiters,
+        'comms.calendar_feed',
+        clientIp(request, server ?? undefined),
+        FEED_LIMIT,
+      );
       const token = params.token.replace(/\.ics$/, '');
       const feed = db
         .select()

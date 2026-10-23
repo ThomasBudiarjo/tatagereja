@@ -53,7 +53,8 @@ const ITEMS_MAX = 30;
 export const sectionsOf = (row: Pick<BulletinRow, 'sections'>): BulletinSection[] =>
   (Array.isArray(row.sections) ? row.sections : []).flatMap((section) => {
     const parsed = bulletinSectionSchema.safeParse(section);
-    return parsed.success && (BULLETIN_SECTION_KINDS as readonly string[]).includes(parsed.data.kind)
+    return parsed.success &&
+      (BULLETIN_SECTION_KINDS as readonly string[]).includes(parsed.data.kind)
       ? [parsed.data]
       : [];
   });
@@ -212,7 +213,13 @@ function anniversaries(db: Queryable, church: ChurchRow, week: Week): BulletinIt
         inArray(sql`substr(${people.weddingDate}, 6, 5)`, [...days.keys()]),
       ),
     )
-    .orderBy(asc(people.firstName))
+    // The head of the household is named first ("Petrus & Maria").
+    .orderBy(
+      asc(
+        sql`case ${householdMembers.relationship} when 'head' then 0 when 'spouse' then 1 else 2 end`,
+      ),
+      asc(people.firstName),
+    )
     .all();
   const couples = new Map<string, { ids: string[]; names: string[]; weddingDate: string }>();
   for (const row of rows) {
@@ -281,7 +288,9 @@ function rosters(db: Queryable, church: ChurchRow, week: Week, itemIds: readonly
         id: service.id,
         title: service.title,
         startsAt: service.startsAt,
-        body: [...positions].map(([position, names]) => `- **${position}**: ${names.join(', ')}`).join('\n'),
+        body: [...positions]
+          .map(([position, names]) => `- **${position}**: ${names.join(', ')}`)
+          .join('\n'),
       }),
     ];
   });
@@ -311,8 +320,14 @@ function financeSummary(db: Queryable, church: ChurchRow, week: Week): BulletinF
     .all();
   const totals = db
     .select({
-      income: sql<number>`coalesce(sum(case when ${financeEntries.amount} > 0 then ${financeEntries.amount} else 0 end), 0)`.mapWith(Number),
-      expense: sql<number>`coalesce(sum(case when ${financeEntries.amount} < 0 then -${financeEntries.amount} else 0 end), 0)`.mapWith(Number),
+      income:
+        sql<number>`coalesce(sum(case when ${financeEntries.amount} > 0 then ${financeEntries.amount} else 0 end), 0)`.mapWith(
+          Number,
+        ),
+      expense:
+        sql<number>`coalesce(sum(case when ${financeEntries.amount} < 0 then -${financeEntries.amount} else 0 end), 0)`.mapWith(
+          Number,
+        ),
     })
     .from(financeEntries)
     .where(where)
@@ -349,7 +364,12 @@ export function renderBulletin(
           {
             ...rendered,
             items: pick(weekAnnouncements(db, church, week), section.itemIds).map((entry) =>
-              item({ id: entry.id, title: entry.title, body: entry.body, startsAt: entry.publishAt ?? entry.publishedAt }),
+              item({
+                id: entry.id,
+                title: entry.title,
+                body: entry.body,
+                startsAt: entry.publishAt ?? entry.publishedAt,
+              }),
             ),
           },
         ];
@@ -378,7 +398,12 @@ export function renderBulletin(
               weekEvents(db, church, week, section.itemIds.length > 0),
               section.itemIds,
             ).map((event) =>
-              item({ id: event.id, title: event.title, startsAt: event.startsAt, subtitle: event.location }),
+              item({
+                id: event.id,
+                title: event.title,
+                startsAt: event.startsAt,
+                subtitle: event.location,
+              }),
             ),
           },
         ];

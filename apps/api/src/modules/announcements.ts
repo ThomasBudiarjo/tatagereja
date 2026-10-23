@@ -301,7 +301,8 @@ export const announcementsModule = (deps: Deps) => {
       '/:id/pin',
       ({ church, access, params, body }) => {
         const row = loadAnnouncement(church.id, params.id);
-        if (!can.manageAnnouncement(access, row)) throw forbidden('You cannot pin this announcement');
+        if (!can.manageAnnouncement(access, row))
+          throw forbidden('You cannot pin this announcement');
         const updated = db
           .update(announcements)
           .set({ pinnedAt: body.pinned ? (row.pinnedAt ?? nowIso()) : null, updatedAt: nowIso() })
@@ -338,11 +339,18 @@ export const announcementsModule = (deps: Deps) => {
         const row = loadAnnouncement(church.id, params.id);
         if (!can.manageAnnouncement(access, row)) throw forbidden('You cannot see who read this');
         const items = db
-          .select({ userId: announcementReads.userId, name: users.name, readAt: announcementReads.readAt })
+          .select({
+            userId: announcementReads.userId,
+            name: users.name,
+            readAt: announcementReads.readAt,
+          })
           .from(announcementReads)
           .innerJoin(users, eq(users.id, announcementReads.userId))
           .where(
-            and(eq(announcementReads.announcementId, row.id), eq(announcementReads.churchId, church.id)),
+            and(
+              eq(announcementReads.announcementId, row.id),
+              eq(announcementReads.churchId, church.id),
+            ),
           )
           .orderBy(desc(announcementReads.readAt), asc(users.name))
           .all();
@@ -377,4 +385,3 @@ export const announcementsModule = (deps: Deps) => {
       { church: true, params: churchIdParamsSchema },
     );
 };
-

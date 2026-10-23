@@ -78,7 +78,10 @@ export function calendarItems(
     const conditions: (SQL | undefined)[] = [
       eq(events.churchId, church.id),
       lt(events.startsAt, range.to),
-      or(gte(events.endsAt, range.from), and(sql`${events.endsAt} is null`, gte(events.startsAt, range.from))),
+      or(
+        gte(events.endsAt, range.from),
+        and(sql`${events.endsAt} is null`, gte(events.startsAt, range.from)),
+      ),
     ];
     if (range.groupId) conditions.push(eq(events.groupId, range.groupId));
     const rows = db
@@ -133,8 +136,7 @@ export function calendarItems(
       const endsAt =
         service.endsAt ??
         new Date(
-          new Date(service.startsAt).getTime() +
-            (typeMinutes ?? DEFAULT_SERVICE_MINUTES) * 60_000,
+          new Date(service.startsAt).getTime() + (typeMinutes ?? DEFAULT_SERVICE_MINUTES) * 60_000,
         ).toISOString();
       if (endsAt <= range.from) continue;
       items.push({

@@ -6,10 +6,16 @@ import { churchDateOf, addDaysToDate, type CalendarItem } from '@tatagereja/shar
  */
 
 const escapeText = (value: string): string =>
-  value.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+  value
+    .replace(/\\/g, '\\\\')
+    .replace(/\r?\n/g, '\\n')
+    .replace(/([,;])/g, '\\$1');
 
 const utcStamp = (iso: string): string =>
-  new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  new Date(iso)
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '');
 
 const dateStamp = (date: string): string => date.replace(/-/g, '');
 
@@ -66,7 +72,9 @@ export function buildIcs(options: {
         item.endsAt ?? new Date(new Date(item.startsAt).getTime() + 60 * 60_000).toISOString();
       lines.push(`DTEND:${utcStamp(end)}`);
     }
-    lines.push(`SUMMARY:${escapeText(item.source === 'birthdays' ? `Ulang tahun ${item.title}` : item.title)}`);
+    lines.push(
+      `SUMMARY:${escapeText(item.source === 'birthdays' ? `Ulang tahun ${item.title}` : item.title)}`,
+    );
     if (item.location) lines.push(`LOCATION:${escapeText(item.location)}`);
     if (item.subtitle) lines.push(`DESCRIPTION:${escapeText(item.subtitle)}`);
     if (item.link) lines.push(`URL:${options.appUrl}${item.link}`);

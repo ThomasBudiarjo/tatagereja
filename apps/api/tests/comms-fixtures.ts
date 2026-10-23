@@ -11,8 +11,7 @@ export const inDays = (days: number, hour = 9, minute = 0) => {
   return date.toISOString();
 };
 
-export const inMinutes = (minutes: number) =>
-  new Date(Date.now() + minutes * 60_000).toISOString();
+export const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 
 export const dayOf = (iso: string) => iso.slice(0, 10);
 
@@ -126,7 +125,12 @@ export async function notificationsOf(
     token,
   });
   expect(response.status).toBe(200);
-  const items = response.json.items as { type: string; title: string; body: string | null; link: string | null }[];
+  const items = response.json.items as {
+    type: string;
+    title: string;
+    body: string | null;
+    link: string | null;
+  }[];
   return type ? items.filter((item) => item.type === type) : items;
 }
 

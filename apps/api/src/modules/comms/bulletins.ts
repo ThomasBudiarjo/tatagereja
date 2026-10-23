@@ -124,7 +124,10 @@ export const bulletinsRouter = (deps: Deps) => {
         if (query.status) conditions.push(eq(bulletins.status, query.status));
         if (query.q) {
           conditions.push(
-            or(like(bulletins.title, likePattern(query.q)), like(bulletins.theme, likePattern(query.q))),
+            or(
+              like(bulletins.title, likePattern(query.q)),
+              like(bulletins.theme, likePattern(query.q)),
+            ),
           );
         }
         const where = and(...conditions);
@@ -206,7 +209,8 @@ export const bulletinsRouter = (deps: Deps) => {
     )
     .get(
       '/:id',
-      ({ church, access, params }) => detail(church, access, loadReadable(church.id, access, params.id)),
+      ({ church, access, params }) =>
+        detail(church, access, loadReadable(church.id, access, params.id)),
       { church: { permission: [...READ] }, params: churchIdParamsSchema },
     )
     .patch(
@@ -249,7 +253,12 @@ export const bulletinsRouter = (deps: Deps) => {
           const now = nowIso();
           const next = tx
             .update(bulletins)
-            .set({ status: 'published', publishedAt: row.publishedAt ?? now, updatedBy: auth.user.id, updatedAt: now })
+            .set({
+              status: 'published',
+              publishedAt: row.publishedAt ?? now,
+              updatedBy: auth.user.id,
+              updatedAt: now,
+            })
             .where(eq(bulletins.id, row.id))
             .returning()
             .get();

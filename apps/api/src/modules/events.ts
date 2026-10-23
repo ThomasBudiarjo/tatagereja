@@ -209,7 +209,12 @@ export const eventsModule = (deps: Deps) => {
     const existing = tx
       .select()
       .from(attendanceSessions)
-      .where(and(eq(attendanceSessions.eventId, event.id), eq(attendanceSessions.churchId, event.churchId)))
+      .where(
+        and(
+          eq(attendanceSessions.eventId, event.id),
+          eq(attendanceSessions.churchId, event.churchId),
+        ),
+      )
       .orderBy(asc(attendanceSessions.createdAt))
       .get();
     if (existing) return existing;
@@ -323,7 +328,10 @@ export const eventsModule = (deps: Deps) => {
                 .select({ id: eventParticipants.eventId })
                 .from(eventParticipants)
                 .where(
-                  and(eq(eventParticipants.personId, personId), eq(eventParticipants.status, 'going')),
+                  and(
+                    eq(eventParticipants.personId, personId),
+                    eq(eventParticipants.status, 'going'),
+                  ),
                 ),
             ),
           );
@@ -453,7 +461,9 @@ export const eventsModule = (deps: Deps) => {
                 location: body.location,
                 startsAt,
                 endsAt: body.durationMinutes
-                  ? new Date(new Date(startsAt).getTime() + body.durationMinutes * 60_000).toISOString()
+                  ? new Date(
+                      new Date(startsAt).getTime() + body.durationMinutes * 60_000,
+                    ).toISOString()
                   : null,
                 isAllDay: body.isAllDay,
                 seriesId: series.id,
@@ -637,7 +647,9 @@ export const eventsModule = (deps: Deps) => {
                     : new Date(new Date(start).getTime() + duration).toISOString(),
                 // A closing time only makes sense for the edited occurrence.
                 registrationClosesAt: target.id === event.id ? fields.registrationClosesAt : null,
-                isSeriesException: future ? target.isSeriesException && target.id !== event.id : target.seriesId !== null,
+                isSeriesException: future
+                  ? target.isSeriesException && target.id !== event.id
+                  : target.seriesId !== null,
                 updatedAt: now,
               })
               .where(eq(events.id, target.id))
@@ -774,7 +786,11 @@ export const eventsModule = (deps: Deps) => {
         const updated = db.transaction((tx) => {
           const row = tx
             .update(events)
-            .set({ cancelledAt: nowIso(), isSeriesException: event.seriesId !== null, updatedAt: nowIso() })
+            .set({
+              cancelledAt: nowIso(),
+              isSeriesException: event.seriesId !== null,
+              updatedAt: nowIso(),
+            })
             .where(eq(events.id, event.id))
             .returning()
             .get();
@@ -951,7 +967,10 @@ export const eventsModule = (deps: Deps) => {
             .select()
             .from(eventRegistrations)
             .where(
-              and(eq(eventRegistrations.eventId, event.id), eq(eventRegistrations.personId, person.id)),
+              and(
+                eq(eventRegistrations.eventId, event.id),
+                eq(eventRegistrations.personId, person.id),
+              ),
             )
             .get();
           if (existing && existing.status !== 'cancelled') {
@@ -960,7 +979,8 @@ export const eventsModule = (deps: Deps) => {
           const taken = registrationCountsOf(tx, [event.id]).get(event.id)?.registered ?? 0;
           // Nobody jumps the queue: with people waiting, newcomers wait too.
           const waiting = (registrationCountsOf(tx, [event.id]).get(event.id)?.waitlisted ?? 0) > 0;
-          const fits = event.capacity === null || (!waiting && taken + body.partySize <= event.capacity);
+          const fits =
+            event.capacity === null || (!waiting && taken + body.partySize <= event.capacity);
           if (!fits && !event.waitlistEnabled) throw conflict('This event is full');
           const status: EventRegistrationRow['status'] = fits ? 'registered' : 'waitlisted';
           const now = nowIso();
@@ -1030,7 +1050,11 @@ export const eventsModule = (deps: Deps) => {
         if (!item) throw notFound('Registration');
         return { registration: item, event: hydrateOne(event, access) };
       },
-      { church: { permission: 'events.view' }, params: churchIdParamsSchema, body: registerForEventBodySchema },
+      {
+        church: { permission: 'events.view' },
+        params: churchIdParamsSchema,
+        body: registerForEventBodySchema,
+      },
     )
     .post(
       '/:id/registrations/:registrationId/cancel',
@@ -1054,7 +1078,8 @@ export const eventsModule = (deps: Deps) => {
         if (!own && !can.manageEvent(access, event)) {
           throw forbidden('You cannot cancel this registration');
         }
-        if (registration.status === 'cancelled') throw conflict('This registration is already cancelled');
+        if (registration.status === 'cancelled')
+          throw conflict('This registration is already cancelled');
         db.transaction((tx) => {
           const now = nowIso();
           tx.update(eventRegistrations)
@@ -1077,7 +1102,8 @@ export const eventsModule = (deps: Deps) => {
             entityType: 'event',
             entityId: event.id,
           });
-          if (registration.status === 'registered') promoteWaitlist(tx, church, event, auth.user.id);
+          if (registration.status === 'registered')
+            promoteWaitlist(tx, church, event, auth.user.id);
         });
         const item = hydrateRegistrations(db, event.id).find((row) => row.id === registration.id);
         if (!item) throw notFound('Registration');
@@ -1093,7 +1119,12 @@ export const eventsModule = (deps: Deps) => {
         const session = db
           .select()
           .from(attendanceSessions)
-          .where(and(eq(attendanceSessions.eventId, event.id), eq(attendanceSessions.churchId, church.id)))
+          .where(
+            and(
+              eq(attendanceSessions.eventId, event.id),
+              eq(attendanceSessions.churchId, church.id),
+            ),
+          )
           .orderBy(asc(attendanceSessions.createdAt))
           .get();
         const present = new Map(
@@ -1115,13 +1146,20 @@ export const eventsModule = (deps: Deps) => {
           .select({ registration: eventRegistrations, person: people })
           .from(eventRegistrations)
           .innerJoin(people, eq(people.id, eventRegistrations.personId))
-          .where(and(eq(eventRegistrations.eventId, event.id), eq(eventRegistrations.status, 'registered')))
+          .where(
+            and(
+              eq(eventRegistrations.eventId, event.id),
+              eq(eventRegistrations.status, 'registered'),
+            ),
+          )
           .all();
         const going = db
           .select({ person: people })
           .from(eventParticipants)
           .innerJoin(people, eq(people.id, eventParticipants.personId))
-          .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.status, 'going')))
+          .where(
+            and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.status, 'going')),
+          )
           .all();
         const seen = new Set<string>();
         const items: {
@@ -1217,7 +1255,11 @@ export const eventsModule = (deps: Deps) => {
         }
         return checkIn(event, personIds, auth.user.id);
       },
-      { church: { permission: 'events.view' }, params: churchIdParamsSchema, body: eventCheckInBodySchema },
+      {
+        church: { permission: 'events.view' },
+        params: churchIdParamsSchema,
+        body: eventCheckInBodySchema,
+      },
     )
     .delete(
       '/:id/check-in/:personId',
@@ -1227,7 +1269,12 @@ export const eventsModule = (deps: Deps) => {
         const session = db
           .select({ id: attendanceSessions.id })
           .from(attendanceSessions)
-          .where(and(eq(attendanceSessions.eventId, event.id), eq(attendanceSessions.churchId, church.id)))
+          .where(
+            and(
+              eq(attendanceSessions.eventId, event.id),
+              eq(attendanceSessions.churchId, church.id),
+            ),
+          )
           .orderBy(asc(attendanceSessions.createdAt))
           .get();
         db.transaction((tx) => {

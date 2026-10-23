@@ -627,21 +627,26 @@ export const calendarSourcesFor = (
   return sources;
 };
 
+/** Comma-separated sources; some servers already split repeated or comma-separated values. */
 const sourceListSchema = z
-  .string()
-  .trim()
-  .max(LIMITS.shortTextMax)
+  .union([
+    z.string().trim().max(LIMITS.shortTextMax),
+    z.array(z.string().trim().max(40)).max(CALENDAR_SOURCES.length * 2),
+  ])
   .optional()
-  .transform((value): CalendarSource[] =>
-    value
-      ? value
-          .split(',')
+  .transform((value): CalendarSource[] => {
+    if (value === undefined || value === '') return ['events', 'services', 'bookings'];
+    const parts = (Array.isArray(value) ? value : [value]).flatMap((part) => part.split(','));
+    return [
+      ...new Set(
+        parts
           .map((part) => part.trim())
           .filter((part): part is CalendarSource =>
             (CALENDAR_SOURCES as readonly string[]).includes(part),
-          )
-      : ['events', 'services', 'bookings'],
-  );
+          ),
+      ),
+    ];
+  });
 
 export const calendarQuerySchema = z
   .object({
@@ -785,7 +790,15 @@ export const defaultBulletinSections = (
   newId: () => string = () => Math.random().toString(36).slice(2, 10),
 ): BulletinSection[] =>
   (
-    ['text', 'services', 'rosters', 'announcements', 'events', 'birthdays', 'anniversaries'] as const
+    [
+      'text',
+      'services',
+      'rosters',
+      'announcements',
+      'events',
+      'birthdays',
+      'anniversaries',
+    ] as const
   ).map((kind) => ({
     id: newId(),
     kind,
