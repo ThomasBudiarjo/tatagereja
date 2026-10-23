@@ -77,8 +77,7 @@ export function PersonAttendancePage() {
         tone={ATTENDANCE_TONE}
         breadcrumbs={[
           { label: t('attendance.title'), to: `${base}/attendance` },
-          ...(query.data ? [{ label: name, to: `${base}/people/${personId}` }] : []),
-          { label: t('attendance.lastTwelveMonths') },
+          { label: name || t('attendance.title') },
         ]}
         actions={
           query.data ? (
@@ -161,7 +160,7 @@ function HistoryView({ history }: { history: AttendanceHistory }) {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <Section title={t('attendance.lastTwelveMonths')}>
           <Card>
             <CardContent>

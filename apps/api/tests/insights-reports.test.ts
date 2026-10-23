@@ -277,6 +277,16 @@ describe('insights reports', () => {
     expect(body.totals.new).toBe(5);
     expect(body.totals.growthRate).toBe(2.5);
 
+    // A range reaching into the future stops at today: no empty periods ahead.
+    const ahead = await report(
+      'membership_growth',
+      reporter.token,
+      'from=2026-06-01&to=2028-06-30',
+    );
+    const currentMonth = `${new Date().toISOString().slice(0, 7)}-01`;
+    const points = ahead.json.series[0].points as { x: string }[];
+    expect(points.at(-1)!.x <= currentMonth).toBe(true);
+
     const quarterly = await report(
       'membership_growth',
       reporter.token,

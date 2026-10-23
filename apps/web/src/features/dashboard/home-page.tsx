@@ -22,7 +22,6 @@ import {
 import { useState } from 'react';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
-import { QuickActions } from '@/components/layout/quick-actions';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -44,6 +43,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useAuth } from '@/stores/auth';
 import { dashboardQuery, useSaveDashboardPreferences } from './api';
+import { HomeQuickActions } from './quick-actions';
 import {
   AnnouncementsWidget,
   AttendanceWidget,
@@ -229,8 +229,8 @@ function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => vo
 
   return (
     <>
-      {quickActions ? <QuickActions /> : null}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      {quickActions ? <HomeQuickActions /> : null}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         {cards.map((card) => (
           <div key={card.id} className="min-w-0">
             {card.node}

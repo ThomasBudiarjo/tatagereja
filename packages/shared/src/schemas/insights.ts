@@ -24,15 +24,16 @@ export const INSIGHTS_LIMITS = {
 // Personalised home
 // ---------------------------------------------------------------------------------------------
 
+/** Every home widget, in the default order. */
 export const HOME_WIDGETS = [
   'quick_actions',
+  'my_kids',
+  'notifications',
   'my_schedule',
   'my_tasks',
-  'my_kids',
   'upcoming_events',
   'announcements',
   'birthdays',
-  'notifications',
   'attendance_summary',
 ] as const;
 export type HomeWidget = (typeof HOME_WIDGETS)[number];

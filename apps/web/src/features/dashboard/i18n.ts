@@ -15,6 +15,8 @@ export const dashboardDictionary = defineDictionary('dashboard', {
     statUpcomingHint: 'events',
     statAccounts: 'Accounts',
     statAccountsHint: 'signed-in members',
+    allActions: 'All actions ({count})',
+    fewerActions: 'Fewer actions',
     customize: 'Customise',
     customizeTitle: 'Customise your home',
     customizeDescription:
@@ -107,6 +109,8 @@ export const dashboardDictionary = defineDictionary('dashboard', {
     statUpcomingHint: 'kegiatan',
     statAccounts: 'Akun',
     statAccountsHint: 'anggota yang terdaftar',
+    allActions: 'Semua aksi ({count})',
+    fewerActions: 'Lebih sedikit',
     customize: 'Atur',
     customizeTitle: 'Atur beranda Anda',
     customizeDescription:

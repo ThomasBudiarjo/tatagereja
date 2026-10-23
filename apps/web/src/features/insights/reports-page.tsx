@@ -36,6 +36,7 @@ import { DateRangePicker, presetRange } from '@/components/ui/date-range-picker'
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { PrintButton, PrintHeader } from '@/components/ui/print';
+import { Select } from '@/components/ui/select';
 import { Skeleton, SkeletonStats } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
 import { ErrorState } from '@/components/ui/states';
@@ -280,7 +281,23 @@ export function ReportsPage() {
         />
       ) : (
         <UrlTabs param="report" defaultValue={kind} values={kinds}>
-          <TabsList variant="underline" data-print="hide">
+          {/* Phones pick the report from a list; the tab row would hide the active one. */}
+          <div className="sm:hidden" data-print="hide">
+            <Select
+              aria-label={t('insights.reports')}
+              value={kind}
+              onChange={(event) =>
+                setState({ report: event.target.value as ReportKind }, { push: true })
+              }
+            >
+              {kinds.map((item) => (
+                <option key={item} value={item}>
+                  {localize(REPORT_LABELS[item], locale)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <TabsList variant="underline" data-print="hide" className="hidden sm:flex">
             {kinds.map((item) => {
               const Icon = VIEWS[item].icon;
               return (
@@ -302,26 +319,24 @@ export function ReportsPage() {
                         presets={['thisMonth', 'lastMonth', 'last90', 'thisYear']}
                         onChange={(next) => setState({ from: next.from, to: next.to })}
                       />
+                      {VIEWS[item].trend ? (
+                        <Select
+                          aria-label={t('insights.interval')}
+                          value={interval}
+                          onChange={(event) => setState({ interval: event.target.value })}
+                          className="h-11 w-auto sm:h-9"
+                        >
+                          {REPORT_INTERVALS.map((value) => (
+                            <option key={value} value={value}>
+                              {localize(REPORT_INTERVAL_LABELS[value], locale)}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
                       <ExportButton kind={item} params={params} />
                     </div>
                   }
                   filters={[
-                    ...(VIEWS[item].trend
-                      ? [
-                          {
-                            id: 'interval',
-                            label: t('insights.interval'),
-                            value: interval === 'month' ? '' : interval,
-                            onChange: (value: string) => setState({ interval: value || 'month' }),
-                            options: REPORT_INTERVALS.filter((value) => value !== 'month').map(
-                              (value) => ({
-                                value,
-                                label: localize(REPORT_INTERVAL_LABELS[value], locale),
-                              }),
-                            ),
-                          },
-                        ]
-                      : []),
                     ...(item === 'giving_trend'
                       ? []
                       : [
@@ -493,7 +508,7 @@ function ReportBody({ report, stale }: { report: Report; stale: boolean }) {
         ) : (
           <>
             {view.trend && hasTrend ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {lineSeries.length > 0 ? (
                   <Card className={bars ? '' : 'lg:col-span-2'}>
                     <CardHeader>
@@ -549,7 +564,7 @@ function ReportBody({ report, stale }: { report: Report; stale: boolean }) {
             ) : null}
 
             {donuts.length > 0 || lists.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {donuts.map((breakdown) => (
                   <Card key={breakdown.key}>
                     <CardHeader>

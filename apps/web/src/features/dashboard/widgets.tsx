@@ -23,7 +23,6 @@ import { Link } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Sparkline } from '@/components/ui/charts';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import type { Tone } from '@/components/ui/tone';
@@ -84,12 +83,15 @@ function Row({
   leading,
   title,
   subtitle,
+  meta,
   trailing,
 }: {
   to?: string;
   leading?: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  /** A status under the text on phones and at the end of the row from `sm`. */
+  meta?: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
   const body = (
@@ -98,7 +100,9 @@ function Row({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{title}</div>
         {subtitle ? <div className="truncate text-xs text-muted-foreground">{subtitle}</div> : null}
+        {meta ? <div className="mt-1 sm:hidden">{meta}</div> : null}
       </div>
+      {meta ? <div className="hidden shrink-0 sm:block">{meta}</div> : null}
       {trailing ? <div className="flex shrink-0 items-center gap-2">{trailing}</div> : null}
     </>
   );
@@ -266,16 +270,12 @@ export function ScheduleWidget({ items }: { items: NonNullable<Dashboard['mySche
               leading={<DateChip value={item.serviceStartsAt} tone="violet" />}
               title={item.serviceTitle}
               subtitle={`${formatDateTime(item.serviceStartsAt)} · ${item.positionName} · ${item.teamName}`}
-              trailing={
-                item.status === 'pending' ? (
-                  <StatusBadge tone="warning" size="sm" dot>
-                    {t('dashboard.rosterPending')}
-                  </StatusBadge>
-                ) : (
-                  <StatusBadge tone="success" size="sm" dot>
-                    {t('dashboard.rosterAccepted')}
-                  </StatusBadge>
-                )
+              meta={
+                <StatusBadge tone={item.status === 'pending' ? 'warning' : 'success'} size="sm" dot>
+                  {item.status === 'pending'
+                    ? t('dashboard.rosterPending')
+                    : t('dashboard.rosterAccepted')}
+                </StatusBadge>
               }
             />
           ))}
@@ -608,7 +608,7 @@ export function AttendanceWidget({ data }: { data: Dashboard['attendance'] }) {
   const { t, formatPercent, formatNumber, formatDate } = useI18n();
   const mine = data.mine;
   const absent = mine ? mine.currentAbsentStreak > 0 : false;
-  const recent = data.recent ? [...data.recent].reverse() : null;
+  const recent = data.recent;
   return (
     <Widget
       icon={ClipboardCheck}
@@ -642,22 +642,31 @@ export function AttendanceWidget({ data }: { data: Dashboard['attendance'] }) {
           </Link>
         ) : null}
         {recent && recent.length > 0 ? (
-          <div className="flex items-end justify-between gap-3 rounded-xl border border-border/70 p-3">
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">{t('dashboard.recentAttendance')}</p>
-              <p className="text-2xl font-bold tracking-tight tabular">
-                {formatNumber(recent[recent.length - 1]?.attendeeCount ?? 0)}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {recent[recent.length - 1]?.title} ·{' '}
-                {formatDate(recent[recent.length - 1]?.sessionAt, 'dayMonth')}
-              </p>
-            </div>
-            <Sparkline
-              values={recent.map((session) => session.attendeeCount)}
-              width={112}
-              height={40}
-            />
+          <div className="flex flex-col rounded-xl border border-border/70">
+            <p className="px-3 pt-2.5 text-xs text-muted-foreground">
+              {t('dashboard.recentAttendance')}
+            </p>
+            <ul className="divide-y divide-border/60">
+              {recent.slice(0, 3).map((session) => (
+                <li key={session.id}>
+                  <Link
+                    to={`${base}/attendance/${session.id}`}
+                    className="flex min-h-12 items-center gap-3 px-3 py-2 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{session.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {formatDate(session.sessionAt, 'dayMonth')}
+                        {session.groupName ? ` · ${session.groupName}` : ''}
+                      </span>
+                    </span>
+                    <span className="text-base font-bold tabular">
+                      {formatNumber(session.attendeeCount)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
         {data.openAbsences !== null ? (

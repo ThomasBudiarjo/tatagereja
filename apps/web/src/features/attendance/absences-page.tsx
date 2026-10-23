@@ -146,7 +146,7 @@ export function AbsencesPage() {
           description={t('attendance.absencesEmptyBody', { count: query.data.threshold })}
         />
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {query.data.items.map((alert) => (
             <AlertCard
               key={alert.person.id}
@@ -205,7 +205,7 @@ function AlertCard({
   const open = alert.status === 'open';
   const severe = alert.streak >= 6;
   return (
-    <li className="flex animate-rise-in flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-soft">
+    <li className="flex min-w-0 animate-rise-in flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-soft">
       <div className="flex items-start gap-3">
         <EntityAvatar name={name} src={alert.person.photoUrl} />
         <div className="min-w-0 flex-1">
@@ -234,7 +234,7 @@ function AlertCard({
         <span className="text-xs text-muted-foreground">
           {t('attendance.lastAbsent', { date: formatDate(alert.lastAbsentAt, 'dateShort') })}
         </span>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap justify-end gap-2 sm:ml-auto sm:w-auto">
           <Button asChild variant="ghost" size="sm">
             <Link to={`${base}/attendance/people/${alert.person.id}`}>
               <History />

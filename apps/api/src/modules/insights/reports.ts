@@ -831,10 +831,16 @@ export const insightsReportsRouter = (deps: Deps) => {
             .map((row) => row.personId),
         );
       }
+      // Nothing has happened after today yet, so the range stops there (no empty future periods).
+      const today = localDayOf(new Date().toISOString(), church.timezone);
+      const range = {
+        ...query,
+        to: query.to > today ? (query.from > today ? query.from : today) : query.to,
+      };
       const context: Context = {
         church,
-        query,
-        periods: reportPeriods(query.from, query.to, query.interval),
+        query: range,
+        periods: reportPeriods(range.from, range.to, range.interval),
         groupPersonIds,
         text: (key) => localize(REPORT_TEXT[key], query.locale),
         label: (text) => localize(text, query.locale),

@@ -680,7 +680,7 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
         </h2>
         <p className="text-sm text-muted-foreground">{t('attendance.headcountDescription')}</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {HEADCOUNT_CATEGORIES.map((category) => {
           const label = localize(HEADCOUNT_LABELS[category], locale);
           const Icon = HEADCOUNT_ICONS[category];
@@ -689,17 +689,20 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
             <div
               key={category}
               data-tone={HEADCOUNT_TONES[category]}
-              className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-soft"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-card p-3 shadow-soft sm:flex-col sm:items-stretch sm:p-4"
             >
-              <div className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-tone-soft text-tone-ink">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-tone-soft text-tone-ink">
                   <Icon className="size-4" />
                 </span>
-                <label htmlFor={`headcount-${category}`} className="text-sm font-semibold">
+                <label
+                  htmlFor={`headcount-${category}`}
+                  className="min-w-0 text-sm leading-tight font-semibold"
+                >
                   {label}
                 </label>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -722,7 +725,7 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
                       max={HEADCOUNT_MAX}
                       readOnly={!canManage}
                       aria-invalid={!!error}
-                      className="h-12 min-w-0 flex-1 text-center text-2xl font-bold tabular"
+                      className="h-11 w-20 min-w-0 text-center text-xl font-bold tabular sm:h-12 sm:w-auto sm:flex-1 sm:text-2xl"
                       value={field.value ?? 0}
                       onFocus={(event) => event.currentTarget.select()}
                       onChange={(event) =>
@@ -743,7 +746,7 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
                 </Button>
               </div>
               {error ? (
-                <p role="alert" className="text-xs font-medium text-destructive">
+                <p role="alert" className="w-full text-xs font-medium text-destructive">
                   {error}
                 </p>
               ) : null}
@@ -751,17 +754,17 @@ function HeadcountPanel({ detail }: { detail: AttendanceSessionDetail }) {
           );
         })}
       </div>
-      <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+      <div className="sticky bottom-20 z-20 flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/95 p-3 shadow-raised backdrop-blur sm:p-4 md:static md:bg-card md:shadow-soft">
         <div>
           <p className="text-overline text-muted-foreground">{t('attendance.headcountTotal')}</p>
-          <p className="text-3xl font-bold tracking-tight tabular" aria-live="polite">
+          <p className="text-2xl font-bold tracking-tight tabular sm:text-3xl" aria-live="polite">
             {formatNumber(total)}
           </p>
         </div>
         {canManage ? (
           <div className="flex items-center gap-3">
             {isDirty ? (
-              <StatusBadge tone="warning" dot>
+              <StatusBadge tone="warning" dot className="hidden sm:inline-flex">
                 {t('attendance.unsavedCounts')}
               </StatusBadge>
             ) : null}
