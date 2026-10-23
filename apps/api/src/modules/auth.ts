@@ -301,8 +301,14 @@ export const authModule = (deps: Deps) => {
             churchId: null,
             userIds: [user.id],
             type: 'account.two_factor_changed',
-            title: 'A recovery code was used to sign in',
-            body: `${result.remainingRecoveryCodes} recovery code${result.remainingRecoveryCodes === 1 ? '' : 's'} left. Make new ones if you are running low.`,
+            title: {
+              id: 'Kode pemulihan dipakai untuk masuk',
+              en: 'A recovery code was used to sign in',
+            },
+            body: {
+              id: `Sisa ${result.remainingRecoveryCodes} kode pemulihan. Buat yang baru bila hampir habis.`,
+              en: `${result.remainingRecoveryCodes} recovery code${result.remainingRecoveryCodes === 1 ? '' : 's'} left. Make new ones if you are running low.`,
+            },
             link: '/profile?tab=security',
             entityType: 'user',
             entityId: user.id,
@@ -377,11 +383,17 @@ export const authModule = (deps: Deps) => {
             churchId: null,
             userIds: [user.id],
             type: 'account.password_changed',
-            title: 'Your password was changed',
+            title: { id: 'Kata sandi Anda diganti', en: 'Your password was changed' },
             body:
               revoked > 0
-                ? `Other devices were signed out (${revoked}). If this was not you, contact your church administrator.`
-                : 'If this was not you, change it again right away.',
+                ? {
+                    id: `Perangkat lain sudah dikeluarkan (${revoked}). Jika ini bukan Anda, hubungi pengurus gereja.`,
+                    en: `Other devices were signed out (${revoked}). If this was not you, contact your church administrator.`,
+                  }
+                : {
+                    id: 'Jika ini bukan Anda, segera ganti lagi kata sandinya.',
+                    en: 'If this was not you, change it again right away.',
+                  },
             link: '/profile?tab=security',
             entityType: 'user',
             entityId: user.id,

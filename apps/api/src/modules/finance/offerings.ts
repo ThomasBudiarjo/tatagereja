@@ -185,7 +185,10 @@ export const offeringsRouter = (deps: Deps) => {
         ...row.editorUserIds,
       ].filter((id): id is string => !!id),
       type: 'finance.offering_submitted',
-      title: 'Hitungan persembahan menunggu verifikasi',
+      title: {
+        id: 'Hitungan persembahan menunggu verifikasi',
+        en: 'An offering count is waiting for verification',
+      },
       body: serviceName(row),
       link: `/c/${church.id}/finance/offerings/${row.id}`,
       entityType: 'offering_batch',
@@ -475,7 +478,10 @@ export const offeringsRouter = (deps: Deps) => {
               churchId: church.id,
               userIds: recipients,
               type: 'finance.offering_returned',
-              title: 'Hitungan persembahan dikembalikan',
+              title: {
+                id: 'Hitungan persembahan dikembalikan',
+                en: 'An offering count was sent back',
+              },
               body: body.reason ? `${serviceName(batch)}: ${body.reason}` : serviceName(batch),
               link: `/c/${church.id}/finance/offerings/${batch.id}`,
               entityType: 'offering_batch',

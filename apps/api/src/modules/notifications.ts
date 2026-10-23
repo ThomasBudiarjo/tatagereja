@@ -13,6 +13,7 @@ import { churchMemberships, notificationPreferences, notifications } from '../db
 import type { Deps } from '../deps';
 import { notFound } from '../lib/errors';
 import { offsetOf } from '../lib/query';
+import { requestLocale } from '../lib/request';
 import { nowIso } from '../lib/time';
 import { authPlugin } from '../plugins/auth';
 import { toNotification } from '../serializers';
@@ -64,7 +65,7 @@ export const notificationsModule = (deps: Deps) => {
     .use(authPlugin(deps))
     .get(
       '/',
-      ({ auth, query }) => {
+      ({ auth, query, request }) => {
         releaseFor(auth.user.id, query.churchId);
         const conditions: SQL[] = [visibleTo(auth.user.id, query.churchId)];
         if (query.unread) conditions.push(isNull(notifications.readAt));
@@ -80,7 +81,7 @@ export const notificationsModule = (deps: Deps) => {
           .offset(offsetOf(query))
           .all();
         return {
-          items: rows.map(toNotification),
+          items: rows.map((row) => toNotification(row, requestLocale(request))),
           total,
           page: query.page,
           limit: query.limit,
@@ -161,7 +162,7 @@ export const notificationsModule = (deps: Deps) => {
     )
     .patch(
       '/:id',
-      ({ auth, params, body }) => {
+      ({ auth, params, body, request }) => {
         const row = db
           .update(notifications)
           // Keeps the first read time when a read notification is marked read again.
@@ -170,7 +171,7 @@ export const notificationsModule = (deps: Deps) => {
           .returning()
           .get();
         if (!row) throw notFound('Notification');
-        return { notification: toNotification(row) };
+        return { notification: toNotification(row, requestLocale(request)) };
       },
       { auth: true, params: idParamsSchema, body: markNotificationBodySchema },
     );

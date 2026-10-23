@@ -2,6 +2,7 @@ import {
   LIMITS,
   has,
   notificationTypeDefinition,
+  type LocalizedText,
   type NotificationType,
   type Permission,
 } from '@tatagereja/shared';
@@ -27,12 +28,18 @@ export type NotifyAudience =
   | { kind: 'permission'; permission: Permission }
   | { kind: 'role'; roleId: string };
 
+/**
+ * Notification text in both interface languages. A plain string (a service title, a person's
+ * own words) is the same in both.
+ */
+export type NotifyText = string | LocalizedText;
+
 export type NotifyInput = {
   /** Null only for account-level notices (then `userIds` is required). */
   churchId: string | null;
   type: NotificationType;
-  title: string;
-  body?: string | null;
+  title: NotifyText;
+  body?: NotifyText | null;
   /** In-app path, e.g. `/c/${churchId}/events/${id}`. Never an external URL. */
   link?: string | null;
   entityType?: string | null;
@@ -99,6 +106,13 @@ const audienceUserIds = (db: Queryable, churchId: string, audience: NotifyAudien
   }
 };
 
+/** Indonesian for the main column; English only when it differs, read back by `localizedTitle`. */
+const textOf = (text: NotifyText, max: number) => {
+  const id = (typeof text === 'string' ? text : text.id).slice(0, max);
+  const en = typeof text === 'string' ? null : text.en.slice(0, max);
+  return { id, en: en === id ? null : en };
+};
+
 /** Recipients who turned this type off (or never turned an off-by-default type on). */
 const mutedUserIds = (db: Queryable, type: NotificationType, userIds: string[]): Set<string> => {
   const definition = notificationTypeDefinition(type);
@@ -142,13 +156,17 @@ export function notify(db: Queryable, input: NotifyInput): number {
   const now = nowIso();
   const link =
     input.link && input.link.startsWith('/') && !input.link.startsWith('//') ? input.link : null;
+  const title = textOf(input.title, LIMITS.notificationTitleMax);
+  const body = input.body ? textOf(input.body, LIMITS.notificationBodyMax) : null;
   const rows = deliver.map((userId) => ({
     id: newId(),
     churchId: input.churchId,
     userId,
     type: input.type,
-    title: input.title.slice(0, LIMITS.notificationTitleMax),
-    body: input.body ? input.body.slice(0, LIMITS.notificationBodyMax) : null,
+    title: title.id,
+    titleEn: title.en,
+    body: body?.id ?? null,
+    bodyEn: body?.en ?? null,
     link: link ? link.slice(0, LIMITS.urlMax) : null,
     entityType: input.entityType ?? null,
     entityId: input.entityId ?? null,

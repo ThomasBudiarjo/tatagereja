@@ -16,6 +16,7 @@ import {
   voidFinanceBodySchema,
   type AccessLike,
   type ExpenseRequestInput,
+  type LocalizedText,
 } from '@tatagereja/shared';
 import { and, asc, count, desc, eq, gte, like, lte, or, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
@@ -112,8 +113,14 @@ export const expensesRouter = (deps: Deps) => {
       excludeUserIds: [row.requestedBy, ...row.editorUserIds].filter((id): id is string => !!id),
       type: 'finance.expense_submitted',
       title: row.isReimbursement
-        ? 'Penggantian biaya menunggu persetujuan'
-        : 'Pengajuan dana menunggu persetujuan',
+        ? {
+            id: 'Penggantian biaya menunggu persetujuan',
+            en: 'A reimbursement is waiting for approval',
+          }
+        : {
+            id: 'Pengajuan dana menunggu persetujuan',
+            en: 'An expense request is waiting for approval',
+          },
       body: row.title,
       link: `/c/${church.id}/finance/expenses/${row.id}`,
       entityType: 'expense_request',
@@ -124,7 +131,7 @@ export const expensesRouter = (deps: Deps) => {
     tx: Queryable,
     church: ChurchRow,
     row: ExpenseRequestRow,
-    title: string,
+    title: LocalizedText,
     actorId: string,
   ) => {
     if (!row.requestedBy || row.requestedBy === actorId) return;
@@ -353,7 +360,9 @@ export const expensesRouter = (deps: Deps) => {
             tx,
             church,
             updated,
-            body.decision === 'approved' ? 'Pengajuan dana disetujui' : 'Pengajuan dana ditolak',
+            body.decision === 'approved'
+              ? { id: 'Pengajuan dana disetujui', en: 'Your expense request was approved' }
+              : { id: 'Pengajuan dana ditolak', en: 'Your expense request was rejected' },
             auth.user.id,
           );
           return updated;
@@ -419,7 +428,13 @@ export const expensesRouter = (deps: Deps) => {
               amount: expense.amount,
             },
           });
-          notifyRequester(tx, church, updated, 'Pengajuan dana sudah dibayarkan', auth.user.id);
+          notifyRequester(
+            tx,
+            church,
+            updated,
+            { id: 'Pengajuan dana sudah dibayarkan', en: 'Your expense request was paid' },
+            auth.user.id,
+          );
           return updated;
         });
         return { expense: hydrateOne(church.id, access, row) };
@@ -515,7 +530,13 @@ export const expensesRouter = (deps: Deps) => {
             before: { status: expense.status },
             after: { status: updated.status, reason: body.reason },
           });
-          notifyRequester(tx, church, updated, 'Pengajuan dana dibatalkan', auth.user.id);
+          notifyRequester(
+            tx,
+            church,
+            updated,
+            { id: 'Pengajuan dana dibatalkan', en: 'Your expense request was cancelled' },
+            auth.user.id,
+          );
           return updated;
         });
         return { expense: hydrateOne(church.id, access, row) };

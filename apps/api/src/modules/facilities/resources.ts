@@ -219,8 +219,14 @@ export const resourcesRouter = (deps: Deps) => {
               churchId: church.id,
               userIds: [userId],
               type: 'booking.cancelled',
-              title: `Your booking of ${row.name} was cancelled`,
-              body: `${row.name} is no longer available · ${titles.join(', ')}`,
+              title: {
+                id: `Peminjaman ${row.name} dibatalkan`,
+                en: `Your booking of ${row.name} was cancelled`,
+              },
+              body: {
+                id: `${row.name} tidak tersedia lagi · ${titles.join(', ')}`,
+                en: `${row.name} is no longer available · ${titles.join(', ')}`,
+              },
               link: `/c/${church.id}/facilities/bookings`,
               entityType: 'facility_resource',
               entityId: row.id,

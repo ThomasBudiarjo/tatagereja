@@ -166,8 +166,14 @@ export const rosterRouter = (deps: Deps) => {
         userIds: [userId],
         excludeUserIds: [actor.userId],
         type: 'roster.assigned',
-        title: `You are scheduled to serve at ${service.title}`,
-        body: `${labels.join(', ')} · ${serviceWhen(service.startsAt, church.timezone)}. Please accept or decline.`,
+        title: {
+          id: `Anda dijadwalkan bertugas di ${service.title}`,
+          en: `You are scheduled to serve at ${service.title}`,
+        },
+        body: {
+          id: `${labels.join(', ')} · ${serviceWhen(service.startsAt, church.timezone, 'id')}. Mohon terima atau tolak.`,
+          en: `${labels.join(', ')} · ${serviceWhen(service.startsAt, church.timezone)}. Please accept or decline.`,
+        },
         link: `/c/${church.id}/worship/me`,
         entityType: 'service',
         entityId: service.id,
@@ -731,6 +737,7 @@ export const rosterRouter = (deps: Deps) => {
               ...new Set([...(row.assignedBy ? [row.assignedBy] : []), ...leaderUserIds]),
             ];
             if (recipients.length > 0) {
+              const reason = body.status === 'declined' && body.reason ? ` · ${body.reason}` : '';
               notify(tx, {
                 churchId: church.id,
                 userIds: recipients,
@@ -738,11 +745,18 @@ export const rosterRouter = (deps: Deps) => {
                 type: 'roster.response',
                 title:
                   body.status === 'accepted'
-                    ? `${fullName(person)} will serve as ${position.name}`
-                    : `${fullName(person)} cannot serve as ${position.name}`,
-                body: `${service.title} · ${serviceWhen(service.startsAt, church.timezone)}${
-                  body.status === 'declined' && body.reason ? ` · ${body.reason}` : ''
-                }`,
+                    ? {
+                        id: `${fullName(person)} bersedia bertugas sebagai ${position.name}`,
+                        en: `${fullName(person)} will serve as ${position.name}`,
+                      }
+                    : {
+                        id: `${fullName(person)} berhalangan bertugas sebagai ${position.name}`,
+                        en: `${fullName(person)} cannot serve as ${position.name}`,
+                      },
+                body: {
+                  id: `${service.title} · ${serviceWhen(service.startsAt, church.timezone, 'id')}${reason}`,
+                  en: `${service.title} · ${serviceWhen(service.startsAt, church.timezone)}${reason}`,
+                },
                 link: serviceLink(church.id, service.id, 'roster'),
                 entityType: 'service',
                 entityId: service.id,

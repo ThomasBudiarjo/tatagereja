@@ -521,11 +521,11 @@ describe('facilities: resources and bookings', () => {
 
       const memberInbox = await inbox(f.s.member.token);
       expect(memberInbox.find((item) => item.type === 'booking.decided')?.title).toContain(
-        'approved',
+        'disetujui',
       );
       const leaderInbox = await inbox(f.s.leader.token);
       expect(leaderInbox.find((item) => item.type === 'booking.decided')?.title).toContain(
-        'not approved',
+        'tidak disetujui',
       );
 
       const actions = (await auditActions()).map((item) => item.action);

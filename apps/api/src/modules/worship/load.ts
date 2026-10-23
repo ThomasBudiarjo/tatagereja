@@ -1,3 +1,4 @@
+import type { Locale } from '@tatagereja/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Queryable } from '../../db/client';
 import type {
@@ -108,7 +109,8 @@ export function assertAllInChurch(
 }
 
 /** "Sun 26 Oct, 07:00" in the church time zone, for notification bodies. */
-export function serviceWhen(startsAt: string, timeZone: string): string {
+export function serviceWhen(startsAt: string, timeZone: string, locale: Locale = 'en'): string {
+  const tag = locale === 'id' ? 'id-ID' : 'en-GB';
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'short',
     day: 'numeric',
@@ -118,9 +120,9 @@ export function serviceWhen(startsAt: string, timeZone: string): string {
     hourCycle: 'h23',
   };
   try {
-    return new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).format(new Date(startsAt));
+    return new Intl.DateTimeFormat(tag, { ...options, timeZone }).format(new Date(startsAt));
   } catch {
-    return new Intl.DateTimeFormat('en-GB', options).format(new Date(startsAt));
+    return new Intl.DateTimeFormat(tag, options).format(new Date(startsAt));
   }
 }
 

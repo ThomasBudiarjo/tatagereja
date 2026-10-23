@@ -69,6 +69,8 @@ export const api = axios.create({ timeout: 20_000 });
 api.interceptors.request.use((config) => {
   const serverUrl = useServerStore.getState().currentUrl;
   config.baseURL = `${serverUrl}/api`;
+  // Server-written text (notifications) comes back in the interface language.
+  config.headers.set('Accept-Language', currentLocale());
   const token = currentToken();
   if (token && !config.headers.has('Authorization')) {
     config.headers.set('Authorization', `Bearer ${token}`);

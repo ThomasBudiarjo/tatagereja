@@ -7,6 +7,7 @@ import {
   twoFactorEnableBodySchema,
   twoFactorSetupBodySchema,
   type PersonalDataExport,
+  type LocalizedText,
 } from '@tatagereja/shared';
 import { and, count, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Elysia } from 'elysia';
@@ -81,7 +82,12 @@ export const accountSecurityRouter = (deps: Deps) => {
     return user;
   };
 
-  const twoFactorNotice = (tx: Queryable, userId: string, title: string, body: string) =>
+  const twoFactorNotice = (
+    tx: Queryable,
+    userId: string,
+    title: LocalizedText,
+    body: LocalizedText,
+  ) =>
     notify(tx, {
       churchId: null,
       userIds: [userId],
@@ -200,8 +206,11 @@ export const accountSecurityRouter = (deps: Deps) => {
           twoFactorNotice(
             tx,
             auth.user.id,
-            'Two-step verification is on',
-            'Signing in now also asks for a code from your authenticator app.',
+            { id: 'Verifikasi dua langkah aktif', en: 'Two-step verification is on' },
+            {
+              id: 'Saat masuk, Anda kini juga diminta kode dari aplikasi autentikator.',
+              en: 'Signing in now also asks for a code from your authenticator app.',
+            },
           );
           return codes;
         });
@@ -230,8 +239,11 @@ export const accountSecurityRouter = (deps: Deps) => {
           twoFactorNotice(
             tx,
             auth.user.id,
-            'Two-step verification is off',
-            'Your account is protected by your password only. If this was not you, change your password now.',
+            { id: 'Verifikasi dua langkah nonaktif', en: 'Two-step verification is off' },
+            {
+              id: 'Akun Anda kini hanya dilindungi kata sandi. Jika ini bukan Anda, segera ganti kata sandi.',
+              en: 'Your account is protected by your password only. If this was not you, change your password now.',
+            },
           );
         });
         return { ok: true as const };
@@ -258,8 +270,11 @@ export const accountSecurityRouter = (deps: Deps) => {
           twoFactorNotice(
             tx,
             auth.user.id,
-            'New recovery codes were made',
-            'Your previous recovery codes no longer work.',
+            { id: 'Kode pemulihan baru dibuat', en: 'New recovery codes were made' },
+            {
+              id: 'Kode pemulihan sebelumnya tidak berlaku lagi.',
+              en: 'Your previous recovery codes no longer work.',
+            },
           );
           return codes;
         });

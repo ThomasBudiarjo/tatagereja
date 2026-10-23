@@ -95,8 +95,14 @@ export const churchSecurityRouter = (deps: Deps) => {
               churchId: null,
               userIds: managersWithout,
               type: 'security.policy_changed',
-              title: `${church.name} now requires two-step verification`,
-              body: 'Your role manages church data. Turn on two-step verification to keep access.',
+              title: {
+                id: `${church.name} kini mewajibkan verifikasi dua langkah`,
+                en: `${church.name} now requires two-step verification`,
+              },
+              body: {
+                id: 'Peran Anda mengelola data gereja. Aktifkan verifikasi dua langkah agar tetap bisa masuk.',
+                en: 'Your role manages church data. Turn on two-step verification to keep access.',
+              },
               link: '/profile?tab=security',
               entityType: 'church',
               entityId: church.id,

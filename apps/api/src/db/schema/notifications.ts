@@ -12,8 +12,11 @@ export const notifications = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
+    /** Indonesian, the primary language; `titleEn` / `bodyEn` hold English when it differs. */
     title: text('title').notNull(),
     body: text('body'),
+    titleEn: text('title_en'),
+    bodyEn: text('body_en'),
     link: text('link'),
     entityType: text('entity_type'),
     entityId: text('entity_id'),

@@ -11,6 +11,7 @@ import {
   type Group,
   type GroupLeader,
   type Invitation,
+  type Locale,
   type Membership,
   type Notification,
   type Person,
@@ -266,12 +267,20 @@ export const toAuditLog = (row: AuditLogRow, actorName: string | null): AuditLog
   createdAt: row.createdAt,
 });
 
-export const toNotification = (row: NotificationRow): Notification => ({
+/** The title and body in the caller's language: English when it was stored, else Indonesian. */
+export const localizedNotificationText = (
+  row: Pick<NotificationRow, 'title' | 'titleEn' | 'body' | 'bodyEn'>,
+  locale: Locale,
+) => ({
+  title: locale === 'en' ? (row.titleEn ?? row.title) : row.title,
+  body: locale === 'en' && row.body !== null ? (row.bodyEn ?? row.body) : row.body,
+});
+
+export const toNotification = (row: NotificationRow, locale: Locale): Notification => ({
   id: row.id,
   churchId: row.churchId,
   type: row.type,
-  title: row.title,
-  body: row.body,
+  ...localizedNotificationText(row, locale),
   link: row.link,
   entityType: row.entityType,
   entityId: row.entityId,

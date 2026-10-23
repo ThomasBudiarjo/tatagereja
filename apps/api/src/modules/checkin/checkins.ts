@@ -164,8 +164,10 @@ export const checkinCheckinsRouter = (deps: Deps) => {
         userIds: guardianUserIds(tx, churchId, row.childPersonId),
         excludeUserIds: [access.userId],
         type: 'checkin.child_picked_up',
-        title: `${name} sudah dijemput`,
-        body: pickup.pickupName ? `Dijemput oleh ${pickup.pickupName}` : null,
+        title: { id: `${name} sudah dijemput`, en: `${name} was picked up` },
+        body: pickup.pickupName
+          ? { id: `Dijemput oleh ${pickup.pickupName}`, en: `Picked up by ${pickup.pickupName}` }
+          : null,
         link: `/c/${churchId}/checkin/me`,
         entityType: 'checkin',
         entityId: row.id,

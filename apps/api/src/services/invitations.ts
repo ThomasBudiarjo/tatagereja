@@ -131,7 +131,10 @@ export function acceptInvitation(
       userIds: [invitation.createdBy],
       excludeUserIds: [userId],
       type: 'invitation.accepted',
-      title: `${name ?? 'Someone'} joined through your invitation`,
+      title: {
+        id: `${name ?? 'Seseorang'} bergabung lewat undangan Anda`,
+        en: `${name ?? 'Someone'} joined through your invitation`,
+      },
       body: invitation.label,
       link: `/c/${invitation.churchId}/settings`,
       entityType: 'invitation',

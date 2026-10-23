@@ -4,6 +4,7 @@ import {
   type EventDetails,
   type EventRegistration,
   type MyEventRegistration,
+  type Locale,
 } from '@tatagereja/shared';
 import { and, asc, count, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { Db, Queryable } from '../db/client';
@@ -337,9 +338,13 @@ export function attendeeUserIds(db: Queryable, event: EventRow): string[] {
 }
 
 /** "Min, 3 Nov 18.00" in the church time zone, for notification bodies (Indonesian first). */
-export function eventWhen(event: Pick<EventRow, 'startsAt' | 'isAllDay'>, timeZone: string) {
+export function eventWhen(
+  event: Pick<EventRow, 'startsAt' | 'isAllDay'>,
+  timeZone: string,
+  locale: Locale = 'id',
+) {
   try {
-    return new Intl.DateTimeFormat('id-ID', {
+    return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-GB', {
       timeZone,
       weekday: 'short',
       day: 'numeric',
@@ -407,7 +412,10 @@ export function promoteWaitlist(
     excludeUserIds: actorUserId ? [actorUserId] : [],
     type: 'event.registration',
     title: event.title,
-    body: `Ada tempat untuk Anda: pendaftaran dari daftar tunggu kini terkonfirmasi · ${eventWhen(event, church.timezone)}`,
+    body: {
+      id: `Ada tempat untuk Anda: pendaftaran dari daftar tunggu kini terkonfirmasi · ${eventWhen(event, church.timezone)}`,
+      en: `A place opened up: your registration from the waiting list is confirmed · ${eventWhen(event, church.timezone, 'en')}`,
+    },
     link: eventLink(church.id, event.id),
     entityType: 'event',
     entityId: event.id,

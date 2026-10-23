@@ -12,6 +12,7 @@ import {
   type FacilityBooking,
   type FacilityResource,
   type InventoryAsset,
+  type Locale,
 } from '@tatagereja/shared';
 import {
   and,
@@ -73,12 +74,18 @@ export function dateIn(timeZone: string, at: Date = new Date()): string {
 }
 
 /** "Sun 25 Oct 2026, 10:00–12:00" in the church time zone, for English server messages. */
-export function describeRange(startsAt: string, endsAt: string, timeZone: string): string {
+export function describeRange(
+  startsAt: string,
+  endsAt: string,
+  timeZone: string,
+  locale: Locale = 'en',
+): string {
+  const tag = locale === 'id' ? 'id-ID' : 'en-GB';
   const options = (extra: Intl.DateTimeFormatOptions) => {
     try {
-      return new Intl.DateTimeFormat('en-GB', { timeZone, ...extra });
+      return new Intl.DateTimeFormat(tag, { timeZone, ...extra });
     } catch {
-      return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', ...extra });
+      return new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...extra });
     }
   };
   const day = options({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });

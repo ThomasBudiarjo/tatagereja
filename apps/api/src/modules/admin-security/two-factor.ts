@@ -236,8 +236,14 @@ export function registerLoginFailure(
       churchId: null,
       userIds: [user.id],
       type: 'account.locked',
-      title: 'Sign-in to your account was paused',
-      body: `${failedCount} wrong attempts in a row. If this was not you, change your password and turn on two-step verification.`,
+      title: {
+        id: 'Masuk ke akun Anda dihentikan sementara',
+        en: 'Sign-in to your account was paused',
+      },
+      body: {
+        id: `${failedCount} kali salah berturut-turut. Jika ini bukan Anda, ganti kata sandi dan aktifkan verifikasi dua langkah.`,
+        en: `${failedCount} wrong attempts in a row. If this was not you, change your password and turn on two-step verification.`,
+      },
       link: '/profile?tab=activity',
       entityType: 'user',
       entityId: user.id,

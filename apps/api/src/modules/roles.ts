@@ -260,13 +260,24 @@ export const rolesModule = (deps: Deps) => {
         userIds: [target.user.id],
         excludeUserIds: [access.userId],
         type: 'membership.roles_changed',
-        title: `Your roles in ${church.name} changed`,
-        body: [
-          added.length > 0 ? `Added: ${describe(added)}` : null,
-          removed.length > 0 ? `Removed: ${describe(removed)}` : null,
-        ]
-          .filter(Boolean)
-          .join('. '),
+        title: {
+          id: `Peran Anda di ${church.name} berubah`,
+          en: `Your roles in ${church.name} changed`,
+        },
+        body: {
+          id: [
+            added.length > 0 ? `Ditambahkan: ${describe(added)}` : null,
+            removed.length > 0 ? `Dicabut: ${describe(removed)}` : null,
+          ]
+            .filter(Boolean)
+            .join('. '),
+          en: [
+            added.length > 0 ? `Added: ${describe(added)}` : null,
+            removed.length > 0 ? `Removed: ${describe(removed)}` : null,
+          ]
+            .filter(Boolean)
+            .join('. '),
+        },
         link: `/c/${church.id}`,
         entityType: 'membership',
         entityId: target.membership.id,
@@ -477,8 +488,14 @@ export const rolesModule = (deps: Deps) => {
               userIds: assignees,
               excludeUserIds: [access.userId],
               type: 'membership.roles_changed',
-              title: `Your roles in ${church.name} changed`,
-              body: `The role ${role.name} was deleted.`,
+              title: {
+                id: `Peran Anda di ${church.name} berubah`,
+                en: `Your roles in ${church.name} changed`,
+              },
+              body: {
+                id: `Peran ${role.name} dihapus.`,
+                en: `The role ${role.name} was deleted.`,
+              },
               link: `/c/${church.id}`,
               entityType: 'role',
               entityId: role.id,

@@ -341,7 +341,7 @@ describe('worship teams, rosters and availability', () => {
       );
       const toScheduler = await notificationsOf(w.scheduler.token, 'roster.response');
       expect(toScheduler).toHaveLength(1);
-      expect(toScheduler[0]!.title).toBe('Mem Ber cannot serve as Gitar');
+      expect(toScheduler[0]!.title).toBe('Mem Ber berhalangan bertugas sebagai Gitar');
       expect(toScheduler[0]!.body).toContain('Ada tugas kantor');
       expect(await notificationsOf(w.teamLead.token, 'roster.response')).toHaveLength(1);
       expect(await notificationsOf(w.s.member.token, 'roster.response')).toHaveLength(0);
@@ -494,7 +494,7 @@ describe('worship teams, rosters and availability', () => {
       expect(cancelled.status).toBe(200);
       const changed = await notificationsOf(w.s.member.token, 'roster.changed');
       expect(changed.length).toBe(before + 1);
-      expect(changed[0]!.title).toBe('Ibadah Syukur was cancelled');
+      expect(changed[0]!.title).toBe('Ibadah Syukur dibatalkan');
 
       const respond = await t.request('POST', `${w.base}/roster/${memberRow}/respond`, {
         token: w.s.member.token,

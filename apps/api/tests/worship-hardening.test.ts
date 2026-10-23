@@ -227,7 +227,7 @@ describe('worship hardening', () => {
     expect(moved.status).toBe(200);
     const changed = await notificationsOf(w.s.member.token, 'roster.changed');
     expect(changed.length).toBe(before + 1);
-    expect(changed[0]!.title).toBe('Ibadah Pemuda Remaja has a new time');
+    expect(changed[0]!.title).toBe('Waktu Ibadah Pemuda Remaja berubah');
   });
 
   it('does not copy declined assignments to the next roster', async () => {

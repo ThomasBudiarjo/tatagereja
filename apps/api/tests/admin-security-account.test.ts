@@ -226,7 +226,7 @@ describe('two-step verification', () => {
     });
     expect(both.status).toBe(422);
     const notices = await notificationsOf(t, account.token);
-    expect(notices.some((notice) => notice.title.includes('recovery code'))).toBe(true);
+    expect(notices.some((notice) => notice.title.includes('Kode pemulihan'))).toBe(true);
   });
 
   it('ends a challenge after five wrong codes', async () => {

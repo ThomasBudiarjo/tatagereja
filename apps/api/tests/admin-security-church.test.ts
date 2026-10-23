@@ -240,8 +240,15 @@ describe('admin-security: church administration', () => {
         },
       );
       expect(removed.status).toBe(200);
+      // Notifications come back in the language the app asks for; Indonesian otherwise.
       const inbox = await t.request('GET', '/api/notifications', { token: visitor.token });
-      expect(inbox.json.items[0].title).toContain('removed from Seed Church');
+      expect(inbox.json.items[0].title).toBe('Anda dikeluarkan dari Seed Church');
+      const english = await t.request('GET', '/api/notifications', {
+        token: visitor.token,
+        headers: { 'accept-language': 'en-GB,en;q=0.9' },
+      });
+      expect(english.json.items[0].title).toBe('You were removed from Seed Church');
+      expect(english.json.items[0].body).toContain('new invitation');
       expect((await t.request('GET', base, { token: visitor.token })).status).toBe(403);
     });
 
@@ -291,7 +298,7 @@ describe('admin-security: church administration', () => {
         .filter((row) => row.action === 'member.suspend');
       expect(entries).toHaveLength(1);
       const inbox = await t.request('GET', '/api/notifications', { token: sexton.token });
-      expect(inbox.json.items[0].title).toContain('was suspended');
+      expect(inbox.json.items[0].title).toContain('ditangguhkan');
 
       const restored = await setStatus(deacon.token, target, 'active');
       expect(restored.status).toBe(200);

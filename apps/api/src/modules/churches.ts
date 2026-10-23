@@ -16,6 +16,7 @@ import {
   updateMembershipRoleBodySchema,
   updateMembershipStatusBodySchema,
   type ModuleId,
+  type ChurchRole,
 } from '@tatagereja/shared';
 import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
@@ -85,6 +86,12 @@ const escalationDenied = () =>
     'This member holds permissions you do not have; ask someone who holds them',
   );
 
+/** Base role names as they read inside an Indonesian sentence. */
+const ROLE_LABELS_ID: Record<ChurchRole, string> = {
+  owner: 'pemilik',
+  administrator: 'administrator',
+  member: 'anggota',
+};
 export const churchesModule = (deps: Deps) => {
   const { db } = deps;
 
@@ -504,7 +511,10 @@ export const churchesModule = (deps: Deps) => {
             userIds: [row.user.id],
             excludeUserIds: [auth.user.id],
             type: 'membership.role_changed',
-            title: `Your role in ${church.name} is now ${ROLE_LABELS[body.role].toLowerCase()}`,
+            title: {
+              id: `Peran Anda di ${church.name} kini ${ROLE_LABELS_ID[body.role]}`,
+              en: `Your role in ${church.name} is now ${ROLE_LABELS[body.role].toLowerCase()}`,
+            },
             link: `/c/${church.id}`,
             entityType: 'membership',
             entityId: row.membership.id,
@@ -553,8 +563,14 @@ export const churchesModule = (deps: Deps) => {
             excludeUserIds: [auth.user.id],
             type: 'membership.status_changed',
             title: suspended
-              ? `Your access to ${church.name} was suspended`
-              : `Your access to ${church.name} was restored`,
+              ? {
+                  id: `Akses Anda ke ${church.name} ditangguhkan`,
+                  en: `Your access to ${church.name} was suspended`,
+                }
+              : {
+                  id: `Akses Anda ke ${church.name} dipulihkan`,
+                  en: `Your access to ${church.name} was restored`,
+                },
             link: suspended ? '/churches' : `/c/${church.id}`,
             entityType: 'membership',
             entityId: row.membership.id,
@@ -590,8 +606,14 @@ export const churchesModule = (deps: Deps) => {
             churchId: null,
             userIds: [row.user.id],
             type: 'membership.status_changed',
-            title: `You were removed from ${church.name}`,
-            body: 'Ask a church administrator for a new invitation if this was a mistake.',
+            title: {
+              id: `Anda dikeluarkan dari ${church.name}`,
+              en: `You were removed from ${church.name}`,
+            },
+            body: {
+              id: 'Jika ini keliru, mintalah undangan baru kepada pengurus gereja.',
+              en: 'Ask a church administrator for a new invitation if this was a mistake.',
+            },
             link: '/churches',
             entityType: 'church',
             entityId: church.id,
@@ -681,8 +703,14 @@ export const churchesModule = (deps: Deps) => {
             churchId: church.id,
             userIds: [body.userId],
             type: 'church.ownership_transferred',
-            title: `You are now the owner of ${church.name}`,
-            body: `${auth.user.name} handed ownership of the church to you.`,
+            title: {
+              id: `Anda kini pemilik ${church.name}`,
+              en: `You are now the owner of ${church.name}`,
+            },
+            body: {
+              id: `${auth.user.name} menyerahkan kepemilikan gereja kepada Anda.`,
+              en: `${auth.user.name} handed ownership of the church to you.`,
+            },
             link: `/c/${church.id}/settings`,
             entityType: 'church',
             entityId: church.id,

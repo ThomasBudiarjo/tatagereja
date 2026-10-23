@@ -407,8 +407,11 @@ export const inventoryRouter = (deps: Deps) => {
               userIds: [person.userId],
               excludeUserIds: [access.userId],
               type: 'asset.checked_out',
-              title: `You borrowed ${asset.name}`,
-              body: `${asset.code}${created.dueDate ? ` · return by ${created.dueDate}` : ''}`,
+              title: { id: `Anda meminjam ${asset.name}`, en: `You borrowed ${asset.name}` },
+              body: {
+                id: `${asset.code}${created.dueDate ? ` · kembalikan paling lambat ${created.dueDate}` : ''}`,
+                en: `${asset.code}${created.dueDate ? ` · return by ${created.dueDate}` : ''}`,
+              },
               link: `/c/${church.id}/facilities/inventory/${asset.id}`,
               entityType: 'inventory_asset',
               entityId: asset.id,

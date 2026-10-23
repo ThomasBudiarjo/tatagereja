@@ -293,7 +293,10 @@ export const checkinClassesRouter = (deps: Deps) => {
               userIds: added.flatMap((person) => (person.userId ? [person.userId] : [])),
               excludeUserIds: [access.userId],
               type: 'checkin.teacher_assigned',
-              title: `Anda ditugaskan mengajar ${row.name}`,
+              title: {
+                id: `Anda ditugaskan mengajar ${row.name}`,
+                en: `You were asked to teach ${row.name}`,
+              },
               body: 'Sekolah Minggu',
               link: `/c/${church.id}/checkin/classes`,
               entityType: 'checkin_class',

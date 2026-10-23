@@ -12,6 +12,7 @@ import {
   type Access,
   type DashboardPreferences,
   type HomeWidget,
+  type Locale,
 } from '@tatagereja/shared';
 import {
   and,
@@ -52,8 +53,10 @@ import {
   worshipServices,
 } from '../db/schema';
 import type { Deps } from '../deps';
+import { requestLocale } from '../lib/request';
 import { nowIso } from '../lib/time';
 import { authPlugin } from '../plugins/auth';
+import { localizedNotificationText } from '../serializers';
 import { hydrateAnnouncements } from '../services/announcements';
 import { hydrateSessions, listAbsences, marksOf } from '../services/attendance';
 import { hydrateCheckins } from '../services/checkin';
@@ -290,7 +293,7 @@ export const dashboardModule = (deps: Deps) => {
     return { mine, recent, openAbsences };
   };
 
-  const notificationsOf = (churchId: string, userId: string) => {
+  const notificationsOf = (churchId: string, userId: string, locale: Locale) => {
     const unread = and(
       eq(notifications.churchId, churchId),
       eq(notifications.userId, userId),
@@ -304,7 +307,9 @@ export const dashboardModule = (deps: Deps) => {
           id: notifications.id,
           type: notifications.type,
           title: notifications.title,
+          titleEn: notifications.titleEn,
           body: notifications.body,
+          bodyEn: notifications.bodyEn,
           link: notifications.link,
           createdAt: notifications.createdAt,
         })
@@ -312,7 +317,11 @@ export const dashboardModule = (deps: Deps) => {
         .where(unread)
         .orderBy(desc(notifications.createdAt))
         .limit(LIST_MAX)
-        .all(),
+        .all()
+        .map(({ titleEn, bodyEn, ...row }) => ({
+          ...row,
+          ...localizedNotificationText({ ...row, titleEn, bodyEn }, locale),
+        })),
     };
   };
 
@@ -320,7 +329,7 @@ export const dashboardModule = (deps: Deps) => {
     .use(authPlugin(deps))
     .get(
       '/',
-      ({ church, access }) => {
+      ({ church, access, request }) => {
         const now = nowIso();
         const countOf = (value: number | undefined) => value ?? 0;
         const preferences = preferencesOf(church.id, access.userId);
@@ -413,7 +422,7 @@ export const dashboardModule = (deps: Deps) => {
           celebrations: shows('birthdays')
             ? peopleStats(db, access, church.id, todayIn(church)).celebrations
             : null,
-          notifications: notificationsOf(church.id, access.userId),
+          notifications: notificationsOf(church.id, access.userId, requestLocale(request)),
           attendance: attendanceOf(church, access),
           myGroups,
         };

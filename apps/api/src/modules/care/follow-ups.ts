@@ -100,7 +100,10 @@ export const followUpsRouter = (deps: Deps) => {
       userIds: [row.assignedUserId],
       excludeUserIds: [actorId],
       type: 'care.follow_up_assigned',
-      title: 'Tamu baru untuk Anda tindak lanjuti',
+      title: {
+        id: 'Tamu baru untuk Anda tindak lanjuti',
+        en: 'A new visitor for you to follow up',
+      },
       body: personName(row.personId),
       link: `/c/${church.id}/care/follow-ups/${row.id}`,
       entityType: 'visitor_follow_up',

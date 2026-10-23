@@ -1,3 +1,5 @@
+import type { Locale } from '@tatagereja/shared';
+
 type ServerLike = { requestIP?: (req: Request) => { address: string } | null };
 
 /**
@@ -53,4 +55,13 @@ export function isHttpsRequest(request: Request): boolean {
   const forwarded = request.headers.get('x-forwarded-proto');
   if (forwarded) return forwarded.split(',')[0]?.trim().toLowerCase() === 'https';
   return new URL(request.url).protocol === 'https:';
+}
+
+/**
+ * The interface language the client asked for with `Accept-Language` (the web app sends its
+ * chosen language). Indonesian, the primary audience, unless English comes first.
+ */
+export function requestLocale(request: Request): Locale {
+  const first = (request.headers.get('accept-language') ?? '').split(',')[0]?.trim().toLowerCase();
+  return first?.startsWith('en') ? 'en' : 'id';
 }

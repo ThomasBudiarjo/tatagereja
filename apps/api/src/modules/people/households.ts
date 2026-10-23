@@ -128,7 +128,10 @@ export const householdsRouter = (deps: Deps) => {
       userIds: recipients,
       excludeUserIds: [actorUserId],
       type: 'household.added',
-      title: `You were added to ${household.name}`,
+      title: {
+        id: `Anda ditambahkan ke ${household.name}`,
+        en: `You were added to ${household.name}`,
+      },
       link: `/c/${churchId}/households/${household.id}`,
       entityType: 'household',
       entityId: household.id,

@@ -127,7 +127,7 @@ export const careCasesRouter = (deps: Deps) => {
       userIds,
       excludeUserIds: [actorId],
       type: 'care.case_assigned',
-      title: 'Anda ditugaskan mendampingi',
+      title: { id: 'Anda ditugaskan mendampingi', en: 'You were asked to provide care' },
       body: caseLabel(row),
       link: `/c/${church.id}/care/cases/${row.id}`,
       entityType: 'care_case',

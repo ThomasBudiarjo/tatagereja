@@ -99,15 +99,21 @@ const notifyPeople = (
 ) => {
   const userIds = recipientsOf(db, record);
   if (userIds.length === 0) return;
-  const label = REGISTRY_RECORD_TYPE_LABELS[record.type].en;
+  const label = REGISTRY_RECORD_TYPE_LABELS[record.type];
   notify(db, {
     churchId: church.id,
     userIds,
     excludeUserIds: [actorUserId],
     type: 'record.added',
     title: corrected
-      ? `Your ${label.toLowerCase()} record was corrected`
-      : `Your ${label.toLowerCase()} record was entered`,
+      ? {
+          id: `Catatan ${label.id} Anda diperbaiki`,
+          en: `Your ${label.en.toLowerCase()} record was corrected`,
+        }
+      : {
+          id: `Catatan ${label.id} Anda dicatat`,
+          en: `Your ${label.en.toLowerCase()} record was entered`,
+        },
     body: `${record.number} · ${record.date}`,
     link: `/c/${church.id}/records/${record.id}`,
     entityType: 'registry_record',

@@ -277,8 +277,14 @@ export const areasRouter = (deps: Deps) => {
             userIds: [body.userId],
             excludeUserIds: [auth.user.id],
             type: 'area.coordinator_assigned',
-            title: `You coordinate ${area.name}`,
-            body: 'You can now update the profiles of people in this area.',
+            title: {
+              id: `Anda menjadi koordinator ${area.name}`,
+              en: `You coordinate ${area.name}`,
+            },
+            body: {
+              id: 'Anda kini dapat memperbarui data jemaat di wilayah ini.',
+              en: 'You can now update the profiles of people in this area.',
+            },
             link: `/c/${church.id}/areas/${area.id}`,
             entityType: 'area',
             entityId: area.id,

@@ -265,8 +265,8 @@ export function sendDueCareReminders(db: Queryable, church: Pick<ChurchRow, 'id'
       type: 'care.reminder',
       title:
         row.nextActionDate === today
-          ? 'Langkah pendampingan hari ini'
-          : 'Langkah pendampingan terlambat',
+          ? { id: 'Langkah pendampingan hari ini', en: 'A care step is due today' }
+          : { id: 'Langkah pendampingan terlambat', en: 'A care step is overdue' },
       body: caseLabel(row),
       link: `/c/${church.id}/care/cases/${row.id}`,
       entityType: 'care_case',
@@ -287,7 +287,9 @@ export function sendDueCareReminders(db: Queryable, church: Pick<ChurchRow, 'id'
       userIds: [row.assignedUserId],
       type: 'care.reminder',
       title:
-        row.dueDate === today ? 'Tugas tindak lanjut hari ini' : 'Tugas tindak lanjut terlambat',
+        row.dueDate === today
+          ? { id: 'Tugas tindak lanjut hari ini', en: 'A follow-up task is due today' }
+          : { id: 'Tugas tindak lanjut terlambat', en: 'A follow-up task is overdue' },
       body: confidential ? CONFIDENTIAL_LABEL : row.title,
       link: `/c/${church.id}/care/tasks`,
       entityType: 'care_task',

@@ -652,8 +652,11 @@ export const attendanceModule = (deps: Deps) => {
               userIds: [assigneeId],
               excludeUserIds: [auth.user.id],
               type: 'attendance.absence_follow_up',
-              title: `Tolong hubungi ${name}`,
-              body: `${streak.streak}× tidak hadir berturut-turut`,
+              title: { id: `Tolong hubungi ${name}`, en: `Please contact ${name}` },
+              body: {
+                id: `${streak.streak}× tidak hadir berturut-turut`,
+                en: `Absent ${streak.streak} times in a row`,
+              },
               link: `/c/${church.id}/care/tasks`,
               entityType: 'care_task',
               entityId: careTaskId,

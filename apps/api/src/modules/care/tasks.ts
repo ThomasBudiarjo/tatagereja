@@ -124,7 +124,7 @@ export const careTasksRouter = (deps: Deps) => {
       userIds: [row.assignedUserId],
       excludeUserIds: [actorId],
       type: 'care.task_assigned',
-      title: 'Tugas tindak lanjut baru untuk Anda',
+      title: { id: 'Tugas tindak lanjut baru untuk Anda', en: 'A new follow-up task for you' },
       body: confidential ? CONFIDENTIAL_LABEL : row.title,
       link: `/c/${church.id}/care/tasks`,
       entityType: 'care_task',

@@ -192,9 +192,18 @@ export const bookingsRouter = (deps: Deps) => {
       excludeUserIds: [actor.userId],
       type: 'booking.requested',
       title: changed
-        ? `${actor.name} changed a booking of ${resource.name}`
-        : `${actor.name} requests ${resource.name}`,
-      body: `${row.title} · ${describeRange(row.startsAt, row.endsAt, church.timezone)}${row.recurrence === 'weekly' ? ' · weekly' : ''}`,
+        ? {
+            id: `${actor.name} mengubah peminjaman ${resource.name}`,
+            en: `${actor.name} changed a booking of ${resource.name}`,
+          }
+        : {
+            id: `${actor.name} mengajukan peminjaman ${resource.name}`,
+            en: `${actor.name} requests ${resource.name}`,
+          },
+      body: {
+        id: `${row.title} · ${describeRange(row.startsAt, row.endsAt, church.timezone, 'id')}${row.recurrence === 'weekly' ? ' · mingguan' : ''}`,
+        en: `${row.title} · ${describeRange(row.startsAt, row.endsAt, church.timezone)}${row.recurrence === 'weekly' ? ' · weekly' : ''}`,
+      },
       link: bookingLink(church.id, row.id),
       entityType: 'facility_booking',
       entityId: row.id,
@@ -549,9 +558,18 @@ export const bookingsRouter = (deps: Deps) => {
               excludeUserIds: [access.userId],
               type: 'booking.decided',
               title: approve
-                ? `Your booking of ${resource.name} is approved`
-                : `Your booking of ${resource.name} was not approved`,
-              body: `${next.title} · ${describeRange(next.startsAt, next.endsAt, church.timezone)}${body.note ? ` · ${body.note}` : ''}`,
+                ? {
+                    id: `Peminjaman ${resource.name} disetujui`,
+                    en: `Your booking of ${resource.name} is approved`,
+                  }
+                : {
+                    id: `Peminjaman ${resource.name} tidak disetujui`,
+                    en: `Your booking of ${resource.name} was not approved`,
+                  },
+              body: {
+                id: `${next.title} · ${describeRange(next.startsAt, next.endsAt, church.timezone, 'id')}${body.note ? ` · ${body.note}` : ''}`,
+                en: `${next.title} · ${describeRange(next.startsAt, next.endsAt, church.timezone)}${body.note ? ` · ${body.note}` : ''}`,
+              },
               link: bookingLink(church.id, next.id),
               entityType: 'facility_booking',
               entityId: next.id,
@@ -639,8 +657,14 @@ export const bookingsRouter = (deps: Deps) => {
               userIds: [row.requestedBy],
               type: 'booking.cancelled',
               title: occurrenceDate
-                ? `One date of your booking of ${resource.name} was cancelled`
-                : `Your booking of ${resource.name} was cancelled`,
+                ? {
+                    id: `Satu tanggal peminjaman ${resource.name} dibatalkan`,
+                    en: `One date of your booking of ${resource.name} was cancelled`,
+                  }
+                : {
+                    id: `Peminjaman ${resource.name} dibatalkan`,
+                    en: `Your booking of ${resource.name} was cancelled`,
+                  },
               body: `${row.title}${occurrenceDate ? ` · ${occurrenceDate}` : ''}${body.reason ? ` · ${body.reason}` : ''}`,
               link: bookingLink(church.id, row.id),
               entityType: 'facility_booking',

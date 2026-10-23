@@ -22,6 +22,8 @@ import {
   updateParticipantBodySchema,
   type Access,
   type EventRegistrationSettings,
+  fullName,
+  type LocalizedText,
 } from '@tatagereja/shared';
 import {
   and,
@@ -152,7 +154,7 @@ export const eventsModule = (deps: Deps) => {
     church: ChurchRow,
     event: EventRow,
     actorUserId: string,
-    body: string,
+    body: LocalizedText,
     userIds = attendeeUserIds(tx, event),
   ) => {
     if (new Date(event.endsAt ?? event.startsAt).getTime() < Date.now()) return;
@@ -184,7 +186,10 @@ export const eventsModule = (deps: Deps) => {
       excludeUserIds: [actorUserId],
       type: 'event.created',
       title: event.title,
-      body: `${eventWhen(event, church.timezone)}${recurring ? ' · kegiatan rutin' : ''}${event.location ? ` · ${event.location}` : ''}`,
+      body: {
+        id: `${eventWhen(event, church.timezone)}${recurring ? ' · kegiatan rutin' : ''}${event.location ? ` · ${event.location}` : ''}`,
+        en: `${eventWhen(event, church.timezone, 'en')}${recurring ? ' · recurring' : ''}${event.location ? ` · ${event.location}` : ''}`,
+      },
       link: eventLink(church.id, event.id),
       entityType: 'event',
       entityId: event.id,
@@ -695,7 +700,10 @@ export const eventsModule = (deps: Deps) => {
               church,
               row,
               auth.user.id,
-              `Jadwal berubah: ${eventWhen(row, church.timezone)}${row.location ? ` · ${row.location}` : ''}${future && targets.length > 1 ? ' (juga pertemuan berikutnya)' : ''}`,
+              {
+                id: `Jadwal berubah: ${eventWhen(row, church.timezone)}${row.location ? ` · ${row.location}` : ''}${future && targets.length > 1 ? ' (juga pertemuan berikutnya)' : ''}`,
+                en: `New time: ${eventWhen(row, church.timezone, 'en')}${row.location ? ` · ${row.location}` : ''}${future && targets.length > 1 ? ' (and the following meetings)' : ''}`,
+              },
               recipients,
             );
           }
@@ -736,7 +744,10 @@ export const eventsModule = (deps: Deps) => {
             church,
             event,
             auth.user.id,
-            `Kegiatan ini dihapus dari jadwal${future && targets.length > 1 ? ', bersama pertemuan berikutnya' : ''}.`,
+            {
+              id: `Kegiatan ini dihapus dari jadwal${future && targets.length > 1 ? ', bersama pertemuan berikutnya' : ''}.`,
+              en: `This event was removed from the calendar${future && targets.length > 1 ? ', with the following meetings' : ''}.`,
+            },
             recipients,
           );
           tx.delete(events)
@@ -808,13 +819,10 @@ export const eventsModule = (deps: Deps) => {
             summary: `Cancelled the event ${event.title}`,
             after: { reason: body.reason },
           });
-          notifyAttendees(
-            tx,
-            church,
-            row,
-            auth.user.id,
-            `Dibatalkan · ${eventWhen(row, church.timezone)}${body.reason ? ` · ${body.reason}` : ''}`,
-          );
+          notifyAttendees(tx, church, row, auth.user.id, {
+            id: `Dibatalkan · ${eventWhen(row, church.timezone)}${body.reason ? ` · ${body.reason}` : ''}`,
+            en: `Cancelled · ${eventWhen(row, church.timezone, 'en')}${body.reason ? ` · ${body.reason}` : ''}`,
+          });
           return row;
         });
         return { event: hydrateOne(updated, access) };
@@ -842,13 +850,10 @@ export const eventsModule = (deps: Deps) => {
             entityId: event.id,
             summary: `Restored the cancelled event ${event.title}`,
           });
-          notifyAttendees(
-            tx,
-            church,
-            row,
-            auth.user.id,
-            `Kegiatan ini jadi diadakan · ${eventWhen(row, church.timezone)}`,
-          );
+          notifyAttendees(tx, church, row, auth.user.id, {
+            id: `Kegiatan ini jadi diadakan · ${eventWhen(row, church.timezone)}`,
+            en: `This event is on again · ${eventWhen(row, church.timezone, 'en')}`,
+          });
           return row;
         });
         return { event: hydrateOne(updated, access) };
@@ -1030,8 +1035,14 @@ export const eventsModule = (deps: Deps) => {
               title: event.title,
               body:
                 status === 'registered'
-                  ? `Anda terdaftar · ${eventWhen(event, church.timezone)}`
-                  : `Anda masuk daftar tunggu · ${eventWhen(event, church.timezone)}`,
+                  ? {
+                      id: `Anda terdaftar · ${eventWhen(event, church.timezone)}`,
+                      en: `You are registered · ${eventWhen(event, church.timezone, 'en')}`,
+                    }
+                  : {
+                      id: `Anda masuk daftar tunggu · ${eventWhen(event, church.timezone)}`,
+                      en: `You are on the waiting list · ${eventWhen(event, church.timezone, 'en')}`,
+                    },
               link: eventLink(church.id, event.id),
               entityType: 'event',
               entityId: event.id,
@@ -1043,7 +1054,10 @@ export const eventsModule = (deps: Deps) => {
             excludeUserIds: [auth.user.id],
             type: 'event.registrations',
             title: event.title,
-            body: `${person.firstName}${person.lastName ? ` ${person.lastName}` : ''} ${status === 'registered' ? 'mendaftar' : 'masuk daftar tunggu'}${body.partySize > 1 ? ` (${body.partySize} orang)` : ''}`,
+            body: {
+              id: `${fullName(person)} ${status === 'registered' ? 'mendaftar' : 'masuk daftar tunggu'}${body.partySize > 1 ? ` (${body.partySize} orang)` : ''}`,
+              en: `${fullName(person)} ${status === 'registered' ? 'registered' : 'joined the waiting list'}${body.partySize > 1 ? ` (${body.partySize} people)` : ''}`,
+            },
             link: eventLink(church.id, event.id),
             entityType: 'event',
             entityId: event.id,
@@ -1102,7 +1116,10 @@ export const eventsModule = (deps: Deps) => {
             excludeUserIds: [auth.user.id],
             type: 'event.registrations',
             title: event.title,
-            body: `${person ? `${person.firstName}${person.lastName ? ` ${person.lastName}` : ''}` : 'Seseorang'} membatalkan pendaftaran`,
+            body: {
+              id: `${person ? fullName(person) : 'Seseorang'} membatalkan pendaftaran`,
+              en: `${person ? fullName(person) : 'Someone'} cancelled their registration`,
+            },
             link: eventLink(church.id, event.id),
             entityType: 'event',
             entityId: event.id,

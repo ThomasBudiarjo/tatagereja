@@ -329,7 +329,7 @@ export const groupsModule = (deps: Deps) => {
         userIds,
         excludeUserIds: [access.userId],
         type: 'group.member_added',
-        title: `You were added to ${group.name}`,
+        title: { id: `Anda ditambahkan ke ${group.name}`, en: `You were added to ${group.name}` },
         link: `/c/${group.churchId}/groups/${group.id}`,
         entityType: 'group',
         entityId: group.id,
@@ -735,7 +735,10 @@ export const groupsModule = (deps: Deps) => {
             churchId: church.id,
             excludeUserIds: [auth.user.id],
             type: 'group.join_requested' as const,
-            title: `${name} asked to join ${group.name}`,
+            title: {
+              id: `${name} ingin bergabung dengan ${group.name}`,
+              en: `${name} asked to join ${group.name}`,
+            },
             body: body.message,
             link,
             entityType: 'group',
@@ -858,8 +861,11 @@ export const groupsModule = (deps: Deps) => {
               type: 'group.join_decided',
               title:
                 body.decision === 'approved'
-                  ? `Welcome to ${group.name}`
-                  : `Your request to join ${group.name} was declined`,
+                  ? { id: `Selamat bergabung di ${group.name}`, en: `Welcome to ${group.name}` }
+                  : {
+                      id: `Permintaan bergabung dengan ${group.name} ditolak`,
+                      en: `Your request to join ${group.name} was declined`,
+                    },
               body: body.note,
               link: `/c/${church.id}/groups/${group.id}`,
               entityType: 'group',
@@ -956,8 +962,11 @@ export const groupsModule = (deps: Deps) => {
               userIds: [body.userId],
               excludeUserIds: [auth.user.id],
               type: 'group.leader_assigned',
-              title: `You now lead ${group.name}`,
-              body: 'You can manage its members, events, attendance and announcements.',
+              title: { id: `Anda kini memimpin ${group.name}`, en: `You now lead ${group.name}` },
+              body: {
+                id: 'Anda dapat mengelola anggota, kegiatan, kehadiran, dan pengumumannya.',
+                en: 'You can manage its members, events, attendance and announcements.',
+              },
               link: `/c/${church.id}/groups/${group.id}`,
               entityType: 'group',
               entityId: group.id,

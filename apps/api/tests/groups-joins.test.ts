@@ -182,7 +182,7 @@ describe('groups: schedule, visibility, join requests and leader tools', () => {
     ]);
     const joinerNotes = await s.notificationsOf(joiner.token);
     expect(joinerNotes.find((note) => note.type === 'group.join_decided')?.title).toContain(
-      'Welcome',
+      'Selamat bergabung',
     );
   });
 
@@ -214,7 +214,7 @@ describe('groups: schedule, visibility, join requests and leader tools', () => {
     );
     expect(decline.json.request.status).toBe('declined');
     const notes = await s.notificationsOf(s.member.token);
-    expect(notes.find((note) => note.type === 'group.join_decided')?.title).toContain('declined');
+    expect(notes.find((note) => note.type === 'group.join_decided')?.title).toContain('ditolak');
 
     // Fill the choir (capacity 2) and check both the request and the direct add.
     await t.request('POST', `${s.base}/groups/${choir.id}/members`, {

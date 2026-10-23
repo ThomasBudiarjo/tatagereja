@@ -194,7 +194,10 @@ export const periodsRouter = (deps: Deps) => {
             audience: { kind: 'permission', permission: 'finance.manage' },
             excludeUserIds: [auth.user.id],
             type: 'finance.period_reopened',
-            title: `Tutup buku ${periodKey(params.year, params.month)} dibuka kembali`,
+            title: {
+              id: `Tutup buku ${periodKey(params.year, params.month)} dibuka kembali`,
+              en: `The closed books of ${periodKey(params.year, params.month)} were reopened`,
+            },
             body: body.reason,
             link: `/c/${church.id}/finance/periods?year=${params.year}`,
             entityType: 'finance_period',

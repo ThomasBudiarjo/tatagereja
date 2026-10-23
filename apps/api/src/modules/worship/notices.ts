@@ -36,9 +36,15 @@ export function notifyRosterGone(
     type: 'roster.changed',
     title:
       reason === 'cancelled'
-        ? `${service.title} was cancelled`
-        : `${service.title} was removed from the schedule`,
-    body: `${serviceWhen(service.startsAt, church.timezone)} · You no longer serve at this service.`,
+        ? { id: `${service.title} dibatalkan`, en: `${service.title} was cancelled` }
+        : {
+            id: `${service.title} dihapus dari jadwal`,
+            en: `${service.title} was removed from the schedule`,
+          },
+    body: {
+      id: `${serviceWhen(service.startsAt, church.timezone, 'id')} · Anda tidak lagi bertugas di ibadah ini.`,
+      en: `${serviceWhen(service.startsAt, church.timezone)} · You no longer serve at this service.`,
+    },
     link:
       reason === 'cancelled' ? serviceLink(church.id, service.id) : `/c/${church.id}/worship/me`,
     entityType: 'service',
@@ -70,6 +76,8 @@ export function notifyServiceChanged(
   const userIds = [...userIdsOfPeople(tx, church.id, personIds).values()];
   if (userIds.length === 0) return;
   const when = serviceWhen(service.startsAt, church.timezone);
+  const whenId = serviceWhen(service.startsAt, church.timezone, 'id');
+  const place = service.location ? ` · ${service.location}` : '';
   notify(tx, {
     churchId: church.id,
     userIds,
@@ -77,12 +85,21 @@ export function notifyServiceChanged(
     type: 'roster.changed',
     title:
       change === 'moved'
-        ? `${service.title} has a new time`
-        : `${service.title} is back on the schedule`,
+        ? { id: `Waktu ${service.title} berubah`, en: `${service.title} has a new time` }
+        : {
+            id: `${service.title} kembali dijadwalkan`,
+            en: `${service.title} is back on the schedule`,
+          },
     body:
       change === 'moved'
-        ? `Now ${when}${service.location ? ` · ${service.location}` : ''}. You are still scheduled to serve.`
-        : `${when} · You are still scheduled to serve.`,
+        ? {
+            id: `Sekarang ${whenId}${place}. Anda tetap dijadwalkan bertugas.`,
+            en: `Now ${when}${place}. You are still scheduled to serve.`,
+          }
+        : {
+            id: `${whenId} · Anda tetap dijadwalkan bertugas.`,
+            en: `${when} · You are still scheduled to serve.`,
+          },
     link: serviceLink(church.id, service.id, 'roster'),
     entityType: 'service',
     entityId: service.id,
@@ -141,8 +158,14 @@ export function notifyAssignmentsRemoved(
       userIds: [userId],
       excludeUserIds: [actorUserId],
       type: 'roster.changed',
-      title: `You no longer serve at ${service.title}`,
-      body: `${positions.join(', ')} · ${serviceWhen(service.startsAt, church.timezone)}`,
+      title: {
+        id: `Anda tidak lagi bertugas di ${service.title}`,
+        en: `You no longer serve at ${service.title}`,
+      },
+      body: {
+        id: `${positions.join(', ')} · ${serviceWhen(service.startsAt, church.timezone, 'id')}`,
+        en: `${positions.join(', ')} · ${serviceWhen(service.startsAt, church.timezone)}`,
+      },
       link: `/c/${church.id}/worship/me`,
       entityType: 'service',
       entityId: service.id,

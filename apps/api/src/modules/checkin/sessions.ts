@@ -544,8 +544,16 @@ export const checkinSessionsRouter = (deps: Deps) => {
               userIds: recipients,
               excludeUserIds: [access.userId],
               type: 'checkin.child_checked_in',
-              title: `${item.child.firstName} sudah masuk kelas ${item.classRow.name}`,
-              body: guardian ? `${session.name} · diantar ${fullName(guardian)}` : session.name,
+              title: {
+                id: `${item.child.firstName} sudah masuk kelas ${item.classRow.name}`,
+                en: `${item.child.firstName} is in class: ${item.classRow.name}`,
+              },
+              body: guardian
+                ? {
+                    id: `${session.name} · diantar ${fullName(guardian)}`,
+                    en: `${session.name} · brought by ${fullName(guardian)}`,
+                  }
+                : session.name,
               link: `/c/${church.id}/checkin/me`,
               entityType: 'checkin_session',
               entityId: session.id,

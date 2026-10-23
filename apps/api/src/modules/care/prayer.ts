@@ -128,21 +128,24 @@ export const prayerRouter = (deps: Deps) => {
       notify(tx, {
         ...base,
         userIds: usersHolding(church.id, canModeratePrayer),
-        title: 'Pokok doa menunggu ditinjau',
+        title: { id: 'Pokok doa menunggu ditinjau', en: 'A prayer request is waiting for review' },
         body: row.title,
       });
     } else if (row.visibility === 'care_team') {
       notify(tx, {
         ...base,
         userIds: usersHolding(church.id, isCareTeam),
-        title: 'Pokok doa baru untuk tim pastoral',
+        title: {
+          id: 'Pokok doa baru untuk tim pastoral',
+          en: 'A new prayer request for the care team',
+        },
         body: row.title,
       });
     } else {
       notify(tx, {
         ...base,
         audience: { kind: 'permission', permission: 'care.confidential' },
-        title: 'Pokok doa baru untuk pendeta',
+        title: { id: 'Pokok doa baru untuk pendeta', en: 'A new prayer request for the pastors' },
       });
     }
   };
@@ -371,8 +374,14 @@ export const prayerRouter = (deps: Deps) => {
               type: 'prayer.moderated',
               title:
                 body.decision === 'approved'
-                  ? 'Pokok doa Anda dibagikan kepada jemaat'
-                  : 'Pokok doa Anda tidak dibagikan',
+                  ? {
+                      id: 'Pokok doa Anda dibagikan kepada jemaat',
+                      en: 'Your prayer request was shared with the church',
+                    }
+                  : {
+                      id: 'Pokok doa Anda tidak dibagikan',
+                      en: 'Your prayer request was not shared',
+                    },
               body: row.title,
               link: `/c/${church.id}/care/prayer/${row.id}`,
               entityType: 'prayer_request',
@@ -498,7 +507,10 @@ export const prayerRouter = (deps: Deps) => {
               churchId: church.id,
               userIds: prayed,
               type: 'prayer.answered',
-              title: 'Doa yang Anda doakan telah dijawab',
+              title: {
+                id: 'Doa yang Anda doakan telah dijawab',
+                en: 'A prayer you prayed for was answered',
+              },
               body: next.visibility === 'pastors' ? null : next.title,
               link: `/c/${church.id}/care/prayer/${row.id}`,
               entityType: 'prayer_request',
