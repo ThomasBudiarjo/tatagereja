@@ -161,6 +161,7 @@ export const directoryToolsRouter = (deps: Deps) => {
         const stored = customFieldValuesByPerson(
           db,
           rows.map((row) => row.id),
+          church.id,
         );
         const lines = directory.map((person, index) => {
           const row = rows[index] as PersonRow;

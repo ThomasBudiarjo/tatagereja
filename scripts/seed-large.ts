@@ -725,6 +725,7 @@ for (const offset of sundays) {
           personId: person.id,
           churchId,
           status: status === 'absent' && chance(0.3) ? 'excused' : status,
+          sessionAt: startsAt,
           note: null,
           recordedBy: admin.user.id,
           recordedAt: startsAt,

@@ -19,6 +19,7 @@ import {
 } from '../db/schema';
 import { notFound, validationError } from '../lib/errors';
 import { nowIso } from '../lib/time';
+import { personIdsIn } from './people';
 
 export const toCustomFieldDefinition = (row: CustomFieldDefinitionRow): CustomFieldDefinition => ({
   id: row.id,
@@ -79,13 +80,14 @@ export function customFieldsOf(
 export function customFieldValuesByPerson(
   db: Queryable,
   personIds: readonly string[],
+  churchId?: string,
 ): Map<string, Map<string, string>> {
   const result = new Map<string, Map<string, string>>();
   if (personIds.length === 0) return result;
   for (const row of db
     .select()
     .from(customFieldValues)
-    .where(inArray(customFieldValues.personId, [...personIds]))
+    .where(personIdsIn(db, customFieldValues.personId, personIds, churchId))
     .all()) {
     const values = result.get(row.personId) ?? new Map<string, string>();
     values.set(row.fieldId, row.value);

@@ -28,15 +28,19 @@ export function acceptedEncoding(header: string | null): Encoding | null {
   return null;
 }
 
+/** Above this size dynamic bodies use the fastest brotli level (a roster of thousands). */
+const LARGE_BODY_BYTES = 256 * 1024;
+
 /**
- * Compresses a dynamic body. Brotli at quality 4 is faster than gzip -6 and still smaller;
- * the build's static files use the slowest, smallest settings instead (precompressed).
+ * Compresses a dynamic body. Brotli at quality 4 is about as fast as gzip -6 and smaller;
+ * very large bodies use quality 1, three times faster for a tenth more bytes. The build's
+ * static files use the slowest, smallest settings instead (precompressed).
  */
 export function compressBody(body: Uint8Array, encoding: Encoding): Uint8Array {
   if (encoding === 'br') {
     return brotliCompressSync(body, {
       params: {
-        [zlib.BROTLI_PARAM_QUALITY]: 4,
+        [zlib.BROTLI_PARAM_QUALITY]: body.byteLength > LARGE_BODY_BYTES ? 1 : 4,
         [zlib.BROTLI_PARAM_SIZE_HINT]: body.byteLength,
       },
     });
