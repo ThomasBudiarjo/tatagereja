@@ -548,7 +548,8 @@ function NoteComposer({ careCase }: { careCase: CareCase }) {
         render={({ field }) => (
           <Segmented
             aria-label={t('care.noteKind')}
-            className="h-10"
+            // Four kinds fit a phone only as words; the icons return from `sm`.
+            className="h-10 max-sm:[&_svg]:hidden max-sm:[&>button]:px-1"
             value={field.value ?? 'note'}
             onChange={field.onChange}
             options={CARE_NOTE_INPUT_KINDS.map((kind) => ({

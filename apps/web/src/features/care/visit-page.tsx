@@ -207,7 +207,17 @@ export function NewVisitPage() {
   const { base, access } = useChurch();
   const [search] = useSearchParams();
   // Without care.manage a visit can only be recorded for a case the caller accompanies.
-  if (!has(access, 'care.manage') && !search.get('caseId')) return <NoAccessState />;
+  if (!has(access, 'care.manage') && !search.get('caseId')) {
+    return (
+      <NoAccessState
+        action={
+          <Button asChild>
+            <Link to={`${base}/care`}>{t('care.backToCare')}</Link>
+          </Button>
+        }
+      />
+    );
+  }
   return (
     <Page size="narrow">
       <PageHeader

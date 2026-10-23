@@ -67,7 +67,7 @@ export function PriorityBadge({
 export function ConfidentialBadge({ size }: { size?: 'sm' | 'md' }) {
   const { t } = useI18n();
   return (
-    <StatusBadge tone="danger" icon={Lock} size={size}>
+    <StatusBadge tone="danger" icon={Lock} size={size} className="shrink-0">
       {t('care.confidential')}
     </StatusBadge>
   );
@@ -126,12 +126,17 @@ export function DueLabel({
     <span
       data-tone={overdue ? 'danger' : isToday ? 'warning' : undefined}
       className={cn(
-        'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap tabular',
+        // Wraps instead of being cut off in narrow cards (an overdue date is the point).
+        'inline-flex min-w-0 items-center gap-1 text-xs font-medium whitespace-normal tabular',
         overdue || isToday ? 'text-tone-ink' : 'text-muted-foreground',
         className,
       )}
     >
-      {overdue ? <AlarmClock className="size-3.5" /> : <CalendarClock className="size-3.5" />}
+      {overdue ? (
+        <AlarmClock className="size-3.5 shrink-0" />
+      ) : (
+        <CalendarClock className="size-3.5 shrink-0" />
+      )}
       {overdue
         ? t('care.overdueSince', { date: formatDate(date, 'dateShort') })
         : isToday

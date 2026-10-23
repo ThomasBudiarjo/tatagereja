@@ -269,7 +269,10 @@ export function FollowUpsPage() {
         </>
       )}
       {mover.dialog}
-      <NewFollowUpSheet open={state.new} onOpenChange={(open) => setState({ new: open })} />
+      <NewFollowUpSheet
+        open={canCreate && state.new}
+        onOpenChange={(open) => setState({ new: open })}
+      />
     </Page>
   );
 }

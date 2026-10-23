@@ -15,6 +15,8 @@ export const careDictionary = defineDictionary('care', {
     navDiakonia: 'Diakonia',
     prayerNavDescription: 'Share prayer requests and pray for one another.',
     quickActions: 'Quick actions',
+    homeDescriptionMember: 'Pray for one another and keep up with the tasks given to you.',
+    backToCare: 'Back to pastoral care',
 
     // Shared words
     careTeam: 'Care team',
@@ -57,7 +59,7 @@ export const careDictionary = defineDictionary('care', {
     searchHouseholds: 'Search households',
     noHouseholdsFound: 'No households found',
     whoCanRead: 'Who can read it',
-    confidentialityNormalHint: 'Everyone on the care team (care.view) can read the notes.',
+    confidentialityNormalHint: 'Everyone on the care team can read the notes.',
     confidentialityConfidentialHint:
       'Only the assigned caregivers and pastors with confidential access. Administrators cannot read it.',
     confidentialBannerTitle: 'Confidential',
@@ -265,6 +267,9 @@ export const careDictionary = defineDictionary('care', {
     prayerApproved: 'Shared with the church',
     prayerRejected: 'Not shared; the requester is told',
     prayerAnswered: 'Marked answered. Praise the Lord!',
+    testimonyInReview:
+      'Marked answered. Your testimony is shown to the church once it is reviewed.',
+    testimonyReviewHint: 'A testimony is reviewed before the church sees it.',
     prayerReopened: 'Back on the prayer wall',
     iPrayed: 'I prayed',
     prayed: 'Prayed',
@@ -450,6 +455,8 @@ export const careDictionary = defineDictionary('care', {
     navDiakonia: 'Diakonia',
     prayerNavDescription: 'Bagikan pokok doa dan saling mendoakan.',
     quickActions: 'Aksi cepat',
+    homeDescriptionMember: 'Saling mendoakan dan ikuti tugas pelayanan yang diberikan kepada Anda.',
+    backToCare: 'Kembali ke Pelayanan Pastoral',
 
     careTeam: 'Tim pastoral',
     confidential: 'Rahasia',
@@ -491,7 +498,7 @@ export const careDictionary = defineDictionary('care', {
     searchHouseholds: 'Cari keluarga',
     noHouseholdsFound: 'Keluarga tidak ditemukan',
     whoCanRead: 'Siapa yang dapat membaca',
-    confidentialityNormalHint: 'Seluruh tim pastoral (care.view) dapat membaca catatannya.',
+    confidentialityNormalHint: 'Seluruh tim pastoral dapat membaca catatannya.',
     confidentialityConfidentialHint:
       'Hanya pendamping yang ditugaskan dan pendeta dengan akses rahasia. Administrator tidak dapat membacanya.',
     confidentialBannerTitle: 'Rahasia',
@@ -699,6 +706,9 @@ export const careDictionary = defineDictionary('care', {
     prayerApproved: 'Dibagikan kepada jemaat',
     prayerRejected: 'Tidak dibagikan; pengirim diberi tahu',
     prayerAnswered: 'Ditandai sudah dijawab. Puji Tuhan!',
+    testimonyInReview:
+      'Ditandai sudah dijawab. Kesaksian Anda tampil bagi jemaat setelah ditinjau.',
+    testimonyReviewHint: 'Kesaksian ditinjau dahulu sebelum dibagikan kepada jemaat.',
     prayerReopened: 'Kembali ke dinding doa',
     iPrayed: 'Saya sudah berdoa',
     prayed: 'Sudah didoakan',
@@ -859,7 +869,7 @@ export const careDictionary = defineDictionary('care', {
     voidReasonPlaceholder: 'mis. Tercatat dua kali',
     voided: 'Dibatalkan',
     voidedOn: 'Dibatalkan pada {date}',
-    voidedFilter: 'Batal',
+    voidedFilter: 'Dibatalkan',
     includeVoided: 'Tampilkan yang dibatalkan',
     totalGiven: 'Total bantuan',
     totalGivenHint: 'Bantuan uang dalam periode terpilih',

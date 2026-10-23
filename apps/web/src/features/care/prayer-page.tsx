@@ -78,7 +78,7 @@ export function PrayerPage() {
   const pending = overview.data?.prayer.pending ?? 0;
   const [editing, setEditing] = useState<PrayerRequest | null>(null);
   const [answering, setAnswering] = useState<PrayerRequest | null>(null);
-  const creating = state.new;
+  const creating = canSubmit && state.new;
   const setCreating = (open: boolean) => setState({ new: open });
   const filtered = !!(state.q || state.visibility);
   const empty = EMPTY[scope];

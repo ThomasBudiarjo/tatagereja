@@ -206,7 +206,7 @@ export function CasesPage() {
                 header: t('care.caseTitle'),
                 primary: true,
                 cell: (item) => (
-                  <span className="inline-flex min-w-0 items-center gap-2.5">
+                  <span className="flex min-w-0 items-center gap-2.5">
                     <ToneIcon
                       icon={CATEGORY_ICONS[item.category]}
                       tone={CATEGORY_TONES[item.category]}

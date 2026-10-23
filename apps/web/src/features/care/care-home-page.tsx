@@ -130,7 +130,7 @@ export function CareHomePage() {
         icon={HeartHandshake}
         tone="rose"
         title={t('care.nav')}
-        description={t('care.homeDescription')}
+        description={t(team ? 'care.homeDescription' : 'care.homeDescriptionMember')}
         actions={
           manager ? (
             <Button asChild className="max-sm:size-11 max-sm:px-0">
@@ -254,6 +254,25 @@ export function CareHomePage() {
             ) : null}
           </div>
 
+          {overview.data.tasks.overdue > 0 ? (
+            <div
+              data-tone="danger"
+              className="flex animate-rise-in items-start gap-3 rounded-xl border border-tone/25 bg-tone-soft/60 p-3.5"
+            >
+              <AlarmClock className="mt-0.5 size-4 shrink-0 text-tone-ink" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-tone-ink">
+                  {t('care.overdueBannerTitle', { count: overview.data.tasks.overdue })}
+                </p>
+                <Link
+                  to={`${base}/care/tasks?overdue=1`}
+                  className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  {t('care.overdueBannerAction')}
+                </Link>
+              </div>
+            </div>
+          ) : null}
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <div className="flex min-w-0 flex-col gap-6">
               {team || overview.data.upcoming.length > 0 ? (
@@ -290,7 +309,7 @@ export function CareHomePage() {
                         />
                       )}
                       title={(item) => (
-                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           <span className="truncate">{item.title}</span>
                           {item.confidentiality === 'confidential' ? (
                             <ConfidentialBadge size="sm" />
@@ -298,15 +317,25 @@ export function CareHomePage() {
                         </span>
                       )}
                       subtitle={(item) => (
-                        <span className="inline-flex min-w-0 items-center gap-2">
-                          <DueLabel date={item.nextActionDate} today={overview.data.today} />
-                          <span className="truncate">
+                        // Wraps on phones: the due date and priority first, then the name.
+                        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <DueLabel
+                            date={item.nextActionDate}
+                            today={overview.data.today}
+                            className="whitespace-nowrap"
+                          />
+                          <span className="sm:hidden">
+                            <PriorityBadge priority={item.priority} size="sm" quiet />
+                          </span>
+                          <span className="min-w-0 truncate">
                             {personName(item.person) ?? item.household?.name}
                           </span>
                         </span>
                       )}
                       trailing={(item) => (
-                        <PriorityBadge priority={item.priority} size="sm" quiet />
+                        <span className="max-sm:hidden">
+                          <PriorityBadge priority={item.priority} size="sm" quiet />
+                        </span>
                       )}
                     />
                   )}
@@ -349,26 +378,6 @@ export function CareHomePage() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">
-              {overview.data.tasks.overdue > 0 ? (
-                <div
-                  data-tone="danger"
-                  className="flex animate-rise-in items-start gap-3 rounded-xl border border-tone/25 bg-tone-soft/60 p-3.5"
-                >
-                  <AlarmClock className="mt-0.5 size-4 shrink-0 text-tone-ink" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-tone-ink">
-                      {t('care.overdueBannerTitle', { count: overview.data.tasks.overdue })}
-                    </p>
-                    <Link
-                      to={`${base}/care/tasks?overdue=1`}
-                      className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-                    >
-                      {t('care.overdueBannerAction')}
-                    </Link>
-                  </div>
-                </div>
-              ) : null}
-
               {canPray || manager || has(access, 'diakonia.manage') ? (
                 <Section title={t('care.quickActions')}>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">

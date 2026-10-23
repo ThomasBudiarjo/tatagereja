@@ -34,6 +34,7 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { Input, Textarea } from '@/components/ui/input';
 import { Alert, Segmented } from '@/components/ui/misc';
 import { Pagination } from '@/components/ui/pagination';
+import { PrintButton, PrintHeader } from '@/components/ui/print';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { Select } from '@/components/ui/select';
 import {
@@ -65,7 +66,7 @@ const recipientOf = (aid: DiakoniaAid) => (
 
 export function DiakoniaPage() {
   const { t, locale, formatDate, formatCurrency, formatNumber } = useI18n();
-  const { churchId, base, access } = useChurch();
+  const { church, churchId, base, access } = useChurch();
   const today = useToday();
   const canManage = canManageDiakonia(access);
   const [state, setState, reset] = useUrlState({
@@ -129,7 +130,26 @@ export function DiakoniaPage() {
           { label: t('care.nav'), to: `${base}/care` },
           { label: t('care.navDiakonia') },
         ]}
-        actions={recordButton}
+        actions={
+          <>
+            {query.data && query.data.items.length > 0 ? (
+              <PrintButton className="max-sm:hidden" />
+            ) : null}
+            {recordButton}
+          </>
+        }
+      />
+      <PrintHeader
+        churchName={church.name}
+        logoUrl={church.logoUrl}
+        title={t('care.diakoniaTitle')}
+        subtitle={
+          state.period === 'month'
+            ? t('common.rangeThisMonth')
+            : state.period === 'year'
+              ? t('common.rangeThisYear')
+              : t('care.allTime')
+        }
       />
       <CareNav />
       {query.isPending ? (
@@ -158,54 +178,56 @@ export function DiakoniaPage() {
           />
         </div>
       ) : null}
-      <FilterBar
-        search={{
-          value: state.q,
-          onChange: (q) => setState({ q }),
-          placeholder: t('care.searchAid'),
-        }}
-        filters={[
-          {
-            id: 'period',
-            label: t('care.period'),
-            value: state.period,
-            onChange: (period) => setState({ period }),
-            options: [
-              { value: 'month', label: t('common.rangeThisMonth') },
-              { value: 'year', label: t('common.rangeThisYear') },
-              { value: 'all', label: t('care.allTime') },
-            ],
-          },
-          {
-            id: 'category',
-            label: t('care.aidCategory'),
-            value: state.category,
-            onChange: (category) => setState({ category }),
-            options: DIAKONIA_CATEGORIES.map((value) => ({
-              value,
-              label: localize(DIAKONIA_CATEGORY_LABELS[value], locale),
-            })),
-          },
-          {
-            id: 'form',
-            label: t('care.aidForm'),
-            value: state.form,
-            onChange: (form) => setState({ form }),
-            options: DIAKONIA_FORMS.map((value) => ({
-              value,
-              label: localize(DIAKONIA_FORM_LABELS[value], locale),
-            })),
-          },
-          {
-            id: 'voided',
-            label: t('care.voidedFilter'),
-            value: state.voided ? 'yes' : '',
-            onChange: (value) => setState({ voided: value === 'yes' }),
-            options: [{ value: 'yes', label: t('care.includeVoided') }],
-          },
-        ]}
-        onReset={() => reset(['period'])}
-      />
+      <div data-print="hide">
+        <FilterBar
+          search={{
+            value: state.q,
+            onChange: (q) => setState({ q }),
+            placeholder: t('care.searchAid'),
+          }}
+          filters={[
+            {
+              id: 'period',
+              label: t('care.period'),
+              value: state.period,
+              onChange: (period) => setState({ period }),
+              options: [
+                { value: 'month', label: t('common.rangeThisMonth') },
+                { value: 'year', label: t('common.rangeThisYear') },
+                { value: 'all', label: t('care.allTime') },
+              ],
+            },
+            {
+              id: 'category',
+              label: t('care.aidCategory'),
+              value: state.category,
+              onChange: (category) => setState({ category }),
+              options: DIAKONIA_CATEGORIES.map((value) => ({
+                value,
+                label: localize(DIAKONIA_CATEGORY_LABELS[value], locale),
+              })),
+            },
+            {
+              id: 'form',
+              label: t('care.aidForm'),
+              value: state.form,
+              onChange: (form) => setState({ form }),
+              options: DIAKONIA_FORMS.map((value) => ({
+                value,
+                label: localize(DIAKONIA_FORM_LABELS[value], locale),
+              })),
+            },
+            {
+              id: 'voided',
+              label: t('care.voidedFilter'),
+              value: state.voided ? 'yes' : '',
+              onChange: (value) => setState({ voided: value === 'yes' }),
+              options: [{ value: 'yes', label: t('care.includeVoided') }],
+            },
+          ]}
+          onReset={() => reset(['period'])}
+        />
+      </div>
       {query.isPending ? (
         <SkeletonTable rows={6} columns={5} />
       ) : query.isError ? (
@@ -308,7 +330,7 @@ export function DiakoniaPage() {
         }}
       />
       <AidSheet
-        open={state.new}
+        open={canManage && state.new}
         caseId={state.caseId || null}
         onOpenChange={(open) => setState({ new: open, caseId: open ? state.caseId : '' })}
       />

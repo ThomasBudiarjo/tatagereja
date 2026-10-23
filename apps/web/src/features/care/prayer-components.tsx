@@ -519,7 +519,14 @@ export function AnswerDialog({
   const { t } = useI18n();
   const { churchId } = useChurch();
   const [testimony, setTestimony] = useState('');
-  const answer = useMutationToast(useAnswerPrayer(churchId), { success: t('care.prayerAnswered') });
+  const answer = useMutationToast(useAnswerPrayer(churchId), {
+    success: (data) =>
+      data.request.moderationStatus === 'pending'
+        ? t('care.testimonyInReview')
+        : t('care.prayerAnswered'),
+  });
+  // Testimonies of requesters are reviewed before the church sees them.
+  const reviewed = !!request && request.visibility === 'church' && !request.canModerate;
   return (
     <Dialog
       open={!!request}
@@ -547,6 +554,9 @@ export function AnswerDialog({
               onChange={(event) => setTestimony(event.target.value)}
             />
           </Field>
+          {reviewed ? (
+            <p className="text-xs text-muted-foreground">{t('care.testimonyReviewHint')}</p>
+          ) : null}
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={answer.isPending}>
