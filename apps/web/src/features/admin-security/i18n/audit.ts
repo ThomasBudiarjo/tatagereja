@@ -68,6 +68,8 @@ export const auditMessages = messages(
     verbReturn: 'Returned: {entity}',
     verbOpen: 'Opened: {entity}',
     actGroupMembersAdd: 'Added members to a group',
+    actGroupJoinApprove: 'Approved a request to join a group',
+    actGroupJoinDecline: 'Declined a request to join a group',
     actGroupMemberRemove: 'Removed a member from a group',
     actPersonStatusChange: 'Changed a membership status',
     // Entries whose content the viewer may not read
@@ -192,6 +194,8 @@ export const auditMessages = messages(
     verbReturn: 'Mengembalikan: {entity}',
     verbOpen: 'Membuka: {entity}',
     actGroupMembersAdd: 'Menambahkan anggota kelompok',
+    actGroupJoinApprove: 'Menyetujui permintaan bergabung dengan kelompok',
+    actGroupJoinDecline: 'Menolak permintaan bergabung dengan kelompok',
     actGroupMemberRemove: 'Mengeluarkan anggota kelompok',
     actPersonStatusChange: 'Mengubah status keanggotaan',
     auditHidden: 'rincian disembunyikan',

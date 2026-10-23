@@ -18,6 +18,8 @@ const ACTION_KEYS: Record<string, MessageKey> = {
   'church.transfer': 'admin-security.actChurchTransfer',
   'church.update': 'admin-security.actChurchUpdate',
   'group.delete': 'admin-security.actGroupDelete',
+  'group.join_request_approve': 'admin-security.actGroupJoinApprove',
+  'group.join_request_decline': 'admin-security.actGroupJoinDecline',
   'group.member_remove': 'admin-security.actGroupMemberRemove',
   'group.members_add': 'admin-security.actGroupMembersAdd',
   'group.leader_assign': 'admin-security.actGroupLeaderAssign',
@@ -163,7 +165,7 @@ function auditSubject(entry: Pick<AuditLog, 'params' | 'before' | 'after'>): str
   const text = (value: unknown) =>
     typeof value === 'string' && value.trim() ? value.trim() : null;
   const params = entry.params ?? {};
-  const who = text(params.member) ?? text(params.person);
+  const who = text(params.member) ?? text(params.person) ?? text(params.members);
   let name = text(params.name);
   if (!name) {
     for (const side of [entry.after, entry.before]) {

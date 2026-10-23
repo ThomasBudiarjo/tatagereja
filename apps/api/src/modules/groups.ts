@@ -867,7 +867,7 @@ export const groupsModule = (deps: Deps) => {
     )
     .post(
       '/:id/join-requests/:requestId/decision',
-      ({ church, access, auth, params, body }) => {
+      ({ church, access, audit, auth, params, body }) => {
         const group = loadGroup(church.id, params.id);
         if (!canDecideJoinRequests(access, group.id)) {
           throw forbidden('You cannot decide on join requests for this group');
@@ -890,6 +890,24 @@ export const groupsModule = (deps: Deps) => {
           if (body.decision === 'approved') {
             addMembers(tx, access, group, [request.personId], { notifyAdded: false });
           }
+          // An approval adds a member, so it is audited like any other add.
+          const person = tx.select().from(people).where(eq(people.id, request.personId)).get();
+          const name = person ? fullName(person) : 'a member';
+          recordAudit(tx, audit, {
+            module: 'people',
+            action:
+              body.decision === 'approved'
+                ? 'group.join_request_approve'
+                : 'group.join_request_decline',
+            entityType: 'group',
+            entityId: group.id,
+            summary:
+              body.decision === 'approved'
+                ? `Approved the request of ${name} to join ${group.name}`
+                : `Declined the request of ${name} to join ${group.name}`,
+            params: { name: group.name, person: name, asLeader: !has(access, 'groups.manage') },
+            after: { personId: request.personId, decision: body.decision },
+          });
           const updated = tx
             .update(groupJoinRequests)
             .set({
