@@ -15,6 +15,7 @@ import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Alert } from '@/components/ui/misc';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Pagination } from '@/components/ui/pagination';
 import { ResponsiveTable, formatSort, parseSort } from '@/components/ui/responsive-table';
@@ -98,6 +99,9 @@ export function ContributionsPage() {
         }
       />
       <FinanceNav />
+      {!has(access, 'finance.view') ? (
+        <Alert variant="info">{t('finance.recordedByYouHint')}</Alert>
+      ) : null}
       <FilterBar
         search={{
           value: state.q,

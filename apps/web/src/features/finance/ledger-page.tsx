@@ -64,6 +64,7 @@ import {
   sourcePath,
   todayIn,
   useFinanceSetup,
+  useFinanceResolver,
 } from './helpers';
 
 const PAGE_SIZE = 50;
@@ -302,7 +303,10 @@ function EntriesTab() {
                 header: t('finance.descriptionField'),
                 primary: true,
                 cell: (entry) => (
-                  <span className="flex items-center gap-2.5">
+                  <span
+                    className="flex items-center gap-2.5 md:max-w-sm xl:max-w-md"
+                    title={entry.description}
+                  >
                     <ToneIcon
                       icon={SOURCE_ICON[entry.sourceType]}
                       tone={SOURCE_TONE[entry.sourceType]}
@@ -325,6 +329,7 @@ function EntriesTab() {
                 id: 'date',
                 header: t('finance.date'),
                 secondary: true,
+                className: 'whitespace-nowrap',
                 cell: (entry) => (
                   <span className="inline-flex items-center gap-2">
                     {formatDate(entry.entryDate, 'dateShort')}
@@ -336,7 +341,12 @@ function EntriesTab() {
                   </span>
                 ),
               },
-              { id: 'account', header: t('finance.account'), cell: (entry) => entry.accountName },
+              {
+                id: 'account',
+                header: t('finance.account'),
+                className: 'whitespace-nowrap',
+                cell: (entry) => entry.accountName,
+              },
               {
                 id: 'fund',
                 header: t('finance.fund'),
@@ -520,7 +530,7 @@ function AdjustmentDialog({
   const setup = useFinanceSetup();
   const [direction, setDirection] = useState<'in' | 'out'>('out');
   const form = useForm<AdjustmentForm, unknown, FinanceAdjustmentInput>({
-    resolver: zodResolver(financeAdjustmentInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeAdjustmentInputSchema)),
     values: {
       entryDate: todayIn(church.timezone),
       accountId: setup.activeAccounts[0]?.id ?? '',
@@ -664,7 +674,7 @@ function TransferDialog({
   const cash = setup.activeAccounts.find((item) => item.type === 'cash');
   const bank = setup.activeAccounts.find((item) => item.type === 'bank');
   const form = useForm<TransferForm, unknown, FinanceTransferInput>({
-    resolver: zodResolver(financeTransferInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeTransferInputSchema)),
     values: {
       fromAccountId: cash?.id ?? setup.activeAccounts[0]?.id ?? '',
       toAccountId: bank?.id ?? setup.activeAccounts[1]?.id ?? '',

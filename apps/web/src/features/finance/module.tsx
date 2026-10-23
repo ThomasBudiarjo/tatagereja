@@ -62,7 +62,8 @@ export const financeModule = defineModule({
     {
       path: 'finance/giving',
       lazy: lazyPage(() => import('./contributions-page'), 'ContributionsPage'),
-      handle: { access: anyOf('finance.view') },
+      // Recorders see the gifts they recorded (the API narrows the list).
+      handle: { access: anyOf('finance.view', 'finance.record') },
     },
     {
       path: 'finance/giving/new',
@@ -77,7 +78,7 @@ export const financeModule = defineModule({
     {
       path: 'finance/giving/:contributionId/edit',
       lazy: lazyPage(() => import('./contribution-form'), 'EditContributionPage'),
-      handle: { access: record },
+      handle: { access: anyOf('finance.record', 'finance.manage') },
     },
     {
       path: 'finance/expenses',

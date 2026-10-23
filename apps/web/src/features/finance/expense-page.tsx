@@ -2,6 +2,7 @@ import {
   canCancelExpense,
   canEditExpense,
   canPayExpense,
+  canReversePayment,
   fullName,
   has,
   payExpenseBodySchema,
@@ -19,6 +20,7 @@ import {
   Pencil,
   Receipt,
   Send,
+  Undo2,
   ThumbsDown,
   ThumbsUp,
   XCircle,
@@ -53,7 +55,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { expenseQuery, useExpenseAction } from './api';
 import { ExpenseStatusBadge, Money, ReasonDialog } from './components';
-import { todayIn, useFinanceSetup } from './helpers';
+import { todayIn, useFinanceSetup, useFinanceResolver } from './helpers';
 
 export function ExpensePage() {
   const { t } = useI18n();
@@ -107,7 +109,9 @@ function ExpenseDetail({
 }) {
   const { t, formatDate, formatDateTime, formatCurrency } = useI18n();
   const { churchId, base, access } = useChurch();
-  const [dialog, setDialog] = useState<'approve' | 'reject' | 'pay' | 'cancel' | null>(null);
+  const [dialog, setDialog] = useState<'approve' | 'reject' | 'pay' | 'reverse' | 'cancel' | null>(
+    null,
+  );
   const action = useExpenseAction(churchId, expense.id);
   const run = useMutationToast(action, {
     success: (_data, variables) =>
@@ -118,6 +122,7 @@ function ExpenseDetail({
         : {
             submit: t('finance.expenseSubmitted'),
             pay: t('finance.expensePaid'),
+            'reverse-payment': t('finance.paymentReversed'),
             cancel: t('finance.expenseCancelled'),
           }[variables.action],
   });
@@ -125,6 +130,7 @@ function ExpenseDetail({
   const canEdit = canEditExpense(access, expense);
   const canPay = canPayExpense(access, expense);
   const canCancel = canCancelExpense(access, expense);
+  const canReverse = canReversePayment(access, expense);
   const ownRequest = expense.requestedBy === access.userId;
 
   return (
@@ -193,6 +199,12 @@ function ExpenseDetail({
                 {t('finance.markPaid')}
               </Button>
             ) : null}
+            {canReverse ? (
+              <Button variant="outline" onClick={() => setDialog('reverse')}>
+                <Undo2 />
+                {t('finance.reversePayment')}
+              </Button>
+            ) : null}
             {canCancel ? (
               <Button
                 variant="ghost"
@@ -207,9 +219,9 @@ function ExpenseDetail({
         </CardContent>
       </Card>
 
-      {expense.status === 'submitted' && ownRequest && has(access, 'finance.approve') ? (
+      {expense.status === 'submitted' && !expense.canApprove && has(access, 'finance.approve') ? (
         <Alert variant="info" title={t('finance.selfApprovalTitle')}>
-          {t('finance.selfApprovalHint')}
+          {ownRequest ? t('finance.selfApprovalHint') : t('finance.editorApprovalHint')}
         </Alert>
       ) : null}
       {expense.decisionNote && (expense.status === 'rejected' || expense.status === 'cancelled') ? (
@@ -349,6 +361,20 @@ function ExpenseDetail({
           if (await run.run({ action: 'cancel', body: { reason: reason || null } })) close();
         }}
       />
+      <ReasonDialog
+        open={dialog === 'reverse'}
+        onOpenChange={(open) => !open && close()}
+        title={t('finance.reversePaymentTitle')}
+        description={t('finance.reversePaymentDescription', {
+          amount: formatCurrency(expense.amount),
+          account: expense.paidFromAccountName ?? '—',
+        })}
+        confirmLabel={t('finance.reversePayment')}
+        loading={run.isPending}
+        onConfirm={async (reason) => {
+          if (await run.run({ action: 'reverse-payment', body: { reason } })) close();
+        }}
+      />
       <PayDialog
         open={dialog === 'pay'}
         onOpenChange={(open) => !open && close()}
@@ -388,7 +414,7 @@ function PayDialog({
   const { church } = useChurch();
   const setup = useFinanceSetup();
   const form = useForm<PayForm, unknown, PayExpenseBody>({
-    resolver: zodResolver(payExpenseBodySchema),
+    resolver: useFinanceResolver(zodResolver(payExpenseBodySchema)),
     values: {
       accountId:
         setup.activeAccounts.find((account) => account.type === 'bank')?.id ??

@@ -20,8 +20,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
+import type { FieldValues, Resolver } from 'react-hook-form';
 import { useChurch } from '@/components/layout/church-provider';
 import type { Tone } from '@/components/ui/tone';
+import { useI18n, type MessageKey } from '@/lib/i18n';
 import { financeSetupQuery } from './api';
 
 export const OFFERING_STATUS_TONE: Record<OfferingBatchStatus, Tone> = {
@@ -129,6 +131,20 @@ export function useFinanceSetup() {
   };
 }
 
+/**
+ * Active choices plus the one a record already uses, so correcting it never silently swaps an
+ * inactive fund, account, category or closed campaign for the first option.
+ */
+export function withCurrent<T extends { id: string }>(
+  active: readonly T[],
+  all: readonly T[],
+  currentId: string | null | undefined,
+): T[] {
+  if (!currentId || active.some((item) => item.id === currentId)) return [...active];
+  const current = all.find((item) => item.id === currentId);
+  return current ? [current, ...active] : [...active];
+}
+
 /** The four years around now, for year pickers. */
 export const yearOptions = (current: number) => [
   current + 1,
@@ -179,3 +195,47 @@ export const compactRange = (active: boolean) =>
     'max-sm:w-11 max-sm:justify-center max-sm:px-0 max-sm:[&>span]:sr-only max-sm:[&>svg:last-child]:hidden',
     active ? 'max-sm:border-primary/30 max-sm:bg-accent max-sm:text-accent-foreground' : '',
   ].join(' ');
+
+/** The shared finance schemas' own rule messages (English), by their dictionary key. */
+const RULE_MESSAGES: Record<string, MessageKey> = {
+  'Choose a person or enter a name': 'finance.ruleChoosePersonOrName',
+  'Choose a shorter range': 'finance.ruleShorterRange',
+  'Choose two different accounts': 'finance.ruleTwoAccounts',
+  'Choose who is reimbursed': 'finance.ruleReimbursePerson',
+  'Each category appears once': 'finance.ruleCategoryOnce',
+  'Enter a target': 'finance.ruleEnterTarget',
+  'Enter an amount': 'finance.ruleEnterAmount',
+  'Enter at least one amount': 'finance.enterAnAmount',
+  'Explain why the request is rejected': 'finance.ruleRejectReason',
+  'Name the first counter': 'finance.ruleFirstCounter',
+  'Offerings are counted by two people': 'finance.ruleTwoCounters',
+  'The amount cannot be zero': 'finance.ruleNonZero',
+  'The amount must equal the counted notes and coins': 'finance.ruleDenominations',
+  'The end date must be on or after the start date': 'finance.ruleEndAfterStart',
+  'The two counters must be different people': 'finance.ruleDifferentCounters',
+  'Too many denominations': 'finance.ruleTooManyDenominations',
+};
+
+/**
+ * Wraps a form resolver so the finance rules (written in English in the shared schemas) show in
+ * the interface language; zod's own messages already follow it.
+ */
+export function useFinanceResolver<TInput extends FieldValues, TContext, TOutput>(
+  resolver: Resolver<TInput, TContext, TOutput>,
+): Resolver<TInput, TContext, TOutput> {
+  const { t } = useI18n();
+  const translate = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'ref') continue;
+      if (key === 'message' && typeof value === 'string' && RULE_MESSAGES[value]) {
+        (node as { message: string }).message = t(RULE_MESSAGES[value]);
+      } else translate(value);
+    }
+  };
+  return async (values, context, options) => {
+    const result = await resolver(values, context, options);
+    translate(result.errors);
+    return result;
+  };
+}

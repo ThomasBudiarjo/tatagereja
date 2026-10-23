@@ -39,6 +39,7 @@ import {
   offeringBatchInputSchema,
   offeringBatchListSchema,
   offeringBatchResponseSchema,
+  offeringServiceListSchema,
   okSchema,
   saveBudgetBodySchema,
   type DecideExpenseBody,
@@ -117,6 +118,18 @@ export const offeringsQuery = (churchId: string, params: OfferingListParams) =>
         url: path(churchId, '/offerings'),
         params: clean(params),
       }),
+  });
+
+/** Worship services of a day, to link a count to (empty when the worship module is off). */
+export const offeringServicesQuery = (churchId: string, date: string) =>
+  queryOptions({
+    queryKey: financeKeys.list(churchId, 'offering-services', { date }),
+    queryFn: () =>
+      request(offeringServiceListSchema, {
+        url: path(churchId, '/offerings/services'),
+        params: { date },
+      }),
+    staleTime: 60_000,
   });
 
 export const offeringQuery = (churchId: string, id: string) =>
@@ -428,6 +441,7 @@ export type ExpenseAction =
   | { action: 'submit' }
   | { action: 'decide'; body: DecideExpenseBody }
   | { action: 'pay'; body: PayExpenseBody }
+  | { action: 'reverse-payment'; body: { reason: string } }
   | { action: 'cancel'; body: { reason: string | null } };
 export const useExpenseAction = (churchId: string, id: string) =>
   useFinanceMutation(churchId, (variables: ExpenseAction) =>

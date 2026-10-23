@@ -38,7 +38,7 @@ import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { accounts, categories, funds, useFinanceDefaults } from './api';
-import { todayIn } from './helpers';
+import { todayIn, useFinanceResolver } from './helpers';
 
 type DialogProps = { open: boolean; onOpenChange: (open: boolean) => void };
 
@@ -100,7 +100,7 @@ export function FundDialog({ open, onOpenChange, fund }: DialogProps & { fund?: 
   const { t } = useI18n();
   const { churchId } = useChurch();
   const form = useForm<FundForm, unknown, FinanceFundInput>({
-    resolver: zodResolver(financeFundInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeFundInputSchema)),
     values: {
       name: fund?.name ?? '',
       code: fund?.code ?? '',
@@ -206,7 +206,7 @@ export function AccountDialog({
   const { t, locale } = useI18n();
   const { churchId, church } = useChurch();
   const form = useForm<AccountForm, unknown, FinanceAccountInput>({
-    resolver: zodResolver(financeAccountInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeAccountInputSchema)),
     values: {
       name: account?.name ?? '',
       type: account?.type ?? 'bank',
@@ -347,7 +347,7 @@ export function CategoryDialog({
   const { t, locale } = useI18n();
   const { churchId } = useChurch();
   const form = useForm<CategoryForm, unknown, FinanceCategoryInput>({
-    resolver: zodResolver(financeCategoryInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeCategoryInputSchema)),
     values: {
       kind: category?.kind ?? kind,
       name: category?.name ?? '',

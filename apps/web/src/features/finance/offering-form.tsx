@@ -4,6 +4,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
   denominationTotal,
+  isModuleEnabled,
   localize,
   offeringBatchInputSchema,
   type OfferingBatch,
@@ -11,7 +12,8 @@ import {
   type PaymentMethod,
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, ArrowRight, Calculator, Minus, Plus, Send, Trash2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Calculator, Church, Minus, Plus, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type Control } from 'react-hook-form';
 import type { z } from 'zod';
@@ -29,10 +31,10 @@ import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useAuth } from '@/stores/auth';
-import { useSaveOffering } from './api';
+import { offeringServicesQuery, useSaveOffering } from './api';
 import { MemberCombobox, MethodLabel, Money } from './components';
 import { ToggleRow } from './setup-dialogs';
-import { lastSunday, todayIn, useFinanceSetup } from './helpers';
+import { lastSunday, todayIn, useFinanceSetup, withCurrent, useFinanceResolver } from './helpers';
 
 type FormValues = z.input<typeof offeringBatchInputSchema>;
 type LineValues = FormValues['lines'][number];
@@ -57,7 +59,7 @@ export function OfferingForm({
   batch?: OfferingBatch;
   onSaved: (batch: OfferingBatch) => void;
 }) {
-  const { t, currency } = useI18n();
+  const { t, currency, formatTime } = useI18n();
   const { church, churchId } = useChurch();
   const { user } = useAuth();
   const setup = useFinanceSetup();
@@ -75,13 +77,14 @@ export function OfferingForm({
     fundId: defaultFund,
     categoryId: defaultCategory,
     method,
+    accountId: null,
     amount: 0,
     denominations: {},
     note: '',
   });
 
   const form = useForm<FormValues, unknown, OfferingBatchInput>({
-    resolver: zodResolver(offeringBatchInputSchema),
+    resolver: useFinanceResolver(zodResolver(offeringBatchInputSchema)),
     defaultValues: batch
       ? {
           serviceDate: batch.serviceDate,
@@ -97,6 +100,7 @@ export function OfferingForm({
             fundId: line.fundId,
             categoryId: line.categoryId,
             method: line.method,
+            accountId: line.accountId,
             amount: line.amount,
             denominations: line.denominations,
             note: line.note ?? '',
@@ -105,6 +109,7 @@ export function OfferingForm({
         }
       : {
           serviceDate: lastSunday(todayIn(church.timezone)),
+          worshipServiceId: null,
           serviceLabel: 'Ibadah Umum 1',
           accountId: defaultAccount,
           counter1UserId: user?.id ?? null,
@@ -125,6 +130,14 @@ export function OfferingForm({
   const pending = save.isPending;
   const values = useWatch({ control: form.control });
   const errors = form.formState.errors;
+  // Services planned in the worship module on the chosen day, to link the count to.
+  const services = useQuery({
+    ...offeringServicesQuery(churchId, values.serviceDate ?? ''),
+    enabled:
+      isModuleEnabled(church.enabledModules, 'worship') &&
+      /^\d{4}-\d{2}-\d{2}$/.test(values.serviceDate ?? ''),
+  });
+  const serviceOptions = services.data?.items ?? [];
   const { isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
   const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
   const total = (values.lines ?? []).reduce((sum, line) => sum + (line?.amount ?? 0), 0);
@@ -134,6 +147,19 @@ export function OfferingForm({
   const [counter2Mode, setCounter2Mode] = useState<'member' | 'name'>(
     batch?.counter2UserId ? 'member' : 'name',
   );
+
+  /** Adds a bag or envelope and brings it into view, ready to type the amount. */
+  const addLine = (method: PaymentMethod) => {
+    const index = lines.fields.length;
+    lines.append(emptyLine(method), { shouldFocus: false });
+    requestAnimationFrame(() => {
+      // Cash opens the note counter; transfers and QRIS go straight to the amount.
+      const amount = document.getElementById(`line-${index}-amount`);
+      const card = amount ?? document.getElementById(`line-${index}-fund`);
+      card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      amount?.focus({ preventScroll: true });
+    });
+  };
 
   const steps = [
     { id: 'service', label: t('finance.stepService') },
@@ -210,7 +236,10 @@ export function OfferingForm({
                     type="date"
                     autoFocus
                     aria-invalid={!!errors.serviceDate}
-                    {...form.register('serviceDate')}
+                    {...form.register('serviceDate', {
+                      // A linked service belongs to one day.
+                      onChange: () => form.setValue('worshipServiceId', null),
+                    })}
                   />
                 </Field>
                 <Field
@@ -224,11 +253,13 @@ export function OfferingForm({
                     aria-invalid={!!errors.accountId}
                     {...form.register('accountId')}
                   >
-                    {setup.activeAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
+                    {withCurrent(setup.activeAccounts, setup.accounts, batch?.accountId).map(
+                      (account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ),
+                    )}
                   </Select>
                 </Field>
               </div>
@@ -244,14 +275,47 @@ export function OfferingForm({
                 />
               </Field>
               <div className="-mt-2 flex flex-wrap gap-1.5">
+                {serviceOptions.map((service) => {
+                  const linked = values.worshipServiceId === service.id;
+                  return (
+                    <button
+                      key={service.id}
+                      type="button"
+                      aria-pressed={linked}
+                      onClick={() => {
+                        form.setValue('worshipServiceId', linked ? null : service.id, {
+                          shouldDirty: true,
+                        });
+                        if (!linked) {
+                          form.setValue('serviceLabel', service.title, { shouldDirty: true });
+                        }
+                      }}
+                      className={cn(
+                        'inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+                        linked
+                          ? 'border-primary/30 bg-accent text-accent-foreground'
+                          : 'border-input bg-card hover:bg-muted',
+                      )}
+                    >
+                      <Church className="size-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">
+                        {service.title} · {formatTime(service.startsAt)}
+                      </span>
+                    </button>
+                  );
+                })}
                 {SERVICE_SUGGESTIONS.map((label) => (
                   <button
                     key={label}
                     type="button"
-                    onClick={() => form.setValue('serviceLabel', label, { shouldDirty: true })}
+                    aria-pressed={!values.worshipServiceId && values.serviceLabel === label}
+                    onClick={() => {
+                      form.setValue('serviceLabel', label, { shouldDirty: true });
+                      form.setValue('worshipServiceId', null, { shouldDirty: true });
+                    }}
                     className={cn(
                       'h-9 rounded-full border px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
-                      values.serviceLabel === label
+                      !values.worshipServiceId && values.serviceLabel === label
                         ? 'border-primary/30 bg-accent text-accent-foreground'
                         : 'border-input bg-card hover:bg-muted',
                     )}
@@ -260,6 +324,9 @@ export function OfferingForm({
                   </button>
                 ))}
               </div>
+              {values.worshipServiceId ? (
+                <p className="-mt-2 text-xs text-muted-foreground">{t('finance.serviceLinked')}</p>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -387,6 +454,14 @@ export function OfferingForm({
                   shouldValidate: true,
                 })
               }
+              setDenominations={(denominations) =>
+                form.setValue(`lines.${index}.denominations`, denominations, {
+                  shouldDirty: true,
+                })
+              }
+              setAccount={(accountId) =>
+                form.setValue(`lines.${index}.accountId`, accountId, { shouldDirty: true })
+              }
               error={errors.lines?.[index]?.amount?.message}
             />
           ))}
@@ -394,11 +469,11 @@ export function OfferingForm({
             <Alert variant="error">{errors.lines.message ?? errors.lines.root?.message}</Alert>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" onClick={() => lines.append(emptyLine('cash'))}>
+            <Button type="button" variant="outline" onClick={() => addLine('cash')}>
               <Plus />
               {t('finance.addCash')}
             </Button>
-            <Button type="button" variant="outline" onClick={() => lines.append(emptyLine('qris'))}>
+            <Button type="button" variant="outline" onClick={() => addLine('qris')}>
               <Plus />
               {t('finance.addNonCash')}
             </Button>
@@ -421,10 +496,15 @@ export function OfferingForm({
                       <span className="block truncate font-medium">
                         {setup.funds.find((fund) => fund.id === line?.fundId)?.name ?? '—'}
                       </span>
-                      <MethodLabel
-                        method={(line?.method ?? 'cash') as PaymentMethod}
-                        className="text-xs text-muted-foreground"
-                      />
+                      <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <MethodLabel method={(line?.method ?? 'cash') as PaymentMethod} />
+                        {line?.method !== 'cash' && line?.accountId ? (
+                          <span className="truncate">
+                            ·{' '}
+                            {setup.accounts.find((account) => account.id === line.accountId)?.name}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                     <Money value={line?.amount ?? 0} />
                   </li>
@@ -519,6 +599,8 @@ function LineCard({
   canRemove,
   onRemove,
   setAmount,
+  setDenominations,
+  setAccount,
   error,
 }: {
   index: number;
@@ -528,11 +610,18 @@ function LineCard({
   canRemove: boolean;
   onRemove: () => void;
   setAmount: (amount: number) => void;
+  setDenominations: (denominations: Record<string, number>) => void;
+  setAccount: (accountId: string | null) => void;
   error?: string;
 }) {
   const { t, locale } = useI18n();
   const setup = useFinanceSetup();
   const line = useWatch({ control, name: `lines.${index}` });
+  const batchAccountId = useWatch({ control, name: 'accountId' });
+  const batchAccount = setup.accounts.find((account) => account.id === batchAccountId)?.name ?? '—';
+  const accountOptions = setup.activeAccounts.filter(
+    (account) => account.id !== batchAccountId || account.id === line?.accountId,
+  );
   const method = (line?.method ?? 'cash') as PaymentMethod;
   const [byNotes, setByNotes] = useState(
     isIdr && (Object.keys(line?.denominations ?? {}).length > 0 || (line?.amount ?? 0) === 0),
@@ -557,7 +646,7 @@ function LineCard({
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t('finance.fund')} htmlFor={`line-${index}-fund`}>
             <Select id={`line-${index}-fund`} {...register(`lines.${index}.fundId`)}>
-              {setup.activeFunds.map((fund) => (
+              {withCurrent(setup.activeFunds, setup.funds, line?.fundId).map((fund) => (
                 <option key={fund.id} value={fund.id}>
                   {fund.name}
                 </option>
@@ -575,11 +664,13 @@ function LineCard({
                   onChange={(event) => field.onChange(event.target.value || null)}
                 >
                   <option value="">{t('finance.noCategory')}</option>
-                  {setup.incomeCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
+                  {withCurrent(setup.incomeCategories, setup.categories, line?.categoryId).map(
+                    (category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ),
+                  )}
                 </Select>
               </Field>
             )}
@@ -594,7 +685,13 @@ function LineCard({
               value={(field.value ?? 'cash') as PaymentMethod}
               onChange={(value) => {
                 field.onChange(value);
-                if (value !== 'cash') setByNotes(false);
+                if (value !== 'cash') {
+                  // Notes and coins only describe cash; the amount stays as typed.
+                  setByNotes(false);
+                  setDenominations({});
+                } else {
+                  setAccount(null);
+                }
               }}
               options={PAYMENT_METHODS.map((value) => ({
                 value,
@@ -609,7 +706,11 @@ function LineCard({
             label={t('finance.countByNotes')}
             description={t('finance.countByNotesHint')}
             checked={byNotes}
-            onCheckedChange={(checked) => setByNotes(checked)}
+            onCheckedChange={(checked) => {
+              setByNotes(checked);
+              // Typing the total instead: the old note count no longer describes it.
+              if (!checked) setDenominations({});
+            }}
           />
         ) : null}
         {method === 'cash' && byNotes ? (
@@ -645,6 +746,32 @@ function LineCard({
             )}
           />
         )}
+        {method !== 'cash' ? (
+          <Controller
+            control={control}
+            name={`lines.${index}.accountId`}
+            render={({ field }) => (
+              <Field
+                label={t('finance.lineAccount')}
+                htmlFor={`line-${index}-account`}
+                description={t('finance.lineAccountHint')}
+              >
+                <Select
+                  id={`line-${index}-account`}
+                  value={field.value ?? ''}
+                  onChange={(event) => field.onChange(event.target.value || null)}
+                >
+                  <option value="">{t('finance.lineAccountSame', { name: batchAccount })}</option>
+                  {accountOptions.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          />
+        ) : null}
         {method === 'cash' && byNotes && error ? (
           <p role="alert" className="text-xs font-medium text-destructive">
             {error}

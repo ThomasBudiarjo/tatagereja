@@ -49,7 +49,7 @@ import { useMutationToast } from '@/lib/use-mutation-toast';
 import { useUrlState } from '@/lib/use-url-state';
 import { campaignQuery, campaigns, campaignsQuery, useDeletePledge, useSavePledge } from './api';
 import { FinanceNav, Meter, Money, PersonCombobox } from './components';
-import { todayIn, useFinanceSetup } from './helpers';
+import { todayIn, useFinanceSetup, withCurrent, useFinanceResolver } from './helpers';
 
 export function CampaignsPage() {
   const { t } = useI18n();
@@ -424,7 +424,7 @@ function CampaignDialog({
   const { churchId, church } = useChurch();
   const setup = useFinanceSetup();
   const form = useForm<CampaignForm, unknown, FinanceCampaignInput>({
-    resolver: zodResolver(financeCampaignInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeCampaignInputSchema)),
     values: {
       name: campaign?.name ?? '',
       description: campaign?.description ?? '',
@@ -495,7 +495,7 @@ function CampaignDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('finance.fund')} htmlFor="campaign-fund">
                 <Select id="campaign-fund" {...form.register('fundId')}>
-                  {setup.activeFunds.map((fund) => (
+                  {withCurrent(setup.activeFunds, setup.funds, campaign?.fundId).map((fund) => (
                     <option key={fund.id} value={fund.id}>
                       {fund.name}
                     </option>
@@ -565,7 +565,7 @@ function PledgeDialog({
   const { churchId } = useChurch();
   const [mode, setMode] = useState<'person' | 'name'>(pledge && !pledge.person ? 'name' : 'person');
   const form = useForm<PledgeForm, unknown, FinancePledgeInput>({
-    resolver: zodResolver(financePledgeInputSchema),
+    resolver: useFinanceResolver(zodResolver(financePledgeInputSchema)),
     values: {
       personId: pledge?.person?.id ?? null,
       donorName: pledge?.donorName ?? '',

@@ -83,8 +83,15 @@ export function PeriodsPage() {
         />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {query.data.items.map((period) => {
+          {query.data.items.map((period, _index, items) => {
             const key = periodKey(period.year, period.month);
+            // Books close in order: only the oldest finished month still open is the next step.
+            const next = items.find(
+              (item) =>
+                item.status !== 'closed' &&
+                item.entryCount > 0 &&
+                periodKey(item.year, item.month) < today.slice(0, 7),
+            );
             const future = key > today.slice(0, 7);
             return (
               <li
@@ -162,6 +169,7 @@ export function PeriodsPage() {
                   ) : (
                     <Button
                       size="sm"
+                      variant={next === period ? 'default' : 'outline'}
                       className="mt-auto"
                       disabled={period.pendingBatches > 0}
                       onClick={() => setClosing(period)}

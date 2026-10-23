@@ -1,7 +1,9 @@
 import {
   CONTRIBUTION_KIND_LABELS,
   PAYMENT_METHOD_LABELS,
+  canCorrectContribution,
   has,
+  hasAny,
   localize,
   type FinanceContribution,
 } from '@tatagereja/shared';
@@ -28,7 +30,7 @@ export function ContributionPage() {
   const { churchId, base, access } = useChurch();
   const { contributionId = '' } = useParams();
   const query = useQuery(contributionQuery(churchId, contributionId));
-  const crumbs = has(access, 'finance.view')
+  const crumbs = hasAny(access, ['finance.view', 'finance.record'])
     ? [
         { label: t('finance.nav'), to: `${base}/finance` },
         { label: t('finance.navGiving'), to: `${base}/finance/giving` },
@@ -99,7 +101,7 @@ function ReceiptView({
       : []),
     [t('finance.receivedAt'), formatDate(contribution.receivedAt, 'dateLong')],
   ];
-  const canEdit = has(access, 'finance.record') && !contribution.voidedAt;
+  const canEdit = canCorrectContribution(access, contribution);
   const canVoid = has(access, 'finance.manage') && !contribution.voidedAt;
 
   return (

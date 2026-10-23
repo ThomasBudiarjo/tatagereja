@@ -372,7 +372,10 @@ export function FinanceHomePage() {
                         size="sm"
                       />
                     )}
-                    title={(entry) => entry.description}
+                    title={(entry) => (
+                      // Descriptions carry the giver and receipt; two lines keep them readable.
+                      <span className="line-clamp-2 whitespace-normal">{entry.description}</span>
+                    )}
                     subtitle={(entry) =>
                       `${formatDate(entry.entryDate)} · ${entry.accountName} · ${localize(FINANCE_ENTRY_SOURCE_LABELS[entry.sourceType], locale)}`
                     }

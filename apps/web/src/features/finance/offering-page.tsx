@@ -193,6 +193,7 @@ function OfferingDetail({
                   <p className="truncate font-medium">{line.fundName}</p>
                   <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     <MethodLabel method={line.method} />
+                    {line.accountName ? <span>· {line.accountName}</span> : null}
                     {line.categoryName ? <span>· {line.categoryName}</span> : null}
                     {line.note ? <span>· {line.note}</span> : null}
                   </p>

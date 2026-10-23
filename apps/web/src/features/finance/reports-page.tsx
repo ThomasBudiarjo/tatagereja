@@ -332,7 +332,13 @@ function ReportTable({
         <tbody>
           {report.rows.map((row) => (
             <tr key={row.key} className="border-t border-border/60">
-              <th scope="row" className="h-12 px-4 text-left font-medium">
+              <th
+                scope="row"
+                className={cn(
+                  'h-12 px-4 text-left font-medium',
+                  /^\d{4}-\d{2}/.test(row.key) && 'whitespace-nowrap',
+                )}
+              >
                 {labelOf(row.key, row.label)}
               </th>
               {cashFlow ? (

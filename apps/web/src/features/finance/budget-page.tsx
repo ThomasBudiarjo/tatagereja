@@ -327,7 +327,17 @@ function BudgetSection({
               <span className="text-xs font-normal text-muted-foreground md:hidden">
                 {t('finance.variance')}
               </span>
-              <Money value={actual - budget} signed />
+              <Money
+                value={actual - budget}
+                signed
+                className={cn(
+                  'text-inherit',
+                  budget > 0 &&
+                    ((kind === 'expense' ? actual > budget : actual < budget)
+                      ? 'text-destructive'
+                      : 'text-success'),
+                )}
+              />
             </span>
           </li>
         </ul>

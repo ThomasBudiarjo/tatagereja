@@ -114,6 +114,8 @@ export function GivingStatementPage() {
     placeholderData: keepPreviousData,
   });
   const name = query.data ? fullName(query.data.statement.person) : t('finance.statement');
+  const denied =
+    query.isError && isApiClientError(query.error) && [403, 404].includes(query.error.status);
   return (
     <Page>
       <PageHeader
@@ -134,14 +136,16 @@ export function GivingStatementPage() {
             : undefined
         }
       />
-      <Toolbar>
-        <YearSelect year={state.year} onChange={(year) => setState({ year })} />
-        <PrintButton size="sm" />
-      </Toolbar>
+      {!denied ? (
+        <Toolbar>
+          <YearSelect year={state.year} onChange={(year) => setState({ year })} />
+          {query.data ? <PrintButton size="sm" /> : null}
+        </Toolbar>
+      ) : null}
       {query.isPending ? (
         <SkeletonText lines={8} />
       ) : query.isError ? (
-        isApiClientError(query.error) && [403, 404].includes(query.error.status) ? (
+        denied ? (
           <NoAccessState />
         ) : (
           <ErrorState
@@ -245,7 +249,7 @@ function StatementView({ statement, own = false }: { statement: GivingStatement;
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    <th className="py-2 text-left font-medium">{t('finance.date')}</th>
+                    <th className="py-2 pr-3 text-left font-medium">{t('finance.date')}</th>
                     <th className="py-2 text-left font-medium">{t('finance.kind')}</th>
                     <th className="hidden py-2 text-left font-medium sm:table-cell">
                       {t('finance.receiptNumber')}
@@ -255,8 +259,8 @@ function StatementView({ statement, own = false }: { statement: GivingStatement;
                 </thead>
                 <tbody>
                   {statement.items.map((item) => (
-                    <tr key={item.id} className="border-b border-border/50">
-                      <td className="py-2 whitespace-nowrap">
+                    <tr key={item.id} className="border-b border-border/50 align-top">
+                      <td className="py-2 pr-3 whitespace-nowrap">
                         {formatDate(item.receivedAt, 'dateShort')}
                       </td>
                       <td className="py-2">
@@ -264,9 +268,12 @@ function StatementView({ statement, own = false }: { statement: GivingStatement;
                         <span className="block text-xs text-muted-foreground">
                           {item.fundName} · {localize(PAYMENT_METHOD_LABELS[item.method], locale)}
                         </span>
-                        <span className="block font-mono text-[11px] text-muted-foreground sm:hidden">
+                        <Link
+                          to={`${base}/finance/giving/${item.id}`}
+                          className="block font-mono text-[11px] text-muted-foreground hover:underline sm:hidden print:no-underline"
+                        >
                           {item.receiptNumber}
-                        </span>
+                        </Link>
                       </td>
                       <td className="hidden py-2 font-mono text-xs sm:table-cell">
                         <Link
@@ -276,7 +283,7 @@ function StatementView({ statement, own = false }: { statement: GivingStatement;
                           {item.receiptNumber}
                         </Link>
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 pl-3 text-right">
                         <Money value={item.amount} />
                       </td>
                     </tr>

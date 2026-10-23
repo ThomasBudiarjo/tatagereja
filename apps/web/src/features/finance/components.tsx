@@ -138,7 +138,11 @@ const SECTIONS: {
     labelKey: 'finance.navOfferings',
     anyOf: ['finance.view', 'finance.record', 'finance.approve'],
   },
-  { to: 'finance/giving', labelKey: 'finance.navGiving', anyOf: ['finance.view'] },
+  {
+    to: 'finance/giving',
+    labelKey: 'finance.navGiving',
+    anyOf: ['finance.view', 'finance.record'],
+  },
   {
     to: 'finance/expenses',
     labelKey: 'finance.navExpenses',

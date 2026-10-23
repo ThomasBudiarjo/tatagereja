@@ -36,7 +36,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { campaignsQuery, contributionQuery, useSaveContribution } from './api';
 import { PersonCombobox } from './components';
-import { todayIn, useFinanceSetup } from './helpers';
+import { todayIn, useFinanceSetup, withCurrent, useFinanceResolver } from './helpers';
 
 type FormValues = z.input<typeof financeContributionInputSchema>;
 type DonorMode = 'person' | 'name' | 'anonymous';
@@ -121,9 +121,22 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
   const navigate = useNavigate();
   const setup = useFinanceSetup();
   const campaigns = useQuery({
-    ...campaignsQuery(churchId, 'active'),
+    ...campaignsQuery(churchId),
     enabled: hasAny(access, ['finance.view', 'finance.record', 'finance.reports']),
   });
+  const allCampaigns = campaigns.data?.items ?? [];
+  const campaignOptions = withCurrent(
+    allCampaigns.filter((campaign) => campaign.status === 'active'),
+    allCampaigns,
+    contribution?.campaignId,
+  );
+  const fundOptions = withCurrent(setup.activeFunds, setup.funds, contribution?.fundId);
+  const accountOptions = withCurrent(setup.activeAccounts, setup.accounts, contribution?.accountId);
+  const categoryOptions = withCurrent(
+    setup.incomeCategories,
+    setup.categories,
+    contribution?.categoryId,
+  );
   const [mode, setMode] = useState<DonorMode>(
     contribution
       ? contribution.person
@@ -155,7 +168,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
     note: '',
   });
   const form = useForm<FormValues, unknown, FinanceContributionInput>({
-    resolver: zodResolver(financeContributionInputSchema),
+    resolver: useFinanceResolver(zodResolver(financeContributionInputSchema)),
     defaultValues: contribution
       ? {
           personId: contribution.person?.id ?? null,
@@ -346,7 +359,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('finance.fund')} htmlFor="gift-fund" error={errors.fundId?.message}>
               <Select id="gift-fund" {...form.register('fundId')}>
-                {setup.activeFunds.map((fund) => (
+                {fundOptions.map((fund) => (
                   <option key={fund.id} value={fund.id}>
                     {fund.name}
                   </option>
@@ -359,7 +372,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
               error={errors.accountId?.message}
             >
               <Select id="gift-account" {...form.register('accountId')}>
-                {setup.activeAccounts.map((account) => (
+                {accountOptions.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name}
                   </option>
@@ -377,7 +390,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
                     onChange={(event) => field.onChange(event.target.value || null)}
                   >
                     <option value="">{t('finance.noCategory')}</option>
-                    {setup.incomeCategories.map((category) => (
+                    {categoryOptions.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
@@ -386,7 +399,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
                 </Field>
               )}
             />
-            {campaigns.data && campaigns.data.items.length > 0 ? (
+            {campaignOptions.length > 0 ? (
               <Controller
                 control={form.control}
                 name="campaignId"
@@ -398,7 +411,7 @@ function ContributionForm({ contribution }: { contribution?: FinanceContribution
                       onChange={(event) => field.onChange(event.target.value || null)}
                     >
                       <option value="">{t('finance.noCampaign')}</option>
-                      {campaigns.data.items.map((campaign) => (
+                      {campaignOptions.map((campaign) => (
                         <option key={campaign.id} value={campaign.id}>
                           {campaign.name}
                         </option>

@@ -29,7 +29,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { expenseQuery, useSaveExpense } from './api';
 import { PersonCombobox } from './components';
-import { useFinanceSetup } from './helpers';
+import { useFinanceSetup, withCurrent, useFinanceResolver } from './helpers';
 import { ToggleRow } from './setup-dialogs';
 
 type FormValues = z.input<typeof expenseRequestInputSchema>;
@@ -122,7 +122,7 @@ function ExpenseForm({ expense }: { expense?: ExpenseRequest }) {
   const setup = useFinanceSetup();
   const [saved, setSaved] = useState(false);
   const form = useForm<FormValues, unknown, ExpenseRequestInput>({
-    resolver: zodResolver(expenseRequestInputSchema),
+    resolver: useFinanceResolver(zodResolver(expenseRequestInputSchema)),
     defaultValues: {
       title: expense?.title ?? '',
       description: expense?.description ?? '',
@@ -218,11 +218,13 @@ function ExpenseForm({ expense }: { expense?: ExpenseRequest }) {
               required
             >
               <Select id="expense-category" {...form.register('categoryId')}>
-                {setup.expenseCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {withCurrent(setup.expenseCategories, setup.categories, expense?.categoryId).map(
+                  (category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ),
+                )}
               </Select>
             </Field>
             <Field
@@ -232,7 +234,7 @@ function ExpenseForm({ expense }: { expense?: ExpenseRequest }) {
               description={selectedFund?.isRestricted ? t('finance.restrictedWarning') : undefined}
             >
               <Select id="expense-fund" {...form.register('fundId')}>
-                {setup.activeFunds.map((fund) => (
+                {withCurrent(setup.activeFunds, setup.funds, expense?.fundId).map((fund) => (
                   <option key={fund.id} value={fund.id}>
                     {fund.name}
                   </option>
