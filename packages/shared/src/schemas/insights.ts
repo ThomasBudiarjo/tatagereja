@@ -3,19 +3,21 @@
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES, LIMITS } from '../constants';
 import type { LocalizedText } from '../localized';
-import type { ModuleId } from '../modules';
-import { hasAll, type AccessLike, type Permission } from '../permissions';
-import { attendanceSessionInputSchema } from './attendance';
-import { idSchema, isoDateSchema, isoDateTimeSchema } from './common';
+import { isModuleEnabled, type ModuleId } from '../modules';
+import { has, hasAll, isLeaderOfAny, type AccessLike, type Permission } from '../permissions';
+import { idSchema, isoDateSchema, isoDateTimeSchema, optionalText } from './common';
 import { personSummarySchema } from './person';
 
 export const INSIGHTS_LIMITS = {
-  headcountMax: 100_000,
   absentStreakMin: 2,
   absentStreakMax: 26,
   absentStreakDefault: 3,
   /** Longest report range, about three years. */
   reportRangeDaysMax: 1100,
+  /** Sessions shown in a personal history. */
+  historyMax: 100,
+  /** Absence alerts returned at once, longest streaks first. */
+  absenceListMax: 200,
 } as const;
 
 // ---------------------------------------------------------------------------------------------
@@ -60,73 +62,83 @@ export const HOME_WIDGET_MODULES: Record<HomeWidget, ModuleId | null> = {
   attendance_summary: null,
 };
 
+/** Widgets the caller may see in this church: module switched on and permission held. */
+export const availableHomeWidgets = (
+  access: Pick<AccessLike, 'permissions'>,
+  enabledModules: readonly string[],
+): HomeWidget[] =>
+  HOME_WIDGETS.filter((widget) => {
+    const module = HOME_WIDGET_MODULES[widget];
+    if (module && !isModuleEnabled(enabledModules, module)) return false;
+    if (widget === 'upcoming_events') return has(access, 'events.view');
+    if (widget === 'announcements') return has(access, 'announcements.view');
+    if (widget === 'birthdays') return has(access, 'people.view');
+    return true;
+  });
+
+/**
+ * The caller's widgets in display order: their saved order first, then the rest in the default
+ * order, without hidden ones.
+ */
+export const orderHomeWidgets = (
+  available: readonly HomeWidget[],
+  preferences: { hiddenWidgets: readonly HomeWidget[]; widgetOrder: readonly HomeWidget[] },
+): HomeWidget[] => {
+  const ordered = [
+    ...preferences.widgetOrder.filter((widget) => available.includes(widget)),
+    ...available.filter((widget) => !preferences.widgetOrder.includes(widget)),
+  ];
+  return [...new Set(ordered)].filter((widget) => !preferences.hiddenWidgets.includes(widget));
+};
+
 export const dashboardPreferencesSchema = z.object({
   hiddenWidgets: z.array(z.enum(HOME_WIDGETS)),
   widgetOrder: z.array(z.enum(HOME_WIDGETS)),
 });
 export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
 
+const uniqueWidgets = (items: readonly string[]) => new Set(items).size === items.length;
+
 export const dashboardPreferencesInputSchema = z.object({
-  hiddenWidgets: z.array(z.enum(HOME_WIDGETS)).max(HOME_WIDGETS.length).default([]),
-  widgetOrder: z.array(z.enum(HOME_WIDGETS)).max(HOME_WIDGETS.length).default([]),
+  hiddenWidgets: z
+    .array(z.enum(HOME_WIDGETS))
+    .max(HOME_WIDGETS.length)
+    .default([])
+    .refine(uniqueWidgets, { message: 'List each widget once' }),
+  widgetOrder: z
+    .array(z.enum(HOME_WIDGETS))
+    .max(HOME_WIDGETS.length)
+    .default([])
+    .refine(uniqueWidgets, { message: 'List each widget once' }),
 });
 export type DashboardPreferencesInput = z.infer<typeof dashboardPreferencesInputSchema>;
 
-export const celebrationSchema = z.object({
-  kind: z.enum(['birthday', 'anniversary']),
-  person: personSummarySchema,
-  date: isoDateSchema,
-  /** Age reached or years married, when known. */
-  years: z.number().int().nullable(),
-  daysAway: z.number().int().nonnegative(),
+export const dashboardPreferencesResponseSchema = z.object({
+  preferences: dashboardPreferencesSchema,
 });
-export type Celebration = z.infer<typeof celebrationSchema>;
+
 
 // ---------------------------------------------------------------------------------------------
 // Attendance upgrade
 // ---------------------------------------------------------------------------------------------
 
-export const ATTENDANCE_MODES = ['roster', 'headcount'] as const;
-export type AttendanceMode = (typeof ATTENDANCE_MODES)[number];
-
-export const ATTENDANCE_MODE_LABELS: Record<AttendanceMode, LocalizedText> = {
-  roster: { en: 'Name by name', id: 'Per nama' },
-  headcount: { en: 'Headcount only', id: 'Hitung jumlah saja' },
-};
-
-const headcountValue = z.number().int().min(0).max(INSIGHTS_LIMITS.headcountMax);
-
-export const headcountSchema = z.object({
-  men: headcountValue.default(0),
-  women: headcountValue.default(0),
-  children: headcountValue.default(0),
-  visitors: headcountValue.default(0),
-});
-export type Headcount = z.infer<typeof headcountSchema>;
-
-export const headcountTotal = (headcount: Headcount): number =>
-  headcount.men + headcount.women + headcount.children + headcount.visitors;
-
-export const attendanceSessionDetailsInputSchema = attendanceSessionInputSchema
-  .extend({
-    mode: z.enum(ATTENDANCE_MODES).default('roster'),
-    headcount: headcountSchema.nullable().default(null),
-  })
-  .refine((value) => value.mode !== 'headcount' || value.headcount !== null, {
-    message: 'Enter the counts',
-    path: ['headcount'],
-  });
-export type AttendanceSessionDetailsInput = z.infer<typeof attendanceSessionDetailsInputSchema>;
-
-/** Marks everyone (or the listed people) with one status; existing marks are overwritten. */
+/** Marks everyone on the roster (or the listed people) with one status. */
 export const bulkMarkAttendanceBodySchema = z.object({
   status: z.enum(ATTENDANCE_STATUSES),
-  personIds: z.array(idSchema).max(LIMITS.bulkIdsMax).optional(),
+  personIds: z.array(idSchema).min(1).max(LIMITS.bulkIdsMax).optional(),
+  /** Leaves people who already have a mark alone. */
+  onlyUnmarked: z.boolean().default(false),
 });
 export type BulkMarkAttendanceBody = z.infer<typeof bulkMarkAttendanceBodySchema>;
 
 export const ABSENCE_ALERT_STATUSES = ['open', 'dismissed', 'followed_up'] as const;
 export type AbsenceAlertStatus = (typeof ABSENCE_ALERT_STATUSES)[number];
+
+export const ABSENCE_ALERT_STATUS_LABELS: Record<AbsenceAlertStatus, LocalizedText> = {
+  open: { en: 'Needs attention', id: 'Perlu perhatian' },
+  dismissed: { en: 'Dismissed', id: 'Diabaikan' },
+  followed_up: { en: 'Follow-up created', id: 'Sudah ditindaklanjuti' },
+};
 
 export const absenceQuerySchema = z.object({
   threshold: z.coerce
@@ -136,39 +148,137 @@ export const absenceQuerySchema = z.object({
     .max(INSIGHTS_LIMITS.absentStreakMax)
     .default(INSIGHTS_LIMITS.absentStreakDefault),
   groupId: idSchema.optional(),
-  includeDismissed: z
+  includeResolved: z
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  q: z.string().trim().max(LIMITS.shortTextMax).optional(),
 });
 export type AbsenceQuery = z.infer<typeof absenceQuerySchema>;
 
 export const absenceAlertSchema = z.object({
   person: personSummarySchema,
+  /** Consecutive sessions marked absent, most recent first (excused marks are skipped). */
   streak: z.number().int().min(1),
   lastPresentAt: isoDateTimeSchema.nullable(),
+  lastAbsentAt: isoDateTimeSchema,
   status: z.enum(ABSENCE_ALERT_STATUSES),
   careTaskId: idSchema.nullable(),
+  resolvedAt: isoDateTimeSchema.nullable(),
 });
 export type AbsenceAlert = z.infer<typeof absenceAlertSchema>;
 
-export const absenceAlertListSchema = z.object({ items: z.array(absenceAlertSchema) });
-
-export const resolveAbsenceAlertBodySchema = z.object({
-  action: z.enum(['dismiss', 'follow_up']),
-  /** For `follow_up`: who gets the care task, and when it is due. */
-  assignedUserId: idSchema.nullable().default(null),
-  dueDate: isoDateSchema.nullable().default(null),
+export const absenceAlertListSchema = z.object({
+  items: z.array(absenceAlertSchema),
+  threshold: z.number().int(),
+  /** Whether the caller can turn an alert into a care follow-up (care on, `care.manage`). */
+  canFollowUp: z.boolean(),
 });
+export type AbsenceAlertList = z.infer<typeof absenceAlertListSchema>;
+
+export const resolveAbsenceAlertBodySchema = z
+  .object({
+    action: z.enum(['dismiss', 'follow_up', 'reopen']),
+    /** For `follow_up`: who gets the care task (default: the caller), when it is due, a note. */
+    assignedUserId: idSchema.nullable().default(null),
+    dueDate: isoDateSchema.nullable().default(null),
+    note: optionalText(LIMITS.longTextMax),
+  })
+  .refine(
+    (value) =>
+      value.action === 'follow_up' ||
+      (value.assignedUserId === null && value.dueDate === null && value.note === null),
+    { message: 'Only follow-ups take an assignee, due date or note', path: ['action'] },
+  );
 export type ResolveAbsenceAlertBody = z.infer<typeof resolveAbsenceAlertBodySchema>;
+
+export const absenceAlertResponseSchema = z.object({ alert: absenceAlertSchema });
+
+/** Who may see and resolve absence alerts: `attendance.view`, or leaders for their groups. */
+export const canViewAbsences = (access: AccessLike, groupId?: string | null): boolean =>
+  has(access, 'attendance.view') ||
+  (groupId ? access.leaderGroupIds.includes(groupId) : access.leaderGroupIds.length > 0);
+
+/** Turning an alert into a care task needs the care module's manage permission. */
+export const canFollowUpAbsence = (
+  access: Pick<AccessLike, 'permissions'>,
+  enabledModules: readonly string[],
+): boolean => isModuleEnabled(enabledModules, 'care') && has(access, 'care.manage');
+
+/** Leaders see alerts of people in the groups they lead. */
+export const canSeeAbsenceOf = (access: AccessLike, personGroupIds: readonly string[]) =>
+  has(access, 'attendance.view') || isLeaderOfAny(access, personGroupIds);
 
 export const attendanceStreakSchema = z.object({
   currentPresentStreak: z.number().int().nonnegative(),
   longestPresentStreak: z.number().int().nonnegative(),
   currentAbsentStreak: z.number().int().nonnegative(),
+  /** Present ÷ (present + absent); excused marks do not count. 0 without marks. */
   presentRate: z.number().min(0).max(1),
 });
 export type AttendanceStreak = z.infer<typeof attendanceStreakSchema>;
+
+type Mark = { status: (typeof ATTENDANCE_STATUSES)[number] };
+
+/**
+ * Streaks of a person's marks, newest first. Excused marks neither break nor extend a streak.
+ * Shared so the history screen and the API agree.
+ */
+export const attendanceStreakOf = (marksNewestFirst: readonly Mark[]): AttendanceStreak => {
+  const counted = marksNewestFirst.filter((mark) => mark.status !== 'excused');
+  let currentPresentStreak = 0;
+  let currentAbsentStreak = 0;
+  const first = counted[0]?.status;
+  for (const mark of counted) {
+    if (mark.status !== first) break;
+    if (first === 'present') currentPresentStreak += 1;
+    else currentAbsentStreak += 1;
+  }
+  let longestPresentStreak = 0;
+  let run = 0;
+  for (const mark of counted) {
+    run = mark.status === 'present' ? run + 1 : 0;
+    longestPresentStreak = Math.max(longestPresentStreak, run);
+  }
+  const present = counted.filter((mark) => mark.status === 'present').length;
+  return {
+    currentPresentStreak,
+    longestPresentStreak,
+    currentAbsentStreak,
+    presentRate: counted.length === 0 ? 0 : present / counted.length,
+  };
+};
+
+export const attendanceHistoryItemSchema = z.object({
+  sessionId: idSchema,
+  title: z.string(),
+  sessionAt: isoDateTimeSchema,
+  groupId: idSchema.nullable(),
+  groupName: z.string().nullable(),
+  status: z.enum(ATTENDANCE_STATUSES),
+  note: z.string().nullable(),
+});
+export type AttendanceHistoryItem = z.infer<typeof attendanceHistoryItemSchema>;
+
+export const attendanceHistorySchema = z.object({
+  person: personSummarySchema,
+  streak: attendanceStreakSchema,
+  counts: z.object({
+    present: z.number().int().nonnegative(),
+    absent: z.number().int().nonnegative(),
+    excused: z.number().int().nonnegative(),
+  }),
+  /** The last twelve months (`YYYY-MM`), oldest first. */
+  months: z.array(
+    z.object({
+      month: z.string(),
+      present: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    }),
+  ),
+  items: z.array(attendanceHistoryItemSchema),
+});
+export type AttendanceHistory = z.infer<typeof attendanceHistorySchema>;
 
 // ---------------------------------------------------------------------------------------------
 // Reports
@@ -220,8 +330,58 @@ export const REPORT_MODULES: Record<ReportKind, ModuleId | null> = {
 export const canViewReport = (access: Pick<AccessLike, 'permissions'>, kind: ReportKind) =>
   hasAll(access, REPORT_PERMISSIONS[kind]);
 
+/** Reports the caller may open in this church, in display order. */
+export const availableReports = (
+  access: Pick<AccessLike, 'permissions'>,
+  enabledModules: readonly string[],
+): ReportKind[] =>
+  REPORT_KINDS.filter((kind) => {
+    const module = REPORT_MODULES[kind];
+    return canViewReport(access, kind) && (!module || isModuleEnabled(enabledModules, module));
+  });
+
 export const REPORT_INTERVALS = ['week', 'month', 'quarter', 'year'] as const;
 export type ReportInterval = (typeof REPORT_INTERVALS)[number];
+
+export const REPORT_INTERVAL_LABELS: Record<ReportInterval, LocalizedText> = {
+  week: { en: 'Weekly', id: 'Mingguan' },
+  month: { en: 'Monthly', id: 'Bulanan' },
+  quarter: { en: 'Quarterly', id: 'Triwulan' },
+  year: { en: 'Yearly', id: 'Tahunan' },
+};
+
+/** The first day of the period `date` falls in; weeks start on Monday. */
+export const periodStartOf = (date: string, interval: ReportInterval): string => {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  if (interval === 'year') return `${date.slice(0, 4)}-01-01`;
+  if (interval === 'quarter') {
+    const first = Math.floor((month - 1) / 3) * 3 + 1;
+    return `${date.slice(0, 4)}-${String(first).padStart(2, '0')}-01`;
+  }
+  if (interval === 'month') return `${date.slice(0, 7)}-01`;
+  const day = new Date(Date.UTC(year, month - 1, Number(date.slice(8, 10))));
+  const offset = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - offset);
+  return day.toISOString().slice(0, 10);
+};
+
+/** Period starts from the one containing `from` to the one containing `to`, inclusive. */
+export const reportPeriods = (from: string, to: string, interval: ReportInterval): string[] => {
+  const periods: string[] = [];
+  let cursor = periodStartOf(from, interval);
+  const last = periodStartOf(to, interval);
+  while (cursor <= last && periods.length < 2000) {
+    periods.push(cursor);
+    const date = new Date(`${cursor}T00:00:00Z`);
+    if (interval === 'week') date.setUTCDate(date.getUTCDate() + 7);
+    else if (interval === 'month') date.setUTCMonth(date.getUTCMonth() + 1);
+    else if (interval === 'quarter') date.setUTCMonth(date.getUTCMonth() + 3);
+    else date.setUTCFullYear(date.getUTCFullYear() + 1);
+    cursor = date.toISOString().slice(0, 10);
+  }
+  return periods;
+};
 
 export const AGE_BANDS = ['0-12', '13-17', '18-25', '26-40', '41-60', '61+', 'unknown'] as const;
 export type AgeBand = (typeof AGE_BANDS)[number];
@@ -266,6 +426,11 @@ export const reportQuerySchema = z
   );
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
+export const reportParamsSchema = z.object({
+  churchId: idSchema,
+  kind: z.enum(REPORT_KINDS),
+});
+
 export const reportPointSchema = z.object({
   /** Period start (YYYY-MM-DD) for trends, or the category key for breakdowns. */
   x: z.string(),
@@ -279,13 +444,29 @@ export const reportSeriesSchema = z.object({
 });
 export type ReportSeries = z.infer<typeof reportSeriesSchema>;
 
+/** A categorical split (by status, age band, team, fund). Keys are stable; labels for display. */
+export const reportBreakdownSchema = z.object({
+  key: z.string(),
+  items: z.array(z.object({ key: z.string(), label: z.string(), value: z.number() })),
+});
+export type ReportBreakdown = z.infer<typeof reportBreakdownSchema>;
+
 export const reportSchema = z.object({
   kind: z.enum(REPORT_KINDS),
   from: isoDateSchema,
   to: isoDateSchema,
   interval: z.enum(REPORT_INTERVALS),
+  /** `money` values are integer minor units of the church currency. */
+  unit: z.enum(['count', 'money']),
   series: z.array(reportSeriesSchema),
+  breakdowns: z.array(reportBreakdownSchema),
   /** Headline numbers ("total", "change", ...). */
   totals: z.record(z.string(), z.number()),
 });
 export type Report = z.infer<typeof reportSchema>;
+
+/** `GET /attendance/me`: null without a linked person record in the church. */
+export const myAttendanceHistorySchema = z.object({ history: attendanceHistorySchema.nullable() });
+export type MyAttendanceHistory = z.infer<typeof myAttendanceHistorySchema>;
+
+export const personAttendanceParamsSchema = z.object({ churchId: idSchema, personId: idSchema });
