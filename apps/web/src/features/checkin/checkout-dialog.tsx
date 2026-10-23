@@ -191,7 +191,9 @@ function CheckoutForm({ detail, onDone }: { detail: CheckinDetail; onDone: () =>
   });
 
   const pickedUp = checkin.status === 'checked_out';
-  const codeError = codeForm.formState.errors.securityCode?.message;
+  const codeIssue = codeForm.formState.errors.securityCode;
+  // The server says the code does not match in English; say it in the interface language.
+  const codeError = codeIssue?.type === 'server' ? t('checkin.codeMismatch') : codeIssue?.message;
   const reasonError = overrideForm.formState.errors.reason?.message;
 
   return (

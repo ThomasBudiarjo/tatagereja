@@ -260,7 +260,9 @@ export function ClassStatTile({ stat, to }: { stat: SessionClassStat; to: string
     >
       <div className="flex items-center gap-2">
         <ClassDot color={stat.color} />
-        <span className="min-w-0 flex-1 truncate font-semibold tracking-tight">{stat.name}</span>
+        <span className="line-clamp-2 min-w-0 flex-1 leading-tight font-semibold tracking-tight">
+          {stat.name}
+        </span>
         <ChevronRight
           className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
           aria-hidden
@@ -434,42 +436,46 @@ export function CheckinListRow({
       <div className="flex items-center gap-3">
         <ChildAvatar child={checkin.child} alerts={checkin.alerts} />
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-2">
-            <span className={cn('truncate font-medium', !inClass && 'text-muted-foreground')}>
-              {fullName(checkin.child)}
-            </span>
+          <p className={cn('truncate font-medium', !inClass && 'text-muted-foreground')}>
+            {fullName(checkin.child)}
+          </p>
+          <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {checkin.securityCode ? (
-              <span className="shrink-0 rounded-md bg-muted px-1.5 font-mono text-xs font-semibold tracking-widest">
+              <span className="shrink-0 rounded bg-muted px-1.5 font-mono font-semibold tracking-widest text-foreground">
                 {checkin.securityCode}
               </span>
             ) : null}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {[
-              showClass ? checkin.className : null,
-              inClass
-                ? t('checkin.inSince', { time: formatTime(checkin.checkedInAt) })
-                : t('checkin.outAt', {
-                    time: formatTime(checkin.checkedOutAt),
-                    name: checkin.pickupName ?? '—',
-                  }),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            <span className="truncate">
+              {[
+                showClass ? checkin.className : null,
+                inClass
+                  ? t('checkin.inSince', { time: formatTime(checkin.checkedInAt) })
+                  : t('checkin.outAt', {
+                      time: formatTime(checkin.checkedOutAt),
+                      name: checkin.pickupName ?? '—',
+                    }),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
           </p>
           {!alertsInFull ? <AlertBadges alerts={checkin.alerts} className="mt-1" /> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {inClass && onCheckOut ? (
-            <Button size="sm" variant="outline" onClick={onCheckOut}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onCheckOut}
+              aria-label={t('checkin.checkOutChild', { name: fullName(checkin.child) })}
+            >
               <LogOut />
               <span className="hidden sm:inline">{t('checkin.checkOut')}</span>
-              <span className="sr-only sm:hidden">
-                {t('checkin.checkOutChild', { name: fullName(checkin.child) })}
-              </span>
             </Button>
           ) : !inClass ? (
-            <CheckinStatusBadge status={checkin.status} />
+            <span className="hidden sm:inline-flex">
+              <CheckinStatusBadge status={checkin.status} />
+            </span>
           ) : null}
           {actions}
         </div>

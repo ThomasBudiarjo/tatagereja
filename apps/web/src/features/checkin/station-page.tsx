@@ -264,7 +264,7 @@ function CheckInPanel({
             autoComplete="off"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={t('checkin.stationSearch')}
+            placeholder={t('checkin.stationSearchShort')}
             aria-label={t('checkin.stationSearch')}
             className="h-14 rounded-xl pl-12 text-lg md:text-lg"
           />
@@ -470,7 +470,7 @@ function FamilyCheckIn({
   };
 
   return (
-    <div className="flex flex-col gap-4 pb-24 sm:pb-0">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -599,10 +599,10 @@ function FamilyCheckIn({
 
       {available.length === 0 ? <Alert variant="success" title={t('checkin.allInClass')} /> : null}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/70 bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-border/70 bg-background/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
         <Button
           size="lg"
-          className="h-14 w-full text-lg sm:w-auto sm:min-w-72"
+          className="h-14 w-full text-lg md:w-auto md:min-w-72"
           disabled={selected.length === 0 || missingClass}
           loading={checkIn.isPending}
           onClick={() => void submit()}

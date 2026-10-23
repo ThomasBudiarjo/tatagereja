@@ -186,7 +186,8 @@ function ChildDetail({
           canEdit ? (
             <Button size="sm" variant="outline" onClick={() => setAlertDialog('new')}>
               <Plus />
-              {t('checkin.addAlert')}
+              <span className="hidden sm:inline">{t('checkin.addAlert')}</span>
+              <span className="sr-only sm:hidden">{t('checkin.addAlert')}</span>
             </Button>
           ) : null
         }
@@ -226,7 +227,8 @@ function ChildDetail({
           canEdit ? (
             <Button size="sm" variant="outline" onClick={() => setPickupDialog('new')}>
               <Plus />
-              {t('checkin.addPickup')}
+              <span className="hidden sm:inline">{t('checkin.addPickup')}</span>
+              <span className="sr-only sm:hidden">{t('checkin.addPickup')}</span>
             </Button>
           ) : null
         }
