@@ -7,16 +7,30 @@ import {
   type DashboardPreferencesInput,
 } from '@tatagereja/shared';
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { z } from 'zod';
-import { request } from '@/lib/api';
+import { getErrorMessage, request } from '@/lib/api';
 import { churchScope, keys } from '@/lib/keys';
 import { optimistic } from '@/lib/use-mutation-toast';
 
 /*
  * The personalised home. One query feeds every widget; the actions taken from the home screen
  * (marking a notification read, ticking a task off, saving the layout) update it at once and
- * refresh the module that owns the data.
+ * refresh the module that owns the data. They are quick taps, often several in a row, so each
+ * one runs (none is dropped while another is pending), a failure is undone and reported here,
+ * and the refresh waits for the last write so it never overwrites one still in flight.
  */
+
+const homeWriteKey = (churchId: string) => [...keys.dashboard(churchId), 'write'] as const;
+
+/** Refreshes after the last pending home write has settled. */
+const refreshWhenIdle = (client: QueryClient, churchId: string, refresh: () => Promise<unknown>) =>
+  client.isMutating({ mutationKey: homeWriteKey(churchId) }) > 1 ? undefined : refresh();
+
+const rollBack = (error: unknown, rollback: (() => void) | undefined) => {
+  rollback?.();
+  toast.error(getErrorMessage(error));
+};
 
 export const dashboardQuery = (churchId: string) =>
   queryOptions({
@@ -33,6 +47,7 @@ export function useSaveDashboardPreferences(churchId: string) {
   const client = useQueryClient();
   const key = keys.dashboard(churchId);
   return useMutation({
+    mutationKey: homeWriteKey(churchId),
     mutationFn: (body: DashboardPreferencesInput) =>
       request(dashboardPreferencesResponseSchema, {
         method: 'PUT',
@@ -49,8 +64,9 @@ export function useSaveDashboardPreferences(churchId: string) {
             }
           : old,
       ),
-    onError: (_error, _body, rollback) => rollback?.(),
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
+    onError: (error, _body, rollback) => rollBack(error, rollback),
+    onSettled: () =>
+      refreshWhenIdle(client, churchId, () => client.invalidateQueries({ queryKey: key })),
   });
 }
 
@@ -59,6 +75,7 @@ export function useMarkNotificationRead(churchId: string) {
   const client = useQueryClient();
   const key = keys.dashboard(churchId);
   return useMutation({
+    mutationKey: homeWriteKey(churchId),
     mutationFn: ({ id }: { id: string | null }) =>
       id
         ? request(z.unknown(), {
@@ -80,9 +97,11 @@ export function useMarkNotificationRead(churchId: string) {
           },
         };
       }),
-    onError: (_error, _body, rollback) => rollback?.(),
+    onError: (error, _body, rollback) => rollBack(error, rollback),
     onSettled: () =>
-      Promise.all([client.invalidateQueries({ queryKey: key }), refreshNotifications(client)]),
+      refreshWhenIdle(client, churchId, () =>
+        Promise.all([client.invalidateQueries({ queryKey: key }), refreshNotifications(client)]),
+      ),
   });
 }
 
@@ -91,6 +110,7 @@ export function useCompleteMyTask(churchId: string) {
   const client = useQueryClient();
   const key = keys.dashboard(churchId);
   return useMutation({
+    mutationKey: homeWriteKey(churchId),
     mutationFn: ({ id }: { id: string }) =>
       request(z.unknown(), {
         method: 'PATCH',
@@ -110,11 +130,13 @@ export function useCompleteMyTask(churchId: string) {
           },
         };
       }),
-    onError: (_error, _body, rollback) => rollback?.(),
+    onError: (error, _body, rollback) => rollBack(error, rollback),
     onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: key }),
-        client.invalidateQueries({ queryKey: [...churchScope(churchId), 'care'] }),
-      ]),
+      refreshWhenIdle(client, churchId, () =>
+        Promise.all([
+          client.invalidateQueries({ queryKey: key }),
+          client.invalidateQueries({ queryKey: [...churchScope(churchId), 'care'] }),
+        ]),
+      ),
   });
 }

@@ -39,7 +39,7 @@ import {
 import * as React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
@@ -64,11 +64,11 @@ import { Input, Textarea } from '@/components/ui/input';
 import { Alert, SearchInput } from '@/components/ui/misc';
 import { Skeleton, SkeletonList, SkeletonStats } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
-import { ErrorState } from '@/components/ui/states';
+import { ErrorState, NoAccessState } from '@/components/ui/states';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { PersonPickerDialog } from '@/features/people/person-picker';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { isGone, useMutationToast } from '@/lib/use-mutation-toast';
 import { useUrlState } from '@/lib/use-url-state';
@@ -115,15 +115,29 @@ export function AttendanceSessionPage() {
     );
   }
   if (query.isError) {
+    // A session of another group (403) or one deleted meanwhile (404) is not worth a retry.
+    const status = isApiClientError(query.error) ? query.error.status : 0;
     return (
       <Page size="wide">
         <PageHeader title={t('attendance.title')} breadcrumbs={crumbs} />
-        <ErrorState
-          error={query.error}
-          message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
-          retrying={query.isFetching}
-        />
+        {status === 403 || status === 404 ? (
+          <NoAccessState
+            title={status === 404 ? t('attendance.sessionGoneTitle') : undefined}
+            description={status === 404 ? t('attendance.sessionGoneBody') : undefined}
+            action={
+              <Button asChild>
+                <Link to={`${base}/attendance`}>{t('attendance.backToSessions')}</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <ErrorState
+            error={query.error}
+            message={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        )}
       </Page>
     );
   }

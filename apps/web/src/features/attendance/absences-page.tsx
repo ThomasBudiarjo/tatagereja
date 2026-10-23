@@ -155,7 +155,7 @@ export function AbsencesPage() {
               onFollowUp={() => setFollowing(alert)}
               onDismiss={() => setDismissing(alert)}
               onReopen={() => void reopen.run({ personId: alert.person.id, action: 'reopen' })}
-              reopening={reopen.isPending}
+              reopening={reopen.isPending && resolve.variables?.personId === alert.person.id}
             />
           ))}
         </ul>
@@ -204,6 +204,13 @@ function AlertCard({
   const name = fullName(alert.person);
   const open = alert.status === 'open';
   const severe = alert.streak >= 6;
+  const streak = (
+    <StatusBadge tone={severe ? 'danger' : 'warning'} icon={CalendarClock}>
+      {t('attendance.streak', { count: alert.streak })}
+    </StatusBadge>
+  );
+  // Phones give each action half a row (the follow-up a whole one) so long names keep room.
+  const action = 'max-sm:min-w-[40%] max-sm:flex-1';
   return (
     <li className="flex min-w-0 animate-rise-in flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-soft">
       <div className="flex items-start gap-3">
@@ -215,17 +222,16 @@ function AlertCard({
           >
             {name}
           </Link>
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {alert.lastPresentAt
               ? t('attendance.lastPresent', { date: formatDate(alert.lastPresentAt, 'dateShort') })
               : t('attendance.neverPresent')}
           </p>
         </div>
-        <StatusBadge tone={severe ? 'danger' : 'warning'} icon={CalendarClock}>
-          {t('attendance.streak', { count: alert.streak })}
-        </StatusBadge>
+        <div className="hidden shrink-0 sm:block">{streak}</div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <div className="sm:hidden">{streak}</div>
         {!open ? (
           <StatusBadge tone={alert.status === 'followed_up' ? 'success' : 'neutral'} dot>
             {localize(ABSENCE_ALERT_STATUS_LABELS[alert.status], locale)}
@@ -234,43 +240,49 @@ function AlertCard({
         <span className="text-xs text-muted-foreground">
           {t('attendance.lastAbsent', { date: formatDate(alert.lastAbsentAt, 'dateShort') })}
         </span>
-        <div className="flex w-full flex-wrap justify-end gap-2 sm:ml-auto sm:w-auto">
-          <Button asChild variant="ghost" size="sm">
-            <Link to={`${base}/attendance/people/${alert.person.id}`}>
-              <History />
-              {t('attendance.viewHistory')}
-            </Link>
-          </Button>
-          {open ? (
-            <>
-              <Button variant="outline" size="sm" onClick={onDismiss}>
-                <XCircle />
-                {t('attendance.dismiss')}
+      </div>
+      <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3 sm:justify-end">
+        <Button asChild variant="ghost" size="sm" className={action}>
+          <Link to={`${base}/attendance/people/${alert.person.id}`}>
+            <History />
+            {t('attendance.viewHistory')}
+          </Link>
+        </Button>
+        {open ? (
+          <>
+            <Button variant="outline" size="sm" className={action} onClick={onDismiss}>
+              <XCircle />
+              {t('attendance.dismiss')}
+            </Button>
+            {canFollowUp ? (
+              <Button size="sm" className={action} onClick={onFollowUp}>
+                <HandHeart />
+                {t('attendance.followUp')}
               </Button>
-              {canFollowUp ? (
-                <Button size="sm" onClick={onFollowUp}>
-                  <HandHeart />
-                  {t('attendance.followUp')}
-                </Button>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {alert.careTaskId ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link to={`${base}/care/tasks`}>
-                    <ClipboardList />
-                    {t('attendance.viewTask')}
-                  </Link>
-                </Button>
-              ) : null}
-              <Button variant="outline" size="sm" onClick={onReopen} disabled={reopening}>
-                <RotateCcw />
-                {t('attendance.reopen')}
+            ) : null}
+          </>
+        ) : (
+          <>
+            {alert.careTaskId ? (
+              <Button asChild variant="outline" size="sm" className={action}>
+                <Link to={`${base}/care/tasks`}>
+                  <ClipboardList />
+                  {t('attendance.viewTask')}
+                </Link>
               </Button>
-            </>
-          )}
-        </div>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              className={action}
+              onClick={onReopen}
+              loading={reopening}
+            >
+              {!reopening ? <RotateCcw /> : null}
+              {t('attendance.reopen')}
+            </Button>
+          </>
+        )}
       </div>
     </li>
   );

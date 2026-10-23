@@ -1,18 +1,19 @@
 import { fullName, type AttendanceHistory } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarCheck2, ClipboardList, Flame, Link2Off, Percent, Trophy } from 'lucide-react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader, Section } from '@/components/layout/page';
 import { EntityAvatar } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BarChart } from '@/components/ui/charts';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ListGroup, ListRow } from '@/components/ui/list';
 import { SkeletonList, SkeletonStats } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
-import { ErrorState } from '@/components/ui/states';
-import { getErrorMessage } from '@/lib/api';
+import { ErrorState, NoAccessState } from '@/components/ui/states';
+import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { myAttendanceQuery, personAttendanceQuery } from './api';
 import { ATTENDANCE_TONE, seesSessions } from './attendance-lib';
@@ -93,12 +94,23 @@ export function PersonAttendancePage() {
       {query.isPending ? (
         <HistorySkeleton />
       ) : query.isError ? (
-        <ErrorState
-          error={query.error}
-          message={getErrorMessage(query.error)}
-          onRetry={() => void query.refetch()}
-          retrying={query.isFetching}
-        />
+        isApiClientError(query.error) && [403, 404].includes(query.error.status) ? (
+          <NoAccessState
+            description={t('attendance.historyNoAccess')}
+            action={
+              <Button asChild>
+                <Link to={`${base}/attendance/me`}>{t('attendance.myHistoryTitle')}</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <ErrorState
+            error={query.error}
+            message={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        )
       ) : (
         <HistoryView history={query.data.history} />
       )}

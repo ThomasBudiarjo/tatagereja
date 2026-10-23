@@ -21,6 +21,10 @@ export const insightsDictionary = defineDictionary('insights', {
     noReportsTitle: 'No reports available',
     noReportsBody:
       'Your role does not include any report. Ask a church administrator if you need one.',
+    rangeTooLong: 'This range is too long',
+    rangeInvalid: 'This date range is not valid',
+    rangeHint: 'Reports cover up to about {years} years. Choose a shorter range.',
+    rangeReset: 'Use this year',
     emptyTitle: 'No data in this range',
     emptyBody: 'Choose a longer date range or another group.',
     chartTrend: 'Over time',
@@ -84,6 +88,11 @@ export const insightsDictionary = defineDictionary('insights', {
     noReportsTitle: 'Belum ada laporan untuk Anda',
     noReportsBody:
       'Peran Anda belum mencakup laporan apa pun. Hubungi admin gereja bila memerlukannya.',
+    rangeTooLong: 'Rentang ini terlalu panjang',
+    rangeInvalid: 'Rentang tanggal ini tidak valid',
+    rangeHint:
+      'Laporan mencakup paling lama sekitar {years} tahun. Pilih rentang yang lebih pendek.',
+    rangeReset: 'Pakai tahun ini',
     emptyTitle: 'Tidak ada data pada rentang ini',
     emptyBody: 'Pilih rentang tanggal yang lebih panjang atau kelompok lain.',
     chartTrend: 'Dari waktu ke waktu',

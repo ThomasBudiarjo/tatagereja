@@ -1,4 +1,5 @@
 import {
+  INSIGHTS_LIMITS,
   REPORT_INTERVALS,
   REPORT_INTERVAL_LABELS,
   REPORT_LABELS,
@@ -35,6 +36,7 @@ import { BarChart, DonutChart, LineChart } from '@/components/ui/charts';
 import { DateRangePicker, presetRange } from '@/components/ui/date-range-picker';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
+import { Alert } from '@/components/ui/misc';
 import { PrintButton, PrintHeader } from '@/components/ui/print';
 import { Select } from '@/components/ui/select';
 import { Skeleton, SkeletonStats } from '@/components/ui/skeleton';
@@ -222,6 +224,16 @@ const VIEWS: Record<
   },
 };
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Whether the API accepts the range (a hand-edited URL can hold anything). */
+const rangeProblem = (from: string, to: string): 'invalid' | 'tooLong' | null => {
+  if (!ISO_DAY.test(from) || !ISO_DAY.test(to) || Number.isNaN(Date.parse(from))) return 'invalid';
+  if (Number.isNaN(Date.parse(to)) || to < from) return 'invalid';
+  const days = (Date.parse(to) - Date.parse(from)) / 86_400_000;
+  return days > INSIGHTS_LIMITS.reportRangeDaysMax ? 'tooLong' : null;
+};
+
 const defaultRange = () => {
   const year = presetRange('thisYear');
   return { from: year.from, to: year.to };
@@ -252,7 +264,10 @@ export function ReportsPage() {
     locale,
     groupId: state.groupId || undefined,
   };
-  const rangeLabel = `${formatDate(state.from, 'dateShort')} – ${formatDate(state.to, 'dateShort')}`;
+  const problem = rangeProblem(state.from, state.to);
+  const rangeLabel = problem
+    ? ''
+    : `${formatDate(state.from, 'dateShort')} – ${formatDate(state.to, 'dateShort')}`;
 
   return (
     <Page size="wide">
@@ -281,8 +296,8 @@ export function ReportsPage() {
         />
       ) : (
         <UrlTabs param="report" defaultValue={kind} values={kinds}>
-          {/* Phones pick the report from a list; the tab row would hide the active one. */}
-          <div className="sm:hidden" data-print="hide">
+          {/* Narrow screens pick the report from a list; the tab row would hide the active one. */}
+          <div className="xl:hidden" data-print="hide">
             <Select
               aria-label={t('insights.reports')}
               value={kind}
@@ -297,12 +312,13 @@ export function ReportsPage() {
               ))}
             </Select>
           </div>
-          <TabsList variant="underline" data-print="hide" className="hidden sm:flex">
+          <TabsList variant="underline" data-print="hide" className="hidden xl:flex">
             {kinds.map((item) => {
               const Icon = VIEWS[item].icon;
               return (
                 <TabsTrigger key={item} value={item}>
-                  <Icon />
+                  {/* Seven tabs fit a laptop row only without their icons. */}
+                  <Icon className="hidden 2xl:block" />
                   {localize(REPORT_LABELS[item], locale)}
                 </TabsTrigger>
               );
@@ -333,7 +349,7 @@ export function ReportsPage() {
                           ))}
                         </Select>
                       ) : null}
-                      <ExportButton kind={item} params={params} />
+                      {!problem ? <ExportButton kind={item} params={params} /> : null}
                     </div>
                   }
                   filters={[
@@ -354,7 +370,27 @@ export function ReportsPage() {
                   ]}
                 />
               </div>
-              <ReportView kind={item} params={params} />
+              {problem ? (
+                <Alert
+                  variant="warning"
+                  title={t(
+                    problem === 'tooLong' ? 'insights.rangeTooLong' : 'insights.rangeInvalid',
+                  )}
+                  action={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setState({ from: range.from, to: range.to })}
+                    >
+                      {t('insights.rangeReset')}
+                    </Button>
+                  }
+                >
+                  {t('insights.rangeHint', { years: 3 })}
+                </Alert>
+              ) : (
+                <ReportView kind={item} params={params} />
+              )}
             </TabsContent>
           ))}
         </UrlTabs>

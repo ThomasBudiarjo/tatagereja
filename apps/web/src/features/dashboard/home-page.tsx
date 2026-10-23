@@ -20,6 +20,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useChurch } from '@/components/layout/church-provider';
 import { Page, PageHeader } from '@/components/layout/page';
 import { EntityAvatar } from '@/components/ui/avatar';
@@ -38,9 +39,10 @@ import { Skeleton, SkeletonCards, SkeletonStats } from '@/components/ui/skeleton
 import { StatCard } from '@/components/ui/stat-card';
 import { ErrorState } from '@/components/ui/states';
 import { Switch } from '@/components/ui/switch';
+import { useModuleMenu } from '@/features/registry';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/stores/auth';
 import { dashboardQuery, useSaveDashboardPreferences } from './api';
 import { HomeQuickActions } from './quick-actions';
@@ -175,42 +177,46 @@ export function HomePage() {
 
 function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => void }) {
   const { t } = useI18n();
-  const cards = data.widgets.flatMap((widget): { id: HomeWidget; node: React.ReactNode }[] => {
-    switch (widget) {
-      case 'quick_actions':
-        return [];
-      case 'notifications':
-        return [{ id: widget, node: <NotificationsWidget data={data.notifications} /> }];
-      case 'my_schedule':
-        return data.mySchedule
-          ? [{ id: widget, node: <ScheduleWidget items={data.mySchedule} /> }]
-          : [];
-      case 'my_tasks':
-        return data.myTasks ? [{ id: widget, node: <TasksWidget data={data.myTasks} /> }] : [];
-      case 'my_kids':
-        // Only parents with children in class need this card.
-        return data.myKids && data.myKids.length > 0
-          ? [{ id: widget, node: <KidsWidget items={data.myKids} /> }]
-          : [];
-      case 'upcoming_events':
-        return data.upcomingEvents
-          ? [{ id: widget, node: <EventsWidget items={data.upcomingEvents} /> }]
-          : [];
-      case 'announcements':
-        return data.announcements
-          ? [{ id: widget, node: <AnnouncementsWidget data={data.announcements} /> }]
-          : [];
-      case 'birthdays':
-        return data.celebrations
-          ? [{ id: widget, node: <CelebrationsWidget items={data.celebrations} /> }]
-          : [];
-      case 'attendance_summary':
-        return [{ id: widget, node: <AttendanceWidget data={data.attendance} /> }];
-    }
-  });
-  const quickActions = data.widgets.includes('quick_actions');
+  const quickActionCount = useModuleMenu().quickActions.length;
+  const cards = data.widgets.flatMap(
+    (widget): { id: HomeWidget; node: React.ReactNode; wide?: boolean }[] => {
+      switch (widget) {
+        case 'quick_actions':
+          return quickActionCount > 0
+            ? [{ id: widget, node: <HomeQuickActions />, wide: true }]
+            : [];
+        case 'notifications':
+          return [{ id: widget, node: <NotificationsWidget data={data.notifications} /> }];
+        case 'my_schedule':
+          return data.mySchedule
+            ? [{ id: widget, node: <ScheduleWidget items={data.mySchedule} /> }]
+            : [];
+        case 'my_tasks':
+          return data.myTasks ? [{ id: widget, node: <TasksWidget data={data.myTasks} /> }] : [];
+        case 'my_kids':
+          // Only parents with children in class need this card.
+          return data.myKids && data.myKids.length > 0
+            ? [{ id: widget, node: <KidsWidget items={data.myKids} /> }]
+            : [];
+        case 'upcoming_events':
+          return data.upcomingEvents
+            ? [{ id: widget, node: <EventsWidget items={data.upcomingEvents} /> }]
+            : [];
+        case 'announcements':
+          return data.announcements
+            ? [{ id: widget, node: <AnnouncementsWidget data={data.announcements} /> }]
+            : [];
+        case 'birthdays':
+          return data.celebrations
+            ? [{ id: widget, node: <CelebrationsWidget items={data.celebrations} /> }]
+            : [];
+        case 'attendance_summary':
+          return [{ id: widget, node: <AttendanceWidget data={data.attendance} /> }];
+      }
+    },
+  );
 
-  if (cards.length === 0 && !quickActions) {
+  if (cards.length === 0) {
     return (
       <EmptyState
         icon={EyeOff}
@@ -228,17 +234,15 @@ function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => vo
   }
 
   return (
-    <>
-      {quickActions ? <HomeQuickActions /> : null}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        {cards.map((card) => (
-          <div key={card.id} className="min-w-0">
-            {card.node}
-          </div>
-        ))}
-        {data.myGroups.length > 0 ? <GroupsWidget items={data.myGroups} /> : null}
-      </div>
-    </>
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      {/* Cards follow the caller's order; quick actions span the full width wherever they sit. */}
+      {cards.map((card) => (
+        <div key={card.id} className={cn('min-w-0', card.wide && 'lg:col-span-2')}>
+          {card.node}
+        </div>
+      ))}
+      {data.myGroups.length > 0 ? <GroupsWidget items={data.myGroups} /> : null}
+    </div>
   );
 }
 
@@ -253,9 +257,8 @@ function CustomizeSheet({
 }) {
   const { churchId } = useChurch();
   const { t, locale } = useI18n();
-  const save = useMutationToast(useSaveDashboardPreferences(churchId), {
-    success: t('dashboard.layoutSaved'),
-  });
+  // Every switch and arrow saves at once; one toast is updated rather than stacked.
+  const save = useSaveDashboardPreferences(churchId);
   // Every available widget, in the caller's order (hidden ones keep their place).
   const ordered = [
     ...data.preferences.widgetOrder.filter((widget) => data.availableWidgets.includes(widget)),
@@ -264,7 +267,10 @@ function CustomizeSheet({
   const hidden = new Set(data.preferences.hiddenWidgets);
 
   const persist = (order: HomeWidget[], hiddenWidgets: HomeWidget[]) =>
-    void save.run({ widgetOrder: order, hiddenWidgets });
+    save.mutate(
+      { widgetOrder: order, hiddenWidgets },
+      { onSuccess: () => toast.success(t('dashboard.layoutSaved'), { id: 'home-layout' }) },
+    );
   const move = (index: number, delta: number) => {
     const next = [...ordered];
     const [item] = next.splice(index, 1);

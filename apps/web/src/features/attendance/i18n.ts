@@ -111,7 +111,11 @@ export const attendanceDictionary = defineDictionary('attendance', {
     followedUp: 'Follow-up task created',
     absencesEmptyTitle: 'Nobody is missing',
     absencesEmptyBody: 'No one has missed {count} sessions in a row. Thank God!',
-    absencesNoAccess: 'Only people who see all attendance or lead a group see absence alerts.',
+    historyNoAccess:
+      'Only the person, leaders of their groups and those who see all attendance can open this history.',
+    sessionGoneTitle: 'This session no longer exists',
+    sessionGoneBody: 'Someone may have deleted it. The other sessions are still in the list.',
+    backToSessions: 'Back to sessions',
     // History
     historyTitle: 'Attendance of {name}',
     myHistoryTitle: 'My attendance',
@@ -237,8 +241,11 @@ export const attendanceDictionary = defineDictionary('attendance', {
     followedUp: 'Tugas tindak lanjut dibuat',
     absencesEmptyTitle: 'Tidak ada yang absen',
     absencesEmptyBody: 'Tidak ada jemaat yang {count} kali berturut-turut tidak hadir. Puji Tuhan!',
-    absencesNoAccess:
-      'Hanya yang dapat melihat seluruh kehadiran atau memimpin kelompok yang melihat peringatan ini.',
+    historyNoAccess:
+      'Riwayat ini hanya dapat dibuka oleh yang bersangkutan, pemimpin kelompoknya, dan yang dapat melihat seluruh kehadiran.',
+    sessionGoneTitle: 'Sesi ini sudah tidak ada',
+    sessionGoneBody: 'Mungkin sudah dihapus. Sesi lainnya tetap ada di daftar.',
+    backToSessions: 'Kembali ke daftar sesi',
     historyTitle: 'Kehadiran {name}',
     myHistoryTitle: 'Kehadiran saya',
     myHistoryDescription: 'Ibadah dan pertemuan tempat kehadiran Anda dicatat.',

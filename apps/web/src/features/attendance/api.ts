@@ -26,7 +26,7 @@ import { optimistic } from '@/lib/use-mutation-toast';
 /*
  * Attendance queries and mutations. Every key lives under `keys.attendance(churchId)`, so one
  * invalidation refreshes sessions, absences and histories; writes also refresh the home
- * dashboard, person pages (their attendance tab) and events (their sessions), and follow-ups
+ * dashboard, person pages (their attendance tab), events (their sessions) and reports, and follow-ups
  * refresh the care module and the notification inbox.
  */
 
@@ -101,6 +101,7 @@ export const invalidateAttendance = (client: QueryClient, churchId: string) =>
     client.invalidateQueries({ queryKey: keys.dashboard(churchId) }),
     client.invalidateQueries({ queryKey: keys.people(churchId) }),
     client.invalidateQueries({ queryKey: keys.events(churchId) }),
+    client.invalidateQueries({ queryKey: [...churchScope(churchId), 'insights'] }),
   ]);
 
 /** Stores the fresh session detail every write answers with, then refreshes the rest. */

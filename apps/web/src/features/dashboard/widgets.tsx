@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { Link } from 'react-router';
+import { toast } from 'sonner';
 import { useChurch } from '@/components/layout/church-provider';
 import { EntityAvatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import type { Tone } from '@/components/ui/tone';
 import { useI18n } from '@/lib/i18n';
-import { useMutationToast } from '@/lib/use-mutation-toast';
 import { cn } from '@/lib/utils';
 import { useCompleteMyTask, useMarkNotificationRead } from './api';
 
@@ -165,7 +165,9 @@ const Empty = (props: React.ComponentProps<typeof EmptyState>) => (
 export function NotificationsWidget({ data }: { data: Dashboard['notifications'] }) {
   const { churchId } = useChurch();
   const { t, formatRelative } = useI18n();
-  const mark = useMutationToast(useMarkNotificationRead(churchId));
+  // Rows leave at once; a failed write puts them back and says why (see ./api).
+  const { mutate } = useMarkNotificationRead(churchId);
+  const markRead = (id: string | null) => mutate({ id });
   return (
     <Widget
       icon={Bell}
@@ -174,7 +176,7 @@ export function NotificationsWidget({ data }: { data: Dashboard['notifications']
       hint={data.unreadCount > 0 ? t('dashboard.unread', { count: data.unreadCount }) : undefined}
       action={
         data.unreadCount > 0 ? (
-          <Button variant="ghost" size="sm" onClick={() => void mark.run({ id: null })}>
+          <Button variant="ghost" size="sm" onClick={() => markRead(null)}>
             <CheckCheck />
             <span className="hidden sm:inline">{t('dashboard.markAllRead')}</span>
           </Button>
@@ -195,7 +197,7 @@ export function NotificationsWidget({ data }: { data: Dashboard['notifications']
               {item.link?.startsWith('/') ? (
                 <Link
                   to={item.link}
-                  onClick={() => void mark.run({ id: item.id })}
+                  onClick={() => markRead(item.id)}
                   className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/60 sm:px-5"
                 >
                   <NotificationText item={item} relative={formatRelative(item.createdAt)} />
@@ -211,7 +213,7 @@ export function NotificationsWidget({ data }: { data: Dashboard['notifications']
                 className="size-11 text-muted-foreground"
                 aria-label={t('dashboard.markRead')}
                 title={t('dashboard.markRead')}
-                onClick={() => void mark.run({ id: item.id })}
+                onClick={() => markRead(item.id)}
               >
                 <Check />
               </Button>
@@ -288,9 +290,9 @@ export function ScheduleWidget({ items }: { items: NonNullable<Dashboard['mySche
 export function TasksWidget({ data }: { data: NonNullable<Dashboard['myTasks']> }) {
   const { base, churchId } = useChurch();
   const { t, formatDate } = useI18n();
-  const complete = useMutationToast(useCompleteMyTask(churchId), {
-    success: t('dashboard.taskDone'),
-  });
+  const { mutate } = useCompleteMyTask(churchId);
+  const complete = (id: string) =>
+    mutate({ id }, { onSuccess: () => toast.success(t('dashboard.taskDone')) });
   return (
     <Widget
       icon={HandHeart}
@@ -301,7 +303,7 @@ export function TasksWidget({ data }: { data: NonNullable<Dashboard['myTasks']> 
           <>
             {t('dashboard.myTasksHint', { count: data.openCount })}
             {data.overdueCount > 0
-              ? ` · ${data.overdueCount} ${t('dashboard.overdue').toLowerCase()}`
+              ? ` · ${t('dashboard.overdueCount', { count: data.overdueCount })}`
               : ''}
           </>
         ) : undefined
@@ -322,14 +324,14 @@ export function TasksWidget({ data }: { data: NonNullable<Dashboard['myTasks']> 
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-11 shrink-0 rounded-full text-muted-foreground hover:text-success"
+                className="group size-11 shrink-0 rounded-full text-muted-foreground hover:text-success focus-visible:text-success"
                 aria-label={t('dashboard.markDone', { title: task.title })}
                 title={t('dashboard.markDone', { title: task.title })}
                 disabled={!task.canComplete}
-                onClick={() => void complete.run({ id: task.id })}
+                onClick={() => complete(task.id)}
               >
                 <span className="flex size-5 items-center justify-center rounded-full border-2 border-current">
-                  <Check className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                  <Check className="size-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
                 </span>
               </Button>
               <Link
