@@ -310,6 +310,17 @@ describe('visitor follow-up and tasks', () => {
         (item) => item.entityId === task.json.task.id,
       );
       expect(notice?.body).toBe('Pendampingan rahasia');
+      // The case caregivers' view: every task of a case they can read; others get 404.
+      const caseTasks = await t.request('GET', `${base}/tasks?caseId=${caseId}`, {
+        token: pastor.token,
+      });
+      expect(caseTasks.json.items.map((item: { id: string }) => item.id)).toEqual([
+        task.json.task.id,
+      ]);
+      const hidden = await t.request('GET', `${base}/tasks?caseId=${caseId}`, {
+        token: viewer.token,
+      });
+      expect(hidden.status).toBe(404);
       const viewerCreate = await t.request('POST', `${base}/tasks`, {
         token: coordinator.token,
         body: { title: 'Ikut campur', caseId },

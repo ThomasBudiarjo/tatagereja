@@ -247,7 +247,8 @@ export const careOverviewRouter = (deps: Deps) => {
               ...row,
               personId: personIds.get(row.userId) ?? null,
               isCareTeam: team,
-              canReadConfidential: has(held, 'care.confidential'),
+              // Who holds confidential access is only shown to the care team.
+              canReadConfidential: isCareTeam(access) && has(held, 'care.confidential'),
             },
           ];
         });

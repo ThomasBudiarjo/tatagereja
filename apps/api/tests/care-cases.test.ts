@@ -204,11 +204,21 @@ describe('care cases', () => {
         body,
       });
       expect(caregiver.status).toBe(403);
+      const visit = await t.request('POST', `${base}/visits`, {
+        token: elder.token,
+        body: { caseId: normalId, visitDate: dayOffset(0), summary: 'Catatan kunjungan duka' },
+      });
+      expect(visit.json.visit.confidentiality).toBe('normal');
       const raise = await t.request('PATCH', `${base}/cases/${normalId}`, {
         token: elder.token,
         body: { category: 'grief', title: 'Pendampingan duka', confidentiality: 'confidential' },
       });
       expect(raise.status).toBe(200);
+      // Its visits follow, so the care team no longer reads their summaries.
+      const hiddenVisit = await t.request('GET', `${base}/visits/${visit.json.visit.id}`, {
+        token: viewer.token,
+      });
+      expect(hiddenVisit.status).toBe(404);
       // The elder raised it without care.confidential and is not a caregiver: it is gone for them.
       const gone = await t.request('GET', `${base}/cases/${normalId}`, { token: elder.token });
       expect(gone.status).toBe(404);

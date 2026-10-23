@@ -23,7 +23,7 @@ import { and, asc, count, desc, eq, inArray, like, ne, or, sql, type SQL } from 
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { CareCaseRow, ChurchRow } from '../../db/schema';
-import { careCaseCaregivers, careCases, careNotes, people } from '../../db/schema';
+import { careCaseCaregivers, careCases, careNotes, careVisits, people } from '../../db/schema';
 import type { Deps } from '../../deps';
 import { forbidden, notFound } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
@@ -352,6 +352,13 @@ export const careCasesRouter = (deps: Deps) => {
             .get();
           if (!next) throw notFound('Care case');
           if (statusChanged) addStatusNote(tx, next, auth.user.id, now);
+          // Visits of a case that became confidential become confidential with it.
+          if (next.confidentiality === 'confidential' && row.confidentiality !== 'confidential') {
+            tx.update(careVisits)
+              .set({ confidentiality: 'confidential', updatedAt: now })
+              .where(and(eq(careVisits.caseId, row.id), eq(careVisits.churchId, church.id)))
+              .run();
+          }
           // Redact by the stricter of both levels so a lowered case never exposes its old title.
           const level = next.confidentiality === 'confidential' ? next : row;
           recordAudit(tx, audit, {

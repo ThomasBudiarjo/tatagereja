@@ -148,7 +148,18 @@ export const careTasksRouter = (deps: Deps) => {
         sendDueCareReminders(db, church);
         const today = todayIn(church.timezone);
         const conditions: SQL[] = [eq(careTasks.churchId, church.id)];
-        if (query.scope === 'mine') {
+        if (query.caseId) {
+          // Everyone who may read the case sees all of its tasks.
+          const linked = loadCase(church.id, query.caseId);
+          if (!canReadCareCase(access, linked.row, linked.caregiverIds)) {
+            throw notFound('Care case');
+          }
+          conditions.push(eq(careTasks.caseId, linked.row.id));
+        } else if (query.followUpId) {
+          // Likewise for a follow-up the caller can see.
+          const followUp = loadFollowUp(church.id, access, query.followUpId);
+          conditions.push(eq(careTasks.followUpId, followUp.id));
+        } else if (query.scope === 'mine') {
           conditions.push(eq(careTasks.assignedUserId, access.userId));
         } else {
           if (!isCareTeam(access)) throw forbidden('You cannot see the care team tasks');
@@ -167,11 +178,6 @@ export const careTasksRouter = (deps: Deps) => {
         if (query.overdue) {
           conditions.push(eq(careTasks.status, 'open'), lt(careTasks.dueDate, today));
         }
-        if (query.followUpId) {
-          loadFollowUp(church.id, access, query.followUpId);
-          conditions.push(eq(careTasks.followUpId, query.followUpId));
-        }
-        if (query.caseId) conditions.push(eq(careTasks.caseId, query.caseId));
         if (query.q) conditions.push(like(careTasks.title, likePattern(query.q)));
         const rows = db
           .select()

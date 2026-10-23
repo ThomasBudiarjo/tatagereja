@@ -63,6 +63,9 @@ export const CARE_PRIORITY_LABELS: Record<CarePriority, LocalizedText> = {
 export const CARE_STATUSES = ['open', 'in_progress', 'closed'] as const;
 export type CareStatus = (typeof CARE_STATUSES)[number];
 
+export const isCareStatus = (value: string): value is CareStatus =>
+  (CARE_STATUSES as readonly string[]).includes(value);
+
 export const CARE_STATUS_LABELS: Record<CareStatus, LocalizedText> = {
   open: { en: 'Open', id: 'Baru' },
   in_progress: { en: 'In progress', id: 'Sedang didampingi' },
