@@ -231,6 +231,9 @@ cache are free.
 
 - JSON and text of 1 KB and more are sent with brotli (quality 4; quality 1 above 256 KB) or gzip
   when the client accepts it.
+- Compression does not open a BREACH-style leak: the API authenticates with a bearer token that
+  browsers never attach to cross-site requests, so another site cannot make a member's browser
+  fetch authenticated answers to compare their sizes.
 - Successful `GET`s carry a weak `ETag`; a matching `If-None-Match` gets `304` with no body. API
   answers stay `Cache-Control: no-store`, so browsers do not keep member data on shared church
   computers; clients that revalidate on their own (calendar apps, scripts) benefit.
