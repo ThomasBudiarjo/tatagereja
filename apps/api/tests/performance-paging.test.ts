@@ -120,7 +120,7 @@ describe('keyset paging', () => {
     let cursor: string | null = null;
     for (let page = 0; page < 50; page += 1) {
       const separator = path.includes('?') ? '&' : '?';
-      const response = await t.request(
+      const response: { status: number; json: any } = await t.request(
         'GET',
         `${path}${separator}limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
         { token },

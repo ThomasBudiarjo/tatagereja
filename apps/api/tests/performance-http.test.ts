@@ -92,7 +92,8 @@ describe('API responses', () => {
       new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br' } }),
     );
     expect(response.status).toBe(401);
-    expect((await response.json()).error.code).toBe('UNAUTHORIZED');
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('UNAUTHORIZED');
     expect(response.headers.get('etag')).toBeNull();
   });
 });
