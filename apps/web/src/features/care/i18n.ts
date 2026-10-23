@@ -334,7 +334,7 @@ export const careDictionary = defineDictionary('care', {
     statusApplied: 'Status of {name} changed',
     newFollowUpExistingDescription: 'Choose someone in the directory to welcome and follow up.',
     newGuestNeedsPermission:
-      'Adding a new person to the directory needs permission to add people. Choose someone who is already in it.',
+      'A first-time guest who is not in the directory yet is added by someone who may add people.',
     editFollowUp: 'Edit follow-up',
     editFollowUpDescription: 'Details about the visitor and who follows up.',
     followUpDetail: 'Follow-up',
@@ -786,7 +786,7 @@ export const careDictionary = defineDictionary('care', {
     newFollowUpExistingDescription:
       'Pilih orang dari data jemaat untuk disambut dan ditindaklanjuti.',
     newGuestNeedsPermission:
-      'Menambah orang baru ke data jemaat memerlukan izin menambah jemaat. Pilih orang yang sudah ada di data jemaat.',
+      'Tamu baru yang belum ada di data jemaat ditambahkan oleh pengurus yang berwenang menambah jemaat.',
     editFollowUp: 'Ubah tindak lanjut',
     editFollowUpDescription: 'Keterangan tentang tamu dan siapa yang menindaklanjuti.',
     followUpDetail: 'Tindak lanjut',

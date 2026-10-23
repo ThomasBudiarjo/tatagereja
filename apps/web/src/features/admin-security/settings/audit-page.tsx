@@ -121,7 +121,7 @@ function AuditEntrySheet({ id, onClose }: { id: string; onClose: () => void }) {
               </div>
 
               {data.redacted ? (
-                <Alert variant="info" title={t('admin-security.auditHidden')}>
+                <Alert variant="info" title={t('admin-security.auditHiddenTitle')}>
                   {data.redacted === 'finance'
                     ? t('admin-security.auditHiddenFinance')
                     : t('admin-security.auditHiddenCare')}

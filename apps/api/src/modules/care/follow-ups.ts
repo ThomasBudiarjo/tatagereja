@@ -2,6 +2,7 @@ import {
   FOLLOW_UP_ACTIVE_STAGES,
   FOLLOW_UP_STAGES,
   PERSON_MEMBERSHIP_STATUS_LABELS,
+  PERSON_STATUS_TEXT,
   canAddVisitorPerson,
   canApplyStatusSuggestion,
   canManageFollowUp,
@@ -186,8 +187,8 @@ export const followUpsRouter = (deps: Deps) => {
       excludeUserIds: [access.userId],
       type: 'care.status_suggested',
       title: {
-        id: `${fullName(person)} sudah bergabung: ubah statusnya menjadi simpatisan?`,
-        en: `${fullName(person)} joined: change their status to regular attendee?`,
+        id: `${fullName(person)} sudah bergabung: ubah statusnya menjadi ${PERSON_STATUS_TEXT[status].id.toLowerCase()}?`,
+        en: `${fullName(person)} joined: change their status to ${PERSON_STATUS_TEXT[status].en.toLowerCase()}?`,
       },
       link: `/c/${church.id}/care/follow-ups/${row.id}`,
       entityType: 'visitor_follow_up',
@@ -403,7 +404,7 @@ export const followUpsRouter = (deps: Deps) => {
             params: { person: personName(row.personId), stage: body.stage },
             ...redactedChanges(auditable(row), auditable(next), SECRET_FIELDS),
           });
-          // A visitor who joined becomes a regular attendee (simpatisan) in the directory: done
+          // A visitor who joined becomes a regular attendee (jemaat tetap) in the directory: done
           // at once by someone who may edit people, otherwise suggested to those who may.
           if (row.stage !== 'joined') suggestStatus(tx, church, access, audit, next);
           return next;

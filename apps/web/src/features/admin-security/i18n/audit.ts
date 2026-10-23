@@ -74,6 +74,7 @@ export const auditMessages = messages(
     actPersonStatusChange: 'Changed a membership status',
     // Entries whose content the viewer may not read
     auditHidden: 'details hidden',
+    auditHiddenTitle: 'Details hidden',
     auditHiddenFinance:
       'The amounts and donors of finance entries are shown only to people with finance access.',
     auditHiddenCare: 'The content of pastoral care entries is shown only to the care team.',
@@ -199,6 +200,7 @@ export const auditMessages = messages(
     actGroupMemberRemove: 'Mengeluarkan anggota kelompok',
     actPersonStatusChange: 'Mengubah status keanggotaan',
     auditHidden: 'rincian disembunyikan',
+    auditHiddenTitle: 'Rincian disembunyikan',
     auditHiddenFinance:
       'Jumlah dan pemberi pada catatan keuangan hanya ditampilkan kepada yang memiliki akses keuangan.',
     auditHiddenCare: 'Isi catatan pelayanan pastoral hanya ditampilkan kepada tim pastoral.',
