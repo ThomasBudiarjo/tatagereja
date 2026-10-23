@@ -387,6 +387,7 @@ export const checkinSessionsRouter = (deps: Deps) => {
           guardianId && !self ? loadPerson(db, church.id, guardianId, 'Guardian') : null;
 
         const today = todayIn(church.timezone);
+        const settings = checkinSettingsOf(church);
         const classes = classRowsOf(db, church.id);
         const childIds = body.children.map((item) => item.personId);
         const profiles = new Map(
@@ -410,13 +411,16 @@ export const checkinSessionsRouter = (deps: Deps) => {
           if (self && !isGuardianOf(db, church.id, guardianId, child.id)) {
             throw forbidden('You can only check in the children of your own household');
           }
+          const age = childAge(child.birthDate, today);
+          // Guardians check in the children their phone offers; older ones go through a teacher.
+          if (self && age !== null && age > settings.childMaxAge) {
+            throw validationError(`${fullName(child)} is too old for Sekolah Minggu check-in`, [
+              { path: `children.${index}.personId`, message: 'Too old for Sekolah Minggu' },
+            ]);
+          }
           let classRow = item.classId
             ? classes.find((candidate) => candidate.id === item.classId)
-            : suggestClass(
-                classes,
-                childAge(child.birthDate, today),
-                profiles.get(child.id) ?? null,
-              );
+            : suggestClass(classes, age, profiles.get(child.id) ?? null);
           if (item.classId && !classRow) throw notFound('Class');
           if (classRow && !classRow.isActive) classRow = undefined;
           if (!classRow) {
