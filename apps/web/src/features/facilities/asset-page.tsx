@@ -265,17 +265,6 @@ export function AssetPage() {
                     {openLoan.groupName ? ` · ${openLoan.groupName}` : ''}
                   </p>
                 </div>
-                {canManage ? (
-                  // Phones already show "Mark returned" in the action bar above.
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="hidden sm:inline-flex"
-                    onClick={() => setReturning(true)}
-                  >
-                    {t('facilities.markReturned')}
-                  </Button>
-                ) : null}
               </div>
             ) : null}
             {pastLoans.length === 0 && !openLoan ? (
