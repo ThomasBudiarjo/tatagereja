@@ -31,6 +31,20 @@ export function whenIdle(task: () => void, timeout = 2000): void {
   }
 }
 
+/**
+ * Runs `task` once the current screen has its data (no query loading) and the main thread is
+ * idle, or after `maxWait`: speculative downloads must not compete with what is on screen
+ * for a 3G connection's bandwidth.
+ */
+export function whenQuiet(task: () => void, maxWait = 10_000): void {
+  const started = Date.now();
+  const check = () => {
+    if (queryClient.isFetching() === 0 || Date.now() - started > maxWait) whenIdle(task);
+    else setTimeout(check, 500);
+  };
+  setTimeout(check, 500);
+}
+
 const quietly = (promise: Promise<unknown>) => void promise.catch(() => undefined);
 
 /**
@@ -58,7 +72,7 @@ export function prefetchFirstChurchScreen(churchId: string, path: string): void 
  */
 export function prefetchSignedInShell(): void {
   if (!mayPrefetch()) return;
-  whenIdle(() => {
+  whenQuiet(() => {
     quietly(loadDictionaries());
     quietly(loadChurchRoutes());
     quietly(loadHomeScreen());

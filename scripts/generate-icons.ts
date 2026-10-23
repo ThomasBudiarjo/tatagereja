@@ -28,9 +28,7 @@ for (const { source, file, size } of outputs) {
     '<svg ',
     `<svg width="${size}" height="${size}" `,
   );
-  await page.setContent(
-    `<html><body style="margin:0;background:transparent">${svg}</body></html>`,
-  );
+  await page.setContent(`<html><body style="margin:0;background:transparent">${svg}</body></html>`);
   await page.screenshot({ path: join(dir, file), omitBackground: true });
   await page.close();
   console.info(`  ${file}`);

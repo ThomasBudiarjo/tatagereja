@@ -16,6 +16,7 @@
  *          from the first contentful paint until the page went quiet
  *   Busy   the same sum over every long task, before the first paint too (script parsing and
  *          the first render of a single-page app happen before anything is painted)
+ *   API    the median time of the page's API requests (the network profile at work)
  *   JS     script bytes on the wire (compressed) before the first paint, in total, and every
  *          byte on the wire (idle-time prefetches included)
  *
@@ -29,13 +30,18 @@
  *   --email/--password          account for signed-in pages (default demo@tatagereja.test)
  *   --no-throttle               measure without throttling
  *   --warm                      a second load in the same context after each cold one (HTTP
- *                               cache and service worker in place), reported separately
+ *                               cache and the service worker's precache in place), reported
+ *                               separately; the service worker's own requests get the same
+ *                               throttling (Playwright routing) as the page's
  *   --json <file>               also write the raw results
  *
  * Uses the preinstalled Chromium (PLAYWRIGHT_BROWSERS_PATH); never run `playwright install`.
  */
 import { writeFileSync } from 'node:fs';
 import { chromium, type BrowserContext, type CDPSession, type Page } from 'playwright';
+
+// Lets Playwright see and route the requests a service worker makes (Chromium only).
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
@@ -73,6 +79,7 @@ type Sample = {
   ready: number;
   tbt: number;
   busy: number;
+  apiMs: number;
   firstJsKb: number;
   jsKb: number;
   totalKb: number;
@@ -200,6 +207,14 @@ async function measure(page: Page, url: string): Promise<Sample> {
         return sum + Math.max(0, task.start + task.duration - start - 50);
       }, 0);
   const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+  const apiMs = await page.evaluate(() => {
+    const durations = performance
+      .getEntriesByType('resource')
+      .filter((entry) => entry.name.includes('/api/'))
+      .map((entry) => entry.duration)
+      .sort((a, b) => a - b);
+    return durations[Math.floor(durations.length / 2)] ?? 0;
+  });
   const firstPaint = timeOrigin + vitals.fcp;
   await cdp.detach();
   return {
@@ -211,6 +226,7 @@ async function measure(page: Page, url: string): Promise<Sample> {
     ready: vitals.changed,
     tbt: overFifty(vitals.longTasks, vitals.fcp),
     busy: overFifty(vitals.longTasks, 0),
+    apiMs,
     jsKb: jsBytes / 1024,
     totalKb: totalBytes / 1024,
     requests,
@@ -223,11 +239,15 @@ const median = (values: number[]) => {
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function newContext(
   browser: Awaited<ReturnType<typeof chromium.launch>>,
   session: BrowserSession | null,
+  serviceWorkers: 'allow' | 'block',
 ): Promise<BrowserContext> {
   const context = await browser.newContext({
+    serviceWorkers,
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
     isMobile: true,
@@ -237,6 +257,17 @@ async function newContext(
       'Mozilla/5.0 (Linux; Android 13; SM-A346E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
   });
   await context.addInitScript(observeVitals);
+  if (serviceWorkers === 'allow' && throttle) {
+    // DevTools throttling only slows the page's own requests. What the service worker
+    // fetches (API reads, precaching) gets the same round trip and bandwidth here.
+    await context.route('**/*', async (route) => {
+      if (!route.request().serviceWorker()) return route.fallback();
+      const response = await route.fetch();
+      const body = await response.body();
+      await sleep(FAST_3G.latency + (body.byteLength / FAST_3G.downloadThroughput) * 1000);
+      return route.fulfill({ response, body });
+    });
+  }
   if (session) {
     await context.addCookies([
       { ...session.cookie, url: base, httpOnly: true, sameSite: 'Strict' },
@@ -278,11 +309,23 @@ for (const route of routes) {
   const cold: Sample[] = [];
   const warm: Sample[] = [];
   for (let run = 0; run < runs; run += 1) {
-    const context = await newContext(browser, signedIn ? session : null);
+    // Cold loads are a first visit: no service worker yet (it installs after the page).
+    const context = await newContext(
+      browser,
+      signedIn ? session : null,
+      flag('warm') ? 'allow' : 'block',
+    );
     const page = await context.newPage();
     page.on('pageerror', (error) => console.error(`  page error: ${error.message}`));
     cold.push(await measure(page, `${base}${path}`));
     if (flag('warm')) {
+      // The service worker finishes precaching the shell before it activates.
+      await page.evaluate(() =>
+        Promise.race([
+          navigator.serviceWorker?.ready,
+          new Promise((resolve) => setTimeout(resolve, 60_000)),
+        ]).then(() => undefined),
+      );
       const again = await context.newPage();
       warm.push(await measure(again, `${base}${path}`));
     }
@@ -295,13 +338,13 @@ await browser.close();
 
 const pad = (value: string, width: number) => value.padStart(width);
 console.info(
-  `${'Page'.padEnd(26)} ${pad('FCP ms', 7)} ${pad('LCP ms', 7)} ${pad('Ready', 7)} ${pad('TBT ms', 7)} ${pad('Busy', 7)} ${pad('JS@FCP', 7)} ${pad('JS KB', 7)} ${pad('All KB', 7)} ${pad('Req', 4)}`,
+  `${'Page'.padEnd(26)} ${pad('FCP ms', 7)} ${pad('LCP ms', 7)} ${pad('Ready', 7)} ${pad('TBT ms', 7)} ${pad('Busy', 7)} ${pad('API ms', 7)} ${pad('JS@FCP', 7)} ${pad('JS KB', 7)} ${pad('All KB', 7)} ${pad('Req', 4)}`,
 );
 for (const { route, kind, samples } of results) {
   const of = (key: keyof Sample) => median(samples.map((sample) => sample[key]));
   const label = kind === 'warm' ? `${route} (warm)` : route;
   console.info(
-    `${label.padEnd(26)} ${pad(of('fcp').toFixed(0), 7)} ${pad(of('lcp').toFixed(0), 7)} ${pad(of('ready').toFixed(0), 7)} ${pad(of('tbt').toFixed(0), 7)} ${pad(of('busy').toFixed(0), 7)} ${pad(of('firstJsKb').toFixed(1), 7)} ${pad(of('jsKb').toFixed(1), 7)} ${pad(of('totalKb').toFixed(1), 7)} ${pad(of('requests').toFixed(0), 4)}`,
+    `${label.padEnd(26)} ${pad(of('fcp').toFixed(0), 7)} ${pad(of('lcp').toFixed(0), 7)} ${pad(of('ready').toFixed(0), 7)} ${pad(of('tbt').toFixed(0), 7)} ${pad(of('busy').toFixed(0), 7)} ${pad(of('apiMs').toFixed(0), 7)} ${pad(of('firstJsKb').toFixed(1), 7)} ${pad(of('jsKb').toFixed(1), 7)} ${pad(of('totalKb').toFixed(1), 7)} ${pad(of('requests').toFixed(0), 4)}`,
   );
 }
 const json = option('json', '');

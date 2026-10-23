@@ -11,13 +11,15 @@ const srcDir = fileURLToPath(new URL('./src', import.meta.url));
 
 /**
  * `virtual:locale-messages/<locale>`: the messages of every feature dictionary in one
- * language, as `{ '<namespace>.<key>': message }`. The app downloads only the language it
+ * language, as `{ '<namespace>.<key>': message }`, without the namespaces the first download
+ * already carries. The app downloads only the language it
  * shows, half the bytes of `features/dictionaries.ts` (which holds both). A build evaluates
  * the dictionaries once with Vite's module runner; the dev server reads them live instead,
  * so edits still hot-reload.
  */
-function localeMessages(): Plugin {
+function localeMessages({ inFirstDownload }: { inFirstDownload: string[] }): Plugin {
   const prefix = 'virtual:locale-messages/';
+  const skip = new Set(inFirstDownload);
   const dictionaries = '/src/features/dictionaries.ts';
   let command: 'build' | 'serve' = 'build';
   type Dictionary = { namespace: string; messages: Record<string, Record<string, unknown>> };
@@ -36,7 +38,8 @@ function localeMessages(): Plugin {
       if (command === 'serve') {
         return [
           `import { DICTIONARIES } from '${dictionaries}';`,
-          `export default Object.fromEntries(DICTIONARIES.flatMap((d) =>`,
+          `const skip = new Set(${JSON.stringify(inFirstDownload)});`,
+          `export default Object.fromEntries(DICTIONARIES.filter((d) => !skip.has(d.namespace)).flatMap((d) =>`,
           `  Object.entries(d.messages[${locale}]).map(([key, m]) => [d.namespace + '.' + key, m])));`,
         ].join('\n');
       }
@@ -50,6 +53,7 @@ function localeMessages(): Plugin {
       ).then(({ module }) => module.DICTIONARIES);
       const messages: Record<string, unknown> = {};
       for (const dictionary of await loaded) {
+        if (skip.has(dictionary.namespace)) continue;
         for (const [key, message] of Object.entries(
           dictionary.messages[JSON.parse(locale)] ?? {},
         )) {
@@ -193,7 +197,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    localeMessages(),
+    // The namespaces `lib/i18n/index.ts` registers from the first download.
+    localeMessages({ inFirstDownload: ['common', 'auth', 'invitations'] }),
     serviceWorker(),
     precompress(),
     bundleReport(),

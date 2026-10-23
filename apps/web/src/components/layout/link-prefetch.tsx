@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { matchRoutes, type RouteObject } from 'react-router';
 import { useModuleMenu } from '@/features/registry';
 import type { ModuleRouteHandle } from '@/lib/modules';
-import { mayPrefetch, whenIdle } from '@/lib/prefetch';
+import { mayPrefetch, whenQuiet } from '@/lib/prefetch';
 import { useChurch } from './church-provider';
 
 type Preloadable = { preload?: () => Promise<unknown> };
@@ -14,7 +14,7 @@ const HOVER_INTENT_MS = 80;
 /**
  * Fetches a screen before it is opened: its code (every lazy route) and, when its route has a
  * `prefetch` handle, the data it opens with. A touch on a phone starts about 100 ms before
- * the tap ends; a mouse rests on a link longer. After the first church screen has painted,
+ * the tap ends; a mouse rests on a link longer. Once the first church screen has its data,
  * the code of the bottom tabs comes in idle time, so switching tabs never waits on 3G.
  * Nothing is fetched speculatively with Data Saver on.
  */
@@ -65,12 +65,12 @@ export function LinkPrefetch({ routes }: { routes: RouteObject[] }) {
     document.addEventListener('focusin', onIntent);
 
     let active = true;
-    whenIdle(() => {
+    whenQuiet(() => {
       if (!active) return;
       for (const tab of [tabs.home, tabs.people, tabs.events]) {
         if (tab) warm(tab.href, false);
       }
-    }, 4000);
+    });
 
     return () => {
       active = false;
