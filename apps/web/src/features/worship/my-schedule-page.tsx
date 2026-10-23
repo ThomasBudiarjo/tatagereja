@@ -30,7 +30,7 @@ import { useUrlState } from '@/lib/use-url-state';
 import { blockoutsQuery, myScheduleQuery, useAddBlockout, useDeleteBlockout } from './api';
 import { ScheduleCard } from './respond';
 import { WorshipNav } from './worship-ui';
-import { WORSHIP_TONE, useWorshipMe } from './worship-lib';
+import { WORSHIP_TONE, useWorshipMe, withMessages } from './worship-lib';
 
 type Scope = 'upcoming' | 'past';
 
@@ -211,7 +211,9 @@ function BlockoutDialog({
   const { t } = useI18n();
   const today = new Date().toISOString().slice(0, 10);
   const form = useForm<BlockoutForm, unknown, z.output<typeof volunteerBlockoutInputSchema>>({
-    resolver: zodResolver(volunteerBlockoutInputSchema),
+    resolver: withMessages(zodResolver(volunteerBlockoutInputSchema), {
+      endDate: () => t('worship.blockoutEndBeforeStart'),
+    }),
     defaultValues: { startDate: today, endDate: today, reason: '' },
   });
   const errors = form.formState.errors;

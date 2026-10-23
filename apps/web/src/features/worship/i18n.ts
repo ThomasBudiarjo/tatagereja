@@ -81,6 +81,7 @@ export const worshipDictionary = defineDictionary('worship', {
     fieldTitlePlaceholder: 'Ibadah Minggu Adven I',
     fieldStartsAt: 'Starts',
     fieldEndsAt: 'Ends',
+    endsBeforeStart: 'The end must be after the start',
     fieldEndsAtHint: 'Optional. Used to spot volunteers serving twice at the same time.',
     fieldLocation: 'Location',
     fieldLocationPlaceholder: 'Gedung Gereja',
@@ -233,6 +234,7 @@ export const worshipDictionary = defineDictionary('worship', {
     declineReason: 'Reason',
     declineReasonPlaceholder: 'Ada tugas ke luar kota',
     declineConfirm: 'Send',
+    declineReasonRequired: 'Tell the scheduler why you cannot serve',
     changeAnswer: 'Change answer',
     reasonShown: 'Reason: {reason}',
 
@@ -253,6 +255,7 @@ export const worshipDictionary = defineDictionary('worship', {
     blockoutReason: 'Reason (optional)',
     blockoutReasonPlaceholder: 'Mudik Lebaran',
     blockoutAdded: 'Dates saved',
+    blockoutEndBeforeStart: 'The last day must be on or after the first day',
     blockoutRemoved: 'Dates removed',
     removeBlockout: 'Remove these dates',
     removeBlockoutTitle: 'Remove {range}?',
@@ -469,6 +472,7 @@ export const worshipDictionary = defineDictionary('worship', {
     fieldTitlePlaceholder: 'Ibadah Minggu Adven I',
     fieldStartsAt: 'Mulai',
     fieldEndsAt: 'Selesai',
+    endsBeforeStart: 'Waktu selesai harus sesudah waktu mulai',
     fieldEndsAtHint:
       'Opsional. Dipakai untuk mendeteksi pelayan yang bertugas di dua tempat sekaligus.',
     fieldLocation: 'Tempat',
@@ -610,6 +614,7 @@ export const worshipDictionary = defineDictionary('worship', {
     declineReason: 'Alasan',
     declineReasonPlaceholder: 'Ada tugas ke luar kota',
     declineConfirm: 'Kirim',
+    declineReasonRequired: 'Tuliskan alasan Anda berhalangan',
     changeAnswer: 'Ubah jawaban',
     reasonShown: 'Alasan: {reason}',
 
@@ -631,6 +636,7 @@ export const worshipDictionary = defineDictionary('worship', {
     blockoutReason: 'Alasan (opsional)',
     blockoutReasonPlaceholder: 'Mudik Lebaran',
     blockoutAdded: 'Tanggal disimpan',
+    blockoutEndBeforeStart: 'Tanggal akhir tidak boleh sebelum tanggal awal',
     blockoutRemoved: 'Tanggal dihapus',
     removeBlockout: 'Hapus tanggal ini',
     removeBlockoutTitle: 'Hapus {range}?',

@@ -294,7 +294,13 @@ function TeamRoster({
           </p>
         </div>
         {canSchedule ? (
-          <Button variant="ghost" size="sm" disabled={autoFilling} onClick={onAutoFill}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={autoFilling}
+            onClick={onAutoFill}
+            aria-label={t('worship.autoFillTeam', { team: team.name })}
+          >
             <WandSparkles />
             <span className="hidden sm:inline">
               {t('worship.autoFillTeam', { team: team.name })}

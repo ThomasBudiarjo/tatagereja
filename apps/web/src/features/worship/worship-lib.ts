@@ -11,6 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, CircleDot, HandCoins, HandHeart, Megaphone, Mic, Music } from 'lucide-react';
 import type { ComponentType } from 'react';
+import type { FieldValues, Path, Resolver } from 'react-hook-form';
 import { useChurch } from '@/components/layout/church-provider';
 import type { Tone } from '@/components/ui/tone';
 import { useI18n } from '@/lib/i18n';
@@ -104,3 +105,22 @@ export const liturgySchedule = <T extends { durationMinutes: number | null }>(
     { list: [], minutes: 0 },
   ).list;
 };
+
+/**
+ * Translates the messages of the shared schemas' own rules (`refine`), which are English on
+ * both sides; built-in zod messages already follow the interface language.
+ */
+export const withMessages =
+  <V extends FieldValues, C, O>(
+    resolver: Resolver<V, C, O>,
+    messages: Partial<Record<Path<V>, () => string>>,
+  ): Resolver<V, C, O> =>
+  async (values, context, options) => {
+    const result = await resolver(values, context, options);
+    const errors = result.errors as Record<string, { type?: string; message?: string } | undefined>;
+    for (const [path, message] of Object.entries(messages) as [string, () => string][]) {
+      const error = errors[path];
+      if (error && error.type === 'custom') error.message = message();
+    }
+    return result;
+  };

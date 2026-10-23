@@ -31,11 +31,10 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { serviceQuery, serviceTypesQuery, useSaveService } from './api';
 import { PersonSelect } from './worship-ui';
-import { WORSHIP_TONE } from './worship-lib';
+import { WORSHIP_TONE, withMessages } from './worship-lib';
 
 type FormInput = z.input<typeof worshipServiceInputSchema>;
 type FormOutput = z.output<typeof worshipServiceInputSchema>;
-const schemaResolver = zodResolver(worshipServiceInputSchema);
 
 /** The coming Sunday (or next week's when today is Sunday) at the given local time. */
 const nextSundayAt = (time = '09:00') => {
@@ -141,7 +140,9 @@ function ServiceForm({ service, types }: { service?: WorshipService; types: Serv
   const form = useForm<FormInput, unknown, FormOutput>({
     // Blank reading rows are left out rather than reported.
     resolver: (values, context, options) =>
-      schemaResolver(
+      withMessages(zodResolver(worshipServiceInputSchema), {
+        endsAt: () => t('worship.endsBeforeStart'),
+      })(
         {
           ...values,
           scriptureReadings: (values.scriptureReadings ?? []).filter((item) => item.trim()),

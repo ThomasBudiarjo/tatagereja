@@ -28,7 +28,7 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react';
-import { useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import type { z } from 'zod';
@@ -187,21 +187,40 @@ export function LiturgyEditor({
       return next;
     });
 
-  /** Pointer drag on the handle: the row follows the pointer over the midpoints of the others. */
-  const onDragMove = (event: PointerEvent) => {
-    if (dragging === null || !listRef.current) return;
-    const rows = [...listRef.current.children] as HTMLElement[];
-    let target = 0;
-    rows.forEach((row, index) => {
-      if (index === dragging) return;
-      const rect = row.getBoundingClientRect();
-      if (event.clientY > rect.top + rect.height / 2) target += 1;
-    });
-    if (target !== dragging) {
-      move(dragging, target);
+  /**
+   * Pointer drag on the handle (mouse, pen or touch): while a row is held, it moves over the
+   * midpoints of the other rows. Window listeners keep working when the row moves in the DOM.
+   */
+  useEffect(() => {
+    if (dragging === null) return;
+    const onMove = (event: globalThis.PointerEvent) => {
+      if (!listRef.current) return;
+      const rows = [...listRef.current.children] as HTMLElement[];
+      let target = 0;
+      rows.forEach((row, index) => {
+        if (index === dragging) return;
+        const rect = row.getBoundingClientRect();
+        if (event.clientY > rect.top + rect.height / 2) target += 1;
+      });
+      if (target === dragging) return;
+      setDraft((list) => {
+        const next = [...list];
+        const [item] = next.splice(dragging, 1);
+        if (item) next.splice(target, 0, item);
+        return next;
+      });
       setDragging(target);
-    }
-  };
+    };
+    const stop = () => setDragging(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+  }, [dragging]);
 
   const start = new Date(service.startsAt).getTime();
   const times = liturgySchedule(service.startsAt, draft).map((entry) => entry.at);
@@ -310,7 +329,10 @@ export function LiturgyEditor({
 
       <ol
         ref={listRef}
-        className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft"
+        className={cn(
+          'divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft',
+          dragging !== null && 'cursor-grabbing select-none',
+        )}
       >
         {draft.map((item, index) => {
           const style = LITURGY_TYPE_STYLE[item.type];
@@ -331,12 +353,8 @@ export function LiturgyEditor({
                   className="flex size-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/30 active:cursor-grabbing sm:size-9"
                   onPointerDown={(event) => {
                     event.preventDefault();
-                    event.currentTarget.setPointerCapture(event.pointerId);
                     setDragging(index);
                   }}
-                  onPointerMove={onDragMove}
-                  onPointerUp={() => setDragging(null)}
-                  onPointerCancel={() => setDragging(null)}
                   onKeyDown={(event) => {
                     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                       event.preventDefault();

@@ -25,6 +25,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMutationToast } from '@/lib/use-mutation-toast';
 import { cn } from '@/lib/utils';
 import { useRespondToAssignment } from './api';
+import { withMessages } from './worship-lib';
 import { ConflictBadges, DateTile, RosterStatusBadge } from './worship-ui';
 
 type RespondForm = z.input<typeof rosterRespondBodySchema>;
@@ -42,7 +43,9 @@ export function DeclineDialog({
   const { churchId } = useChurch();
   const { t } = useI18n();
   const form = useForm<RespondForm, unknown, z.output<typeof rosterRespondBodySchema>>({
-    resolver: zodResolver(rosterRespondBodySchema),
+    resolver: withMessages(zodResolver(rosterRespondBodySchema), {
+      reason: () => t('worship.declineReasonRequired'),
+    }),
     defaultValues: { status: 'declined', reason: '' },
   });
   const respond = useMutationToast(useRespondToAssignment(churchId), {
