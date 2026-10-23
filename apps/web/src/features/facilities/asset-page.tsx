@@ -57,7 +57,9 @@ export function AssetPage() {
   const [logging, setLogging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [removingEntry, setRemovingEntry] = useState<string | null>(null);
-  const remove = useMutationToast(useDeleteAsset(churchId), { success: t('facilities.assetDeleted') });
+  const remove = useMutationToast(useDeleteAsset(churchId), {
+    success: t('facilities.assetDeleted'),
+  });
   const removeEntry = useMutationToast(useDeleteMaintenance(churchId), {
     success: t('facilities.maintenanceDeleted'),
   });
@@ -185,7 +187,11 @@ export function AssetPage() {
         <div className="flex min-w-0 flex-col gap-6">
           <Card className="overflow-hidden p-0">
             {asset.photoUrl ? (
-              <img src={asset.photoUrl} alt={asset.name} className="aspect-[16/8] w-full object-cover" />
+              <img
+                src={asset.photoUrl}
+                alt={asset.name}
+                className="aspect-[16/8] w-full object-cover"
+              />
             ) : null}
             <CardContent className="p-4 sm:p-5">
               {asset.description ? (
@@ -278,7 +284,11 @@ export function AssetPage() {
               <ul className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card shadow-soft">
                 {pastLoans.map((loan) => (
                   <li key={loan.id} className="flex items-center gap-3 px-4 py-3">
-                    <EntityAvatar name={loan.borrowerName} src={loan.borrower?.photoUrl} size="sm" />
+                    <EntityAvatar
+                      name={loan.borrowerName}
+                      src={loan.borrower?.photoUrl}
+                      size="sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{loan.borrowerName}</p>
                       <p className="text-xs text-muted-foreground tabular">
@@ -365,7 +375,9 @@ export function AssetPage() {
                 size={160}
                 caption={
                   <>
-                    <span className="block font-mono font-semibold text-foreground">{asset.code}</span>
+                    <span className="block font-mono font-semibold text-foreground">
+                      {asset.code}
+                    </span>
                     {t('facilities.qrCaption')}
                   </>
                 }
@@ -392,9 +404,7 @@ export function AssetPage() {
         open={deleting}
         onOpenChange={setDeleting}
         title={t('facilities.deleteAssetTitle', { name: asset.name })}
-        description={
-          openLoan ? t('facilities.deleteAssetOnLoan') : t('facilities.deleteAssetBody')
-        }
+        description={openLoan ? t('facilities.deleteAssetOnLoan') : t('facilities.deleteAssetBody')}
         confirmLabel={t('facilities.deleteAsset')}
         confirmText={asset.code}
         loading={remove.isPending}

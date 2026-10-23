@@ -1,8 +1,4 @@
-import {
-  canCancelBooking,
-  canDecideBooking,
-  canEditBooking,
-} from '@tatagereja/shared';
+import { canCancelBooking, canDecideBooking, canEditBooking } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarClock,
@@ -106,7 +102,9 @@ export function BookingPage() {
         {weekly ? (
           <StatusBadge tone="sky" icon={Repeat}>
             {booking.recurrenceUntil
-              ? t('facilities.weeklyUntil', { date: formatDate(booking.recurrenceUntil, 'dateShort') })
+              ? t('facilities.weeklyUntil', {
+                  date: formatDate(booking.recurrenceUntil, 'dateShort'),
+                })
               : t('facilities.weekly')}
           </StatusBadge>
         ) : null}
@@ -147,7 +145,10 @@ export function BookingPage() {
       <Card>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">
-            <Detail icon={CalendarClock} label={weekly ? t('facilities.firstDate') : t('facilities.when')}>
+            <Detail
+              icon={CalendarClock}
+              label={weekly ? t('facilities.firstDate') : t('facilities.when')}
+            >
               {formatDateRange(booking.startsAt, booking.endsAt)}
             </Detail>
             <Detail icon={DoorOpen} label={t('facilities.fieldResource')}>
@@ -261,7 +262,11 @@ export function BookingPage() {
         </div>
       ) : null}
 
-      <DecisionDialog booking={booking} decision={decision} onOpenChange={() => setDecision(null)} />
+      <DecisionDialog
+        booking={booking}
+        decision={decision}
+        onOpenChange={() => setDecision(null)}
+      />
       <CancelBookingDialog booking={booking} open={cancelling} onOpenChange={setCancelling} />
       <CancelBookingDialog
         booking={booking}

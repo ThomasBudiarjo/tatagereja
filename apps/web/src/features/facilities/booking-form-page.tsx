@@ -86,7 +86,10 @@ export function EditBookingPage() {
   if (booking.status !== 'pending' && booking.status !== 'approved') {
     return (
       <Page size="narrow">
-        <NoAccessState title={t('facilities.cannotEditTitle')} description={t('facilities.cannotEditBody')} />
+        <NoAccessState
+          title={t('facilities.cannotEditTitle')}
+          description={t('facilities.cannotEditBody')}
+        />
       </Page>
     );
   }
@@ -127,7 +130,14 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
   const guard = useUnsavedChangesGuard(isDirty && !isSubmitting && !isSubmitSuccessful);
   const [resourceId, startsAt, endsAt, recurrence, recurrenceUntil, expected] = useWatch({
     control: form.control,
-    name: ['resourceId', 'startsAt', 'endsAt', 'recurrence', 'recurrenceUntil', 'expectedAttendees'],
+    name: [
+      'resourceId',
+      'startsAt',
+      'endsAt',
+      'recurrence',
+      'recurrenceUntil',
+      'expectedAttendees',
+    ],
   });
   const resource = resources.data?.items.find((item) => item.id === resourceId);
   const weekly = recurrence === 'weekly';
@@ -200,7 +210,12 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
   if (resources.isSuccess && resources.data.items.length === 0) {
     return (
       <Page size="narrow">
-        <PageHeader title={title} icon={CalendarClock} tone={FACILITIES_TONE} backTo={`${base}/facilities`} />
+        <PageHeader
+          title={title}
+          icon={CalendarClock}
+          tone={FACILITIES_TONE}
+          backTo={`${base}/facilities`}
+        />
         <NoAccessState title={t('facilities.noRooms')} description={t('facilities.noRoomsView')} />
       </Page>
     );
@@ -240,7 +255,9 @@ function BookingFormPage({ booking }: { booking?: FacilityBooking }) {
                 {(resources.data?.items ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
-                    {item.capacity ? ` · ${t('facilities.capacityValue', { count: item.capacity })}` : ''}
+                    {item.capacity
+                      ? ` · ${t('facilities.capacityValue', { count: item.capacity })}`
+                      : ''}
                   </option>
                 ))}
               </Select>

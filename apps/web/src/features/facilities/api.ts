@@ -122,7 +122,8 @@ export const resourcesQuery = (churchId: string, params: ResourceListParams = {}
 export const resourceQuery = (churchId: string, id: string) =>
   queryOptions({
     queryKey: facilitiesKeys.resource(churchId, id),
-    queryFn: () => request(facilityResourceResponseSchema, { url: at(churchId, `/resources/${id}`) }),
+    queryFn: () =>
+      request(facilityResourceResponseSchema, { url: at(churchId, `/resources/${id}`) }),
   });
 
 export type ScheduleParams = { from: string; to: string; resourceId?: string };
@@ -189,8 +190,7 @@ export type AssetListParams = Partial<InventoryAssetListQuery>;
 export const assetsQuery = (churchId: string, params: AssetListParams = {}) =>
   queryOptions({
     queryKey: facilitiesKeys.assetList(churchId, params),
-    queryFn: () =>
-      request(inventoryAssetListSchema, { url: inv(churchId, '/assets'), params }),
+    queryFn: () => request(inventoryAssetListSchema, { url: inv(churchId, '/assets'), params }),
     placeholderData: keepPreviousData,
   });
 

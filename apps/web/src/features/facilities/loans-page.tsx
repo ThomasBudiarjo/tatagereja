@@ -132,7 +132,9 @@ export function LoansPage() {
                 ) : null
               ) : loan.isOverdue ? (
                 <StatusBadge tone="danger" size="sm">
-                  {t('facilities.overdueSinceShort', { date: formatDate(loan.dueDate, 'dayMonth') })}
+                  {t('facilities.overdueSinceShort', {
+                    date: formatDate(loan.dueDate, 'dayMonth'),
+                  })}
                 </StatusBadge>
               ) : loan.dueDate ? (
                 <StatusBadge tone="info" size="sm">

@@ -12,7 +12,7 @@ import {
 } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
 import { Button } from '@/components/ui/button';
@@ -75,9 +75,7 @@ export function CheckOutSheet({
   };
   const submit = form.handleSubmit(async (values) => {
     const body =
-      mode === 'person'
-        ? { ...values, borrowerName: null }
-        : { ...values, borrowerPersonId: null };
+      mode === 'person' ? { ...values, borrowerName: null } : { ...values, borrowerPersonId: null };
     if (await lend.run(body)) close(false);
   });
 
@@ -88,7 +86,11 @@ export function CheckOutSheet({
           <SheetTitle>{t('facilities.checkOutTitle', { name: asset.name })}</SheetTitle>
           <SheetDescription>{t('facilities.checkOutBody')}</SheetDescription>
         </SheetHeader>
-        <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col gap-4" noValidate>
+        <form
+          onSubmit={(event) => void submit(event)}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+          noValidate
+        >
           <SheetBody className="flex flex-col gap-4">
             <Segmented
               aria-label={t('facilities.borrower')}
@@ -131,7 +133,11 @@ export function CheckOutSheet({
               </Field>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t('facilities.fieldDueDate')} htmlFor="loan-due" error={errors.dueDate?.message}>
+              <Field
+                label={t('facilities.fieldDueDate')}
+                htmlFor="loan-due"
+                error={errors.dueDate?.message}
+              >
                 <Input id="loan-due" type="date" min={today} {...form.register('dueDate')} />
               </Field>
               <Controller
@@ -154,7 +160,11 @@ export function CheckOutSheet({
                 )}
               />
             </div>
-            <Field label={t('facilities.fieldNotes')} htmlFor="loan-notes" error={errors.notes?.message}>
+            <Field
+              label={t('facilities.fieldNotes')}
+              htmlFor="loan-notes"
+              error={errors.notes?.message}
+            >
               <Textarea
                 id="loan-notes"
                 rows={2}
@@ -196,6 +206,7 @@ export function ReturnSheet({
     resolver: zodResolver(returnAssetBodySchema),
     values: { conditionIn: loan?.conditionOut ?? 'good', notes: '' },
   });
+  const conditionIn = useWatch({ control: form.control, name: 'conditionIn' });
   const giveBack = useMutationToast(useReturnAsset(churchId), {
     success: (result) => t('facilities.returned', { name: result.loan.assetName }),
     form,
@@ -213,7 +224,11 @@ export function ReturnSheet({
             {t('facilities.returnBody', { name: loan?.borrowerName ?? '' })}
           </SheetDescription>
         </SheetHeader>
-        <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col gap-4" noValidate>
+        <form
+          onSubmit={(event) => void submit(event)}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+          noValidate
+        >
           <SheetBody className="flex flex-col gap-4">
             <Controller
               control={form.control}
@@ -237,10 +252,16 @@ export function ReturnSheet({
                 </Field>
               )}
             />
-            {form.watch('conditionIn') === 'broken' ? (
-              <p className="text-sm text-muted-foreground">{t('facilities.brokenGoesToMaintenance')}</p>
+            {conditionIn === 'broken' ? (
+              <p className="text-sm text-muted-foreground">
+                {t('facilities.brokenGoesToMaintenance')}
+              </p>
             ) : null}
-            <Field label={t('facilities.fieldNotes')} htmlFor="return-notes" error={form.formState.errors.notes?.message}>
+            <Field
+              label={t('facilities.fieldNotes')}
+              htmlFor="return-notes"
+              error={form.formState.errors.notes?.message}
+            >
               <Textarea id="return-notes" rows={2} {...form.register('notes')} />
             </Field>
           </SheetBody>
@@ -306,10 +327,19 @@ export function MaintenanceSheet({
             {asset.code} · {asset.name}
           </SheetDescription>
         </SheetHeader>
-        <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col gap-4" noValidate>
+        <form
+          onSubmit={(event) => void submit(event)}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+          noValidate
+        >
           <SheetBody className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t('facilities.fieldDate')} htmlFor="maint-date" error={errors.date?.message} required>
+              <Field
+                label={t('facilities.fieldDate')}
+                htmlFor="maint-date"
+                error={errors.date?.message}
+                required
+              >
                 <Input id="maint-date" type="date" max={today} {...form.register('date')} />
               </Field>
               <Field label={t('facilities.fieldMaintenanceKind')} htmlFor="maint-kind">
@@ -342,8 +372,16 @@ export function MaintenanceSheet({
                 control={form.control}
                 name="cost"
                 render={({ field }) => (
-                  <Field label={t('facilities.fieldCost')} htmlFor="maint-cost" error={errors.cost?.message}>
-                    <CurrencyInput id="maint-cost" value={field.value ?? null} onChange={field.onChange} />
+                  <Field
+                    label={t('facilities.fieldCost')}
+                    htmlFor="maint-cost"
+                    error={errors.cost?.message}
+                  >
+                    <CurrencyInput
+                      id="maint-cost"
+                      value={field.value ?? null}
+                      onChange={field.onChange}
+                    />
                   </Field>
                 )}
               />

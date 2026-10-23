@@ -2,7 +2,6 @@ import {
   ASSET_CONDITION_LABELS,
   ASSET_STATUS_LABELS,
   BOOKING_STATUS_LABELS,
-  canManageFacilities,
   canViewFacilities,
   canViewInventory,
   fullName,
@@ -114,7 +113,11 @@ export function BookingStatusBadge({
 }) {
   const { locale } = useI18n();
   return (
-    <StatusBadge tone={BOOKING_STATUS_TONES[status]} icon={BOOKING_STATUS_ICONS[status]} size={size}>
+    <StatusBadge
+      tone={BOOKING_STATUS_TONES[status]}
+      icon={BOOKING_STATUS_ICONS[status]}
+      size={size}
+    >
       {localize(BOOKING_STATUS_LABELS[status], locale)}
     </StatusBadge>
   );
@@ -198,12 +201,7 @@ export function AvailabilityBadge({
     );
   }
   return (
-    <StatusBadge
-      tone="warning"
-      icon={CircleDot}
-      size={size}
-      title={resource.currentBooking.title}
-    >
+    <StatusBadge tone="warning" icon={CircleDot} size={size} title={resource.currentBooking.title}>
       {t('facilities.inUseUntil', { time: formatTime(resource.currentBooking.endsAt) })}
     </StatusBadge>
   );
@@ -381,7 +379,10 @@ export function DayTimeline({
                 ? 'border-dashed border-tone bg-card text-tone-ink'
                 : 'border-y-0 border-r-0 border-l-4 border-tone bg-tone-soft text-tone-ink',
             )}
-            style={{ left: `${position(start)}%`, width: `${Math.max(0.8, position(end) - position(start))}%` }}
+            style={{
+              left: `${position(start)}%`,
+              width: `${Math.max(0.8, position(end) - position(start))}%`,
+            }}
             title={`${item.title} · ${formatTime(item.startsAt)}–${formatTime(item.endsAt)}`}
           >
             <span className="truncate font-semibold">{item.title}</span>
@@ -465,10 +466,4 @@ export function OccurrenceRow({
       )}
     </Link>
   );
-}
-
-/** Whether the caller may approve: shown as a hint next to request forms. */
-export function useIsFacilitiesManager() {
-  const { access } = useChurch();
-  return canManageFacilities(access);
 }

@@ -43,7 +43,9 @@ export function SchedulePage() {
   const from = startOfZonedDay(date, timeZone);
   const to = new Date(from.getTime() + DAY_MS);
   const [nowIso] = useState(() => new Date().toISOString());
-  const query = useQuery(scheduleQuery(churchId, { from: from.toISOString(), to: to.toISOString() }));
+  const query = useQuery(
+    scheduleQuery(churchId, { from: from.toISOString(), to: to.toISOString() }),
+  );
   const canBook = canRequestBooking(access);
   const hrefFor = (item: BookingOccurrence) => `${base}/facilities/bookings/${item.bookingId}`;
   const bookAt = (resourceId: string, minutes: number) => {

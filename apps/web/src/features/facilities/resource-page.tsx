@@ -44,7 +44,13 @@ import {
   todayIn,
   weekStartOf,
 } from './facilities-lib';
-import { AvailabilityBadge, DayTimeline, FacilitiesNav, OccurrenceRow, ResourceThumb } from './facilities-ui';
+import {
+  AvailabilityBadge,
+  DayTimeline,
+  FacilitiesNav,
+  OccurrenceRow,
+  ResourceThumb,
+} from './facilities-ui';
 
 const DAY_MS = 86_400_000;
 
@@ -244,7 +250,8 @@ function ResourceSchedule({ resourceId, canBook }: { resourceId: string; canBook
   const view = state.view === 'week' ? 'week' : 'day';
   const date = isValidDate(state.date) ? state.date : today;
   const first = view === 'week' ? weekStartOf(date) : date;
-  const days = view === 'week' ? Array.from({ length: 7 }, (_, index) => shiftDate(first, index)) : [first];
+  const days =
+    view === 'week' ? Array.from({ length: 7 }, (_, index) => shiftDate(first, index)) : [first];
   const from = startOfZonedDay(first, timeZone);
   const to = new Date(from.getTime() + days.length * DAY_MS);
   const [nowIso] = useState(() => new Date().toISOString());

@@ -101,7 +101,8 @@ function ResourceFormPage({ resource }: { resource?: FacilityResource }) {
   });
   const submit = form.handleSubmit(async (values) => {
     const result = await save.run(values);
-    if (result) void navigate(`${base}/facilities/rooms/${result.resource.id}`, { replace: !resource });
+    if (result)
+      void navigate(`${base}/facilities/rooms/${result.resource.id}`, { replace: !resource });
   });
   const title = resource ? t('facilities.roomFormEdit') : t('facilities.roomFormNew');
 

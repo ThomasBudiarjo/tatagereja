@@ -221,7 +221,10 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 </Select>
               </Field>
               {onLoan ? (
-                <Field label={t('facilities.fieldStatus')} description={t('facilities.statusOnLoanHint')}>
+                <Field
+                  label={t('facilities.fieldStatus')}
+                  description={t('facilities.statusOnLoanHint')}
+                >
                   <Input value={localize(ASSET_STATUS_LABELS.on_loan, locale)} disabled readOnly />
                 </Field>
               ) : (
@@ -306,7 +309,11 @@ function AssetFormPage({ asset }: { asset?: InventoryAsset }) {
                 {...form.register('photoUrl')}
               />
             </Field>
-            <Field label={t('facilities.fieldNotes')} htmlFor="asset-notes" error={errors.notes?.message}>
+            <Field
+              label={t('facilities.fieldNotes')}
+              htmlFor="asset-notes"
+              error={errors.notes?.message}
+            >
               <Textarea id="asset-notes" rows={2} {...form.register('notes')} />
             </Field>
             <FormActions>

@@ -63,7 +63,9 @@ export function BookingsPage() {
     status: '',
     page: 1,
   });
-  const tab: Tab = (tabs as readonly string[]).includes(state.tab) ? (state.tab as Tab) : 'upcoming';
+  const tab: Tab = (tabs as readonly string[]).includes(state.tab)
+    ? (state.tab as Tab)
+    : 'upcoming';
   const status = (BOOKING_STATUSES as readonly string[]).includes(state.status)
     ? (state.status as BookingStatus)
     : undefined;
@@ -143,7 +145,10 @@ export function BookingsPage() {
         }
       />
       <FacilitiesNav />
-      <Tabs value={tab} onValueChange={(value) => setState({ tab: value, status: '' }, { push: true })}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setState({ tab: value, status: '' }, { push: true })}
+      >
         <TabsList variant="underline">
           {tabs.map((value) => (
             <TabsTrigger key={value} value={value}>
