@@ -73,6 +73,8 @@ export const sessionSchema = z.object({
   lastUsedAt: isoDateTimeSchema,
   expiresAt: isoDateTimeSchema,
   userAgent: z.string().nullable(),
+  /** Address the session signed in from; older sessions have none. */
+  ip: z.string().nullable().default(null),
   current: z.boolean(),
 });
 export type Session = z.infer<typeof sessionSchema>;

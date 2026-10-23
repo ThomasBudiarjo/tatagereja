@@ -44,6 +44,21 @@ export const authDictionary = defineDictionary('auth', {
     invitationRequired: 'Invitation required',
     invitationRequiredBody:
       'This server only accepts registrations through an invitation link or QR code from a church administrator.',
+    accountLocked: 'Too many failed attempts. Sign-in to this account is paused for a few minutes.',
+    invalidCredentials: 'The email or password is not right.',
+    twoFactorTitle: 'Two-step verification',
+    twoFactorDescription: 'One more step to keep your church data safe.',
+    twoFactorPrompt: 'Open your authenticator app and enter the 6-digit code for TataGereja.',
+    recoveryPrompt:
+      'Enter one of the recovery codes you saved when turning on two-step verification.',
+    codeWrong: 'That code is not right. Check the time on your phone and try again.',
+    recoveryWrong: 'That recovery code is not valid or was already used.',
+    verify: 'Verify',
+    challengeTimer: 'Time left: {time}',
+    challengeExpired: 'This sign-in has expired',
+    challengeExpiredHint: 'For your safety, enter your password again.',
+    loginAgain: 'Log in again',
+    useOtherAccount: 'Back',
   },
   id: {
     server: 'Server',
@@ -89,5 +104,21 @@ export const authDictionary = defineDictionary('auth', {
     invitationRequired: 'Perlu undangan',
     invitationRequiredBody:
       'Server ini hanya menerima pendaftaran melalui tautan undangan atau kode QR dari pengurus gereja.',
+    accountLocked:
+      'Terlalu banyak percobaan gagal. Proses masuk ke akun ini dihentikan sementara selama beberapa menit.',
+    invalidCredentials: 'Email atau kata sandi tidak sesuai.',
+    twoFactorTitle: 'Verifikasi dua langkah',
+    twoFactorDescription: 'Satu langkah lagi untuk menjaga data gereja Anda.',
+    twoFactorPrompt: 'Buka aplikasi autentikator lalu masukkan 6 digit kode untuk TataGereja.',
+    recoveryPrompt:
+      'Masukkan salah satu kode pemulihan yang Anda simpan saat mengaktifkan verifikasi dua langkah.',
+    codeWrong: 'Kode tidak sesuai. Periksa jam di ponsel Anda lalu coba lagi.',
+    recoveryWrong: 'Kode pemulihan tidak valid atau sudah dipakai.',
+    verify: 'Verifikasi',
+    challengeTimer: 'Sisa waktu: {time}',
+    challengeExpired: 'Proses masuk ini sudah kedaluwarsa',
+    challengeExpiredHint: 'Demi keamanan, masukkan kata sandi Anda lagi.',
+    loginAgain: 'Masuk lagi',
+    useOtherAccount: 'Kembali',
   },
 });
