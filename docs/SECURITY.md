@@ -105,7 +105,8 @@ address or browser. Church audit entries stay with the church's records.
 - **Body size by kind of route** (`lib/abuse.ts`): 32 KB for sign-in, registration and codes;
   1 MB for long documents (Warta Jemaat, liturgies, songs, registry entries, pastoral notes);
   256 KB for everything else; imports up to `MAX_BODY_KB`. Larger bodies answer
-  `413 PAYLOAD_TOO_LARGE`.
+  `413 PAYLOAD_TOO_LARGE`; a chunked body without `Content-Length` answers
+  `411 LENGTH_REQUIRED` outside imports, so the limits cannot be stepped around.
 - **Per account** (`account.*` limiters), on top of the route-specific limits: 1,200 writes per
   10 minutes (a demo church is seeded with about 800), 120 exports and reports per 15 minutes
   (CSV exports, rosters, giving statements, reports, backups), 900 searches per 5 minutes.

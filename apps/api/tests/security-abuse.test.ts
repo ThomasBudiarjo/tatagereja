@@ -67,6 +67,21 @@ describe('abuse controls', () => {
     expect(imported.status).not.toBe(413);
   });
 
+  it('refuses a chunked body without a length outside imports', async () => {
+    const chunked = { 'transfer-encoding': 'chunked' };
+    const refused = await t.request('POST', `${church}/people`, {
+      token: s.owner.token,
+      headers: chunked,
+    });
+    expect(refused.status).toBe(411);
+    expect(refused.json.error.code).toBe('LENGTH_REQUIRED');
+    const imported = await t.request('POST', `${church}/people/import`, {
+      token: s.owner.token,
+      headers: chunked,
+    });
+    expect(imported.status).not.toBe(411);
+  });
+
   it('limits searches and exports per account', async () => {
     const searches = [];
     for (let index = 0; index < 4; index += 1) {

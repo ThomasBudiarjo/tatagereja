@@ -491,7 +491,7 @@ Modules are measured against a large church (`scripts/seed-large.ts`, `scripts/b
 - Audit sensitive writes; rate-limit guessable inputs (codes, tokens, logins).
 - Request bodies are limited by kind of route (`lib/abuse.ts`: 32 KB for auth, 1 MB for long
   documents, 256 KB otherwise, imports up to `MAX_BODY_KB`) and refused with
-  `413 PAYLOAD_TOO_LARGE`. Every account has generous limits on writes, exports and searches
+  `413 PAYLOAD_TOO_LARGE` (`411 LENGTH_REQUIRED` for a chunked body outside imports). Every account has generous limits on writes, exports and searches
   (`account.*` limiters); route-specific limits come on top.
 - Give audit entries `params` with the names the summary uses (`name`, `member`, `person`,
   counts) so the viewer can describe them in Indonesian; entries of the finance and care modules

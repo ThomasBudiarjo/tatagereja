@@ -41,7 +41,8 @@ const CANARY = {
 } as const;
 
 /** Field names that never leave the server, in any answer to anyone. */
-const SECRET_KEYS = /"(passwordHash|tokenHash|refreshTokenHash|secretEncrypted|codeHash)"\s*:/;
+const SECRET_KEYS =
+  /"(\w*(Hash|Encrypted)|passwordHash|totpSecret|recoveryCodes?|refreshToken|tokenHash)"\s*:/;
 
 type Caller = {
   name: string;
@@ -519,6 +520,26 @@ describe('permission and data-scope matrix', () => {
           ...(caller.token ? as(caller.token) : {}),
           body,
         });
+        problems.push(...check(route, caller, response));
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('refuses every guarded church write to members without its permission', async () => {
+    const problems: string[] = [];
+    const writes = world.writes.filter(
+      (route) => isChurchRoute(route) && guardPermissions(route).length > 0,
+    );
+    for (const route of writes) {
+      const path = world.pathOf(home, route, home);
+      const body = world.bodyOf(route, home);
+      const wanted = guardPermissions(route);
+      // Only callers the guard refuses, so nothing is changed by this pass.
+      for (const caller of callers.filter(
+        (item) => item.kind === 'member' && !hasAny(item, wanted),
+      )) {
+        const response = await t.request(route.method, path, { ...as(caller.token!), body });
         problems.push(...check(route, caller, response));
       }
     }

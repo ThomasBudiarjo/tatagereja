@@ -138,8 +138,20 @@ export function createApp(deps: Deps) {
       Object.assign(set.headers, securityHeaders(request, { trustedTypes: !config.turnstile }));
       // Bun also enforces `maxRequestBodySize`; this answers with a clear JSON error first.
       // Each kind of route has its own limit (`bodyLimitFor`): only imports take the largest.
-      const length = Number(request.headers.get('content-length') ?? 0);
+      const declared = request.headers.get('content-length');
+      const length = Number(declared ?? 0);
       const limit = bodyLimitFor(new URL(request.url).pathname, config.maxBodyBytes);
+      // A chunked body has no length to check; only imports (held by Bun's limit) may send one.
+      if (
+        declared === null &&
+        request.headers.has('transfer-encoding') &&
+        limit < config.maxBodyBytes
+      ) {
+        set.status = 411;
+        return {
+          error: { code: 'LENGTH_REQUIRED', message: 'Send the request body with its length' },
+        };
+      }
       if (length > limit) {
         set.status = 413;
         return {
