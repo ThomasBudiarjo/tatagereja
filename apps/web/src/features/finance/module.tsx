@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { request } from '@/lib/api';
 import { churchScope } from '@/lib/keys';
-import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
+import { defineModule, lazyPage, type AccessRule, type RoutePrefetch } from '@/lib/modules';
 
 const anyOf = (...permissions: Permission[]): AccessRule => ({ anyOf: permissions });
 
@@ -26,6 +26,14 @@ const viewers = anyOf('finance.view', 'finance.record', 'finance.approve');
 const expenses = anyOf('finance.view', 'finance.record', 'finance.approve', 'finance.manage');
 const record = anyOf('finance.record');
 
+/** The finance home as it opens: setup, and the summary and approvals the caller may see. */
+const prefetchFinanceHome: RoutePrefetch = async ({ churchId, access: caller, client }) => {
+  const api = await import('./api');
+  void client.prefetchQuery(api.financeSetupQuery(churchId));
+  if (has(caller, 'finance.view')) void client.prefetchQuery(api.financeSummaryQuery(churchId));
+  if (has(caller, 'finance.approve')) void client.prefetchQuery(api.financePendingQuery(churchId));
+};
+
 export const financeModule = defineModule({
   id: 'finance',
   icon: Wallet,
@@ -37,7 +45,7 @@ export const financeModule = defineModule({
     {
       path: 'finance',
       lazy: lazyPage(() => import('./finance-home-page'), 'FinanceHomePage'),
-      handle: { access },
+      handle: { access, prefetch: prefetchFinanceHome },
     },
     {
       path: 'finance/offerings',

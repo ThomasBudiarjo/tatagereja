@@ -7,7 +7,7 @@ import {
   ClipboardPlus,
   Home,
 } from 'lucide-react';
-import { defineModule, lazyPage, type AccessRule } from '@/lib/modules';
+import { defineModule, lazyPage, type AccessRule, type RoutePrefetch } from '@/lib/modules';
 
 const viewReports: AccessRule = { anyOf: ['reports.view'] };
 const viewSessions: AccessRule = { check: ({ access }) => can.viewAttendanceOverview(access) };
@@ -22,6 +22,12 @@ const anyReport: AccessRule = {
   check: ({ access, church }) => availableReports(access, church.enabledModules).length > 0,
 };
 
+/** The church home as it opens: the dashboard. */
+const prefetchHome: RoutePrefetch = async ({ churchId, client }) => {
+  const { dashboardQuery } = await import('@/features/dashboard/api');
+  void client.prefetchQuery(dashboardQuery(churchId));
+};
+
 export const insightsModule = defineModule({
   id: 'insights',
   icon: ChartColumnIncreasing,
@@ -33,6 +39,7 @@ export const insightsModule = defineModule({
     {
       index: true,
       lazy: lazyPage(() => import('@/features/dashboard/home-page'), 'HomePage'),
+      handle: { prefetch: prefetchHome },
     },
     {
       path: 'attendance',

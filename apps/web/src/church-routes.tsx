@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { ChurchProvider } from '@/components/layout/church-provider';
+import { LinkPrefetch } from '@/components/layout/link-prefetch';
 import { AppShell } from '@/components/layout/shells';
 import { NotFoundPage } from '@/features/not-found-page';
 import { CHURCH_ROUTES } from '@/features/registry';
@@ -10,13 +11,14 @@ import { CHURCH_ROUTES } from '@/features/registry';
  * never download the menus, manifests and badge queries of eleven modules.
  */
 
-export const CHURCH_SHELL = (
-  <ChurchProvider>
-    <AppShell />
-  </ChurchProvider>
-);
-
 export const CHURCH_CHILDREN: RouteObject[] = [
   ...CHURCH_ROUTES,
   { path: '*', element: <NotFoundPage embedded /> },
 ];
+
+export const CHURCH_SHELL = (
+  <ChurchProvider>
+    <AppShell />
+    <LinkPrefetch routes={CHURCH_CHILDREN} />
+  </ChurchProvider>
+);
