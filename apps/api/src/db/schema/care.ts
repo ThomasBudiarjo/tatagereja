@@ -262,6 +262,8 @@ export const careTasks = sqliteTable(
     personId: text('person_id').references(() => people.id, { onDelete: 'set null' }),
     completedAt: text('completed_at'),
     completedBy: text('completed_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Set when the assignee was reminded of the due date; cleared when the due date changes. */
+    reminderSentAt: text('reminder_sent_at'),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
