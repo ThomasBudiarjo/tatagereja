@@ -43,6 +43,13 @@
       "when": 1792734648875,
       "tag": "0005_notifications_english_text",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792773290813,
+      "tag": "0006_sec_auth",
+      "breakpoints": true
     }
   ]
 }

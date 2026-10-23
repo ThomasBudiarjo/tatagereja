@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createRateLimiter } from '../src/lib/rate-limit';
 import { checkIn, seedCheckin, type CheckinSeed } from './checkin-fixtures';
-import { createTestApp } from './helpers';
+import { createTestApp, permissiveLimiters } from './helpers';
 
 describe('kids check-out', () => {
   const t = createTestApp();
@@ -198,9 +198,7 @@ describe('kids check-out', () => {
       {},
       {
         limiters: {
-          login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-          register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-          invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+          ...permissiveLimiters(),
           'checkin.checkout': createRateLimiter({ windowMs: 60_000, max: 1 }),
         },
       },

@@ -1,6 +1,6 @@
 import { expect } from 'bun:test';
 import { createApp, createDeps } from '../src/app';
-import { createRateLimiter } from '../src/lib/rate-limit';
+import { createRateLimiter, type Limiters } from '../src/lib/rate-limit';
 import { testConfig, type AppConfig } from '../src/config';
 import { openDatabase } from '../src/db/client';
 import type { Deps } from '../src/deps';
@@ -17,6 +17,16 @@ function parseBody(text: string): any {
   }
 }
 
+/** Every built-in limiter, loose enough that suites can register and sign in freely. */
+export const permissiveLimiters = (): Limiters => ({
+  login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  loginIp: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  sessionRefresh: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+  passwordReset: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+});
+
 export function createTestApp(
   configOverrides: Partial<AppConfig> = {},
   depsOverrides: Partial<Deps> = {},
@@ -25,11 +35,7 @@ export function createTestApp(
   const config = testConfig(configOverrides);
   const deps = createDeps(handle.db, config, {
     // Tests register many accounts from one "IP"; suites that test limits pass their own limiters.
-    limiters: {
-      login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-      register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-      invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-    },
+    limiters: permissiveLimiters(),
     ...depsOverrides,
   });
   const app = createApp(deps);

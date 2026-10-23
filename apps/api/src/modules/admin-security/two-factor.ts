@@ -7,7 +7,6 @@ import {
   type LoginEventOutcome,
 } from '@tatagereja/shared';
 import { and, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
-import type { AppConfig } from '../../config';
 import type { Queryable } from '../../db/client';
 import type { UserRow, UserTwoFactorRow } from '../../db/schema';
 import {
@@ -25,7 +24,6 @@ import { UNAMBIGUOUS_ALPHABET, generateCode, hashToken, newId } from '../../lib/
 import { loadAccess } from '../../services/access';
 import { moduleSettings } from '../../services/modules';
 import { notify } from '../../services/notifications';
-import { decryptSecret } from './secrets';
 import { verifyTotp } from './totp';
 
 /** The enabled second factor of an account, or null. */
@@ -88,13 +86,14 @@ export type SecondFactorResult = { method: 'totp' | 'recovery'; remainingRecover
  */
 export function useSecondFactor(
   db: Queryable,
-  config: Pick<AppConfig, 'databasePath'>,
   row: UserTwoFactorRow,
   factor: SecondFactor,
 ): SecondFactorResult | null {
   if (factor.code) {
-    const secret = decryptSecret(config, row.secretEncrypted);
-    if (!secret) return null;
+    // The column decrypts on read (encryptedText); a secret in the format before field
+    // encryption whose key is gone does not verify any code.
+    const secret = row.secretEncrypted;
+    if (!secret || secret.startsWith('v1:')) return null;
     const step = verifyTotp(secret, factor.code);
     if (step === null || (row.lastUsedStep !== null && step <= row.lastUsedStep)) return null;
     db.update(userTwoFactor)
@@ -209,6 +208,7 @@ export function registerLoginFailure(
   user: UserRow,
   outcome: 'failure' | 'two_factor_failure',
   meta: RequestMeta,
+  reason: string | null = null,
 ): Date | null {
   const now = Date.now();
   const recent =
@@ -228,7 +228,7 @@ export function registerLoginFailure(
     userId: user.id,
     email: user.email,
     outcome,
-    reason: lockedUntil ? `locked_${delay}m` : null,
+    reason: [reason, lockedUntil ? `locked_${delay}m` : null].filter(Boolean).join(',') || null,
     meta,
   });
   if (lockedUntil && failedCount === LOGIN_LOCKOUT_POLICY.freeAttempts) {

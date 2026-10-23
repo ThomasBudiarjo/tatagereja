@@ -16,7 +16,12 @@ import {
   type PermissionDefinition,
 } from '../permissions';
 import { auditLogQuerySchema, auditLogSchema } from './audit';
-import { authResponseSchema, changePasswordBodySchema, userSummarySchema } from './auth';
+import {
+  SESSION_TRANSPORTS,
+  authResponseSchema,
+  changePasswordBodySchema,
+  userSummarySchema,
+} from './auth';
 import { membershipSchema } from './church';
 import { idSchema, isoDateSchema, isoDateTimeSchema, paginatedSchema } from './common';
 import { memberPermissionsSchema } from './role';
@@ -73,6 +78,10 @@ export const LOGIN_EVENT_OUTCOMES = [
   'two_factor_success',
   'two_factor_failure',
   'recovery_code_used',
+  /** A refresh token was used twice: someone copied it, so the session was ended. */
+  'refresh_reuse',
+  'password_reset',
+  'password_reset_failure',
 ] as const;
 export type LoginEventOutcome = (typeof LOGIN_EVENT_OUTCOMES)[number];
 
@@ -87,6 +96,15 @@ export const LOGIN_EVENT_OUTCOME_LABELS: Record<LoginEventOutcome, LocalizedText
   two_factor_success: { en: 'Signed in with 2FA', id: 'Masuk dengan verifikasi dua langkah' },
   two_factor_failure: { en: 'Wrong 2FA code', id: 'Kode verifikasi salah' },
   recovery_code_used: { en: 'Signed in with a recovery code', id: 'Masuk dengan kode pemulihan' },
+  refresh_reuse: {
+    en: 'Session ended: a copied sign-in was used',
+    id: 'Sesi diakhiri: salinan sesi masuk dipakai',
+  },
+  password_reset: { en: 'Password reset', id: 'Kata sandi diatur ulang' },
+  password_reset_failure: {
+    en: 'Password reset refused',
+    id: 'Atur ulang kata sandi ditolak',
+  },
 };
 
 /** Outcomes that mean someone failed to get in; the UI colours them as warnings. */
@@ -94,6 +112,8 @@ export const FAILED_LOGIN_OUTCOMES: readonly LoginEventOutcome[] = [
   'failure',
   'locked',
   'two_factor_failure',
+  'refresh_reuse',
+  'password_reset_failure',
 ];
 
 /** Six digits from an authenticator app; spaces are ignored. */
@@ -187,6 +207,7 @@ export const loginTwoFactorBodySchema = z
     challengeToken: z.string().trim().min(1).max(LIMITS.tokenMax),
     code: totpCodeSchema.optional(),
     recoveryCode: recoveryCodeSchema.optional(),
+    transport: z.enum(SESSION_TRANSPORTS).default('bearer'),
   })
   .refine((value) => !!value.code !== !!value.recoveryCode, {
     message: 'Enter either the authenticator code or a recovery code',
@@ -220,16 +241,32 @@ export type LoginEventListQuery = z.infer<typeof loginEventListQuerySchema>;
 export const loginEventListSchema = paginatedSchema(loginEventSchema);
 export type LoginEventList = z.infer<typeof loginEventListSchema>;
 
-/** Changing the password signs out every other session unless the member chooses otherwise. */
-export const securePasswordChangeBodySchema = changePasswordBodySchema.extend({
-  revokeOtherSessions: z.boolean().default(true),
-});
+/**
+ * Changing the password always signs out every other session, and gives this one new
+ * credentials (`session` in the answer).
+ */
+export const securePasswordChangeBodySchema = changePasswordBodySchema;
 export type SecurePasswordChangeBody = z.infer<typeof securePasswordChangeBodySchema>;
 
 export const passwordChangeResponseSchema = z.object({
   ok: z.literal(true),
   /** Other sessions signed out by the change. */
   revokedSessions: z.number().int().nonnegative(),
+  session: authResponseSchema,
+});
+
+/** Turning two-step verification on: the recovery codes (shown once) and rotated credentials. */
+export const twoFactorEnabledSchema = z.object({
+  recoveryCodes: z.array(z.string()),
+  revokedSessions: z.number().int().nonnegative(),
+  session: authResponseSchema,
+});
+export type TwoFactorEnabled = z.infer<typeof twoFactorEnabledSchema>;
+
+export const twoFactorDisabledSchema = z.object({
+  ok: z.literal(true),
+  revokedSessions: z.number().int().nonnegative(),
+  session: authResponseSchema,
 });
 
 export const revokeSessionsResponseSchema = z.object({

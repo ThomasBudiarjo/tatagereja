@@ -123,6 +123,12 @@ export const ERROR_CODES = [
   'SCHEDULING_CONFLICT',
   /** Segregation of duties: the same person cannot both request and approve or verify. */
   'SELF_APPROVAL',
+  /** A cookie-authenticated write without a valid CSRF token or from another site. */
+  'CSRF_FAILED',
+  /** A refresh token was presented again after it had been rotated: the session is revoked. */
+  'SESSION_REVOKED',
+  /** A password reset link that is unknown, used or expired. */
+  'RESET_LINK_INVALID',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

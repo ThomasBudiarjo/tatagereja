@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createRateLimiter } from '../src/lib/rate-limit';
 import { userTwoFactor, users } from '../src/db/schema';
 import { base32Decode, base32Encode, hotp, totpCode } from '../src/modules/admin-security/totp';
-import { createTestApp } from './helpers';
+import { createTestApp, permissiveLimiters } from './helpers';
 
 type TestApp = ReturnType<typeof createTestApp>;
 
@@ -429,9 +429,7 @@ describe('progressive lockout', () => {
       {},
       {
         limiters: {
-          login: createRateLimiter({ windowMs: 60_000, max: 1000 }),
-          register: createRateLimiter({ windowMs: 60_000, max: 1000 }),
-          invitation: createRateLimiter({ windowMs: 60_000, max: 1000 }),
+          ...permissiveLimiters(),
           'auth.two_factor': createRateLimiter({ windowMs: 60_000, max: 2 }),
         },
       },

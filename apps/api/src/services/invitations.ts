@@ -5,14 +5,39 @@ import type { InvitationRow } from '../db/schema';
 import { churches, churchMemberships, invitations, users } from '../db/schema';
 import { HttpError } from '../lib/errors';
 import type { RequestMeta } from '../lib/request';
-import { newId } from '../lib/tokens';
+import { hashToken, newId } from '../lib/tokens';
 import { nowIso } from '../lib/time';
 import { loadAccess } from './access';
 import { recordAudit } from './audit';
 import { notify } from './notifications';
 
+/** Invitations are found by the hash of their link token; the token itself is never stored. */
 export function findInvitationByToken(db: Queryable, token: string): InvitationRow | undefined {
-  return db.select().from(invitations).where(eq(invitations.token, token)).get();
+  return db
+    .select()
+    .from(invitations)
+    .where(eq(invitations.tokenHash, hashToken(token)))
+    .get();
+}
+
+/**
+ * Replaces the plain link tokens of invitations made before tokens were hashed with their
+ * hash. Runs at startup; a hash is 64 hex characters and no plain token is, so rows already
+ * hashed are left alone and it is idempotent.
+ */
+export function hashLegacyInvitationTokens(db: Queryable): number {
+  const rows = db
+    .select({ id: invitations.id, tokenHash: invitations.tokenHash })
+    .from(invitations)
+    .all()
+    .filter((row) => !/^[0-9a-f]{64}$/.test(row.tokenHash));
+  for (const row of rows) {
+    db.update(invitations)
+      .set({ tokenHash: hashToken(row.tokenHash) })
+      .where(eq(invitations.id, row.id))
+      .run();
+  }
+  return rows.length;
 }
 
 /**

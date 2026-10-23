@@ -6,7 +6,11 @@ import { churchSummarySchema } from './church';
 export const invitationSchema = z.object({
   id: idSchema,
   churchId: idSchema,
-  token: z.string(),
+  /**
+   * The link token, present only in the answer that made or regenerated the link: the server
+   * keeps a hash, so a list never shows it again.
+   */
+  token: z.string().nullable(),
   role: z.enum(INVITABLE_ROLES),
   label: z.string().nullable(),
   expiresAt: isoDateTimeSchema.nullable(),
@@ -17,7 +21,8 @@ export const invitationSchema = z.object({
   createdBy: idSchema,
   createdByName: z.string(),
   createdAt: isoDateTimeSchema,
-  url: z.string(),
+  /** The join link (`/join/<token>`), shown once like `token`. */
+  url: z.string().nullable(),
 });
 export type Invitation = z.infer<typeof invitationSchema>;
 

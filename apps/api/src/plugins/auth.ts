@@ -1,19 +1,29 @@
-import { hasAny, type Access, type ModuleId, type Permission, type User } from '@tatagereja/shared';
+import {
+  CSRF_HEADER,
+  hasAny,
+  type Access,
+  type ModuleId,
+  type Permission,
+  type SessionTransport,
+  type User,
+} from '@tatagereja/shared';
 import { and, eq } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import { churches, churchMemberships, sessions, users } from '../db/schema';
 import type { Deps } from '../deps';
 import { HttpError, forbidden, notFound, unauthorized } from '../lib/errors';
+import { crossSiteReason } from '../lib/origin';
 import { requestMeta } from '../lib/request';
-import { hashToken } from '../lib/tokens';
+import { hashToken, safeEqual } from '../lib/tokens';
 import { toUser } from '../serializers';
 import { loadAccess, seedRoleTemplates } from '../services/access';
 import type { AuditContext } from '../services/audit';
 import { assertModuleEnabled } from '../services/modules';
 import { enforceChurchSecurityPolicy } from '../services/security-policy';
+import { csrfTokenFor, readSessionCookie, sessionEnded } from '../services/sessions';
 
-export type AuthContext = { user: User; sessionId: string };
+export type AuthContext = { user: User; sessionId: string; transport: SessionTransport };
 export type ChurchContext = { church: ChurchRow; membership: MembershipRow; access: Access };
 
 /**
@@ -28,32 +38,68 @@ export type ChurchGuard =
   | { module?: ModuleId; permission?: Permission | readonly Permission[]; message?: string };
 
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 type ServerLike = { requestIP?: (req: Request) => { address: string } | null } | null | undefined;
 
 export function createAuthService(deps: Deps) {
   const { db } = deps;
 
-  const authenticate = (headers: Record<string, string | undefined>): AuthContext => {
+  const authenticate = (
+    request: Request,
+    headers: Record<string, string | undefined>,
+  ): AuthContext => {
     const header = headers.authorization ?? headers.Authorization;
-    if (!header) throw unauthorized();
-    const [scheme, token, ...rest] = header.trim().split(/\s+/);
-    if (!scheme || scheme.toLowerCase() !== 'bearer' || !token || rest.length > 0) {
-      throw unauthorized('Invalid authorization header');
+    let token: string;
+    let transport: SessionTransport;
+    if (header) {
+      const [scheme, value, ...rest] = header.trim().split(/\s+/);
+      if (!scheme || scheme.toLowerCase() !== 'bearer' || !value || rest.length > 0) {
+        throw unauthorized('Invalid authorization header');
+      }
+      if (value.length > 512) throw unauthorized('Invalid authorization header');
+      token = value;
+      transport = 'bearer';
+    } else {
+      const cookie = readSessionCookie(request);
+      if (!cookie) throw unauthorized();
+      token = cookie;
+      transport = 'cookie';
     }
-    if (token.length > 512) throw unauthorized('Invalid authorization header');
     const row = db
       .select({ session: sessions, user: users })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
       .where(eq(sessions.tokenHash, hashToken(token)))
       .get();
-    if (!row) throw unauthorized('Session is invalid or has expired');
+    // A cookie token is never accepted as a bearer token, nor the other way round.
+    if (!row || row.session.transport !== transport) {
+      throw unauthorized('Session is invalid or has expired');
+    }
 
     const now = Date.now();
-    if (new Date(row.session.expiresAt).getTime() <= now) {
+    if (sessionEnded(row.session, deps.config, now)) {
       db.delete(sessions).where(eq(sessions.id, row.session.id)).run();
       throw unauthorized('Session has expired');
+    }
+    if (
+      transport === 'bearer' &&
+      (!row.session.accessExpiresAt || new Date(row.session.accessExpiresAt).getTime() <= now)
+    ) {
+      throw unauthorized('Access token has expired');
+    }
+    if (transport === 'cookie' && UNSAFE_METHODS.has(request.method)) {
+      // The cookie travels with any request the browser makes; writes must prove they come
+      // from this app: same origin, and the CSRF token only same-origin script can read.
+      const crossSite = crossSiteReason(request, deps.config);
+      const csrf = request.headers.get(CSRF_HEADER);
+      if (crossSite || !csrf || !safeEqual(csrf, csrfTokenFor(token))) {
+        throw new HttpError(
+          403,
+          'CSRF_FAILED',
+          'This request did not come from the app. Reload the page and try again',
+        );
+      }
     }
     if (now - new Date(row.session.lastUsedAt).getTime() > TOUCH_INTERVAL_MS) {
       db.update(sessions)
@@ -61,7 +107,7 @@ export function createAuthService(deps: Deps) {
         .where(eq(sessions.id, row.session.id))
         .run();
     }
-    return { user: toUser(row.user), sessionId: row.session.id };
+    return { user: toUser(row.user), sessionId: row.session.id, transport };
   };
 
   const loadChurchContext = (churchId: string, userId: string): ChurchContext => {
@@ -136,7 +182,7 @@ export function authPlugin(deps: Deps) {
   const authenticate = (request: Request, headers: Record<string, string | undefined>) => {
     const known = verified.get(request);
     if (known) return known;
-    const auth = service.authenticate(headers);
+    const auth = service.authenticate(request, headers);
     verified.set(request, auth);
     return auth;
   };

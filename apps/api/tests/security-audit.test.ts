@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { loggedPath } from '../src/app';
 import { createRateLimiter } from '../src/lib/rate-limit';
 import { clientIp } from '../src/lib/request';
-import { createTestApp, seedChurch } from './helpers';
+import { createTestApp, seedChurch, permissiveLimiters } from './helpers';
 
 /*
  * Regression tests for the cross-module security review: forwarded addresses, sessions checked
@@ -11,6 +11,7 @@ import { createTestApp, seedChurch } from './helpers';
  */
 
 const strictLimiters = (max: number) => ({
+  ...permissiveLimiters(),
   login: createRateLimiter({ windowMs: 60_000, max }),
   register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
   invitation: createRateLimiter({ windowMs: 60_000, max }),

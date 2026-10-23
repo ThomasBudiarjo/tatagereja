@@ -92,14 +92,19 @@ export const toMembership = (
 export const invitationUrl = (appUrl: string, token: string): string =>
   `${appUrl}/join/${encodeURIComponent(token)}`;
 
+/**
+ * `token` is the plain link token, known only right after the link was made or regenerated;
+ * everywhere else the invitation is listed without it.
+ */
 export const toInvitation = (
   row: InvitationRow,
   createdByName: string,
   appUrl: string,
+  token: string | null = null,
 ): Invitation => ({
   id: row.id,
   churchId: row.churchId,
-  token: row.token,
+  token,
   role: row.role,
   label: row.label,
   expiresAt: row.expiresAt,
@@ -110,7 +115,7 @@ export const toInvitation = (
   createdBy: row.createdBy,
   createdByName,
   createdAt: row.createdAt,
-  url: invitationUrl(appUrl, row.token),
+  url: token ? invitationUrl(appUrl, token) : null,
 });
 
 export const toPerson = (row: PersonRow): Person => ({

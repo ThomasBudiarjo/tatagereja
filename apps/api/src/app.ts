@@ -32,6 +32,7 @@ import { peopleExtensionsModule } from './modules/people/index';
 import { recordsModule } from './modules/records';
 import { rolesModule } from './modules/roles';
 import { worshipModule } from './modules/worship';
+import { prepareDatabaseSecurity } from './services/security-startup';
 
 type ValidationIssueLike = { path?: unknown; summary?: unknown; message?: unknown };
 
@@ -61,15 +62,21 @@ export const loggedPath = (pathname: string): string => pathname.replace(TOKEN_P
 export function defaultLimiters(): Limiters {
   return {
     login: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }),
+    // Generous: a church wifi or a carrier NAT puts a whole congregation behind one address.
+    loginIp: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }),
     register: createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 }),
     invitation: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 60 }),
+    sessionRefresh: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 120 }),
+    passwordReset: createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }),
   };
 }
 
 export function createDeps(db: Db, config: AppConfig, overrides: Partial<Deps> = {}): Deps {
+  const security = prepareDatabaseSecurity(db, config);
   return {
     db,
     config,
+    security,
     limiters: defaultLimiters(),
     verifyTurnstile: config.turnstile ? createTurnstileVerifier(config.turnstile.secretKey) : null,
     ...overrides,

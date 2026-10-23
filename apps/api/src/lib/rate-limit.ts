@@ -45,14 +45,20 @@ export function createRateLimiter(options: { windowMs: number; max: number }): R
 export type RateLimitOptions = { windowMs: number; max: number };
 
 /**
- * Named limiters shared by the whole server. The three built-in ones are always present;
+ * Named limiters shared by the whole server. The built-in ones are always present;
  * modules add their own lazily through `enforceRateLimit`, and tests can pre-register a
  * permissive or strict limiter under the same name.
  */
 export type Limiters = {
+  /** Sign-in attempts per address and email. */
   login: RateLimiter;
+  /** Sign-in attempts per address, whatever the email (spraying many accounts). */
+  loginIp: RateLimiter;
   register: RateLimiter;
   invitation: RateLimiter;
+  /** Refresh-token exchanges and password-reset attempts per address. */
+  sessionRefresh: RateLimiter;
+  passwordReset: RateLimiter;
   [name: string]: RateLimiter | undefined;
 };
 

@@ -5,7 +5,7 @@ import { createRateLimiter } from '../src/lib/rate-limit';
 import { nowIso } from '../src/lib/time';
 import { newId } from '../src/lib/tokens';
 import { checkIn, seedCheckin, type CheckinSeed } from './checkin-fixtures';
-import { createTestApp } from './helpers';
+import { createTestApp, permissiveLimiters } from './helpers';
 
 const dayOffset = (days: number) => {
   const date = new Date();
@@ -103,9 +103,7 @@ describe('kids check-in hardening', () => {
         {},
         {
           limiters: {
-            login: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-            register: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
-            invitation: createRateLimiter({ windowMs: 60_000, max: 10_000 }),
+            ...permissiveLimiters(),
             'checkin.checkout.user': createRateLimiter({ windowMs: 60_000, max: 2 }),
           },
         },
