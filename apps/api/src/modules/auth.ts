@@ -25,12 +25,7 @@ import {
   validationError,
 } from '../lib/errors';
 import { crossSiteReason } from '../lib/origin';
-import {
-  assertStrongPassword,
-  hashPassword,
-  needsRehash,
-  verifyPassword,
-} from '../lib/password';
+import { assertStrongPassword, hashPassword, needsRehash, verifyPassword } from '../lib/password';
 import { enforceRateLimit } from '../lib/rate-limit';
 import { clientIp, requestMeta, type RequestMeta } from '../lib/request';
 import { nowIso } from '../lib/time';
@@ -116,7 +111,10 @@ export const authModule = (deps: Deps) => {
   /** A new sign-in replaces the session the browser already presented (session fixation). */
   const dropPresentedSession = (request: Request) => {
     const token = readSessionCookie(request);
-    if (token) db.delete(sessions).where(eq(sessions.tokenHash, hashToken(token))).run();
+    if (token)
+      db.delete(sessions)
+        .where(eq(sessions.tokenHash, hashToken(token)))
+        .run();
   };
 
   /** The password (and second factor, when on) checked out: start a session. */

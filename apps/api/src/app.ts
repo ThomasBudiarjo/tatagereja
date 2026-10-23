@@ -54,8 +54,8 @@ function normaliseIssues(all: unknown): { path: string; message: string }[] {
   });
 }
 
-/** Paths that carry a credential (private calendar feeds, invitation links) are logged without it. */
-const TOKEN_PATH = /^(\/api\/(?:calendar\/feeds|invitations)\/)[^/]+/;
+/** Paths that carry a credential (calendar feeds, invitation and reset links) are logged without it. */
+const TOKEN_PATH = /^(\/api\/(?:calendar\/feeds|invitations|auth\/password-reset)\/)[^/]+/;
 export const loggedPath = (pathname: string): string => pathname.replace(TOKEN_PATH, '$1[token]');
 
 /** Production rate limits. Registration is generous because many members share one IP (carrier NAT, church wifi). */

@@ -7,7 +7,7 @@ import { isHttpsRequest } from './request';
 export function requestOrigin(request: Request, trustedProxies: number): string | null {
   const forwarded =
     trustedProxies > 0 ? request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() : null;
-  const host = forwarded || request.headers.get('host');
+  const host = forwarded || request.headers.get('host') || new URL(request.url).host;
   if (!host) return null;
   return `${isHttpsRequest(request) ? 'https' : 'http'}://${host.toLowerCase()}`;
 }

@@ -31,12 +31,23 @@ export const encryptedText = (table: string, column: string) => {
 
 type StoredValue = { id: number; value: string };
 
-const storedValues = (db: Queryable, table: string, column: string, where: ReturnType<typeof sql>) =>
+const storedValues = (
+  db: Queryable,
+  table: string,
+  column: string,
+  where: ReturnType<typeof sql>,
+) =>
   db.all<StoredValue>(
     sql`select rowid as id, ${sql.identifier(column)} as value from ${sql.identifier(table)} where ${sql.identifier(column)} is not null and ${where}`,
   );
 
-const writeValue = (db: Queryable, table: string, column: string, row: StoredValue, value: string) =>
+const writeValue = (
+  db: Queryable,
+  table: string,
+  column: string,
+  row: StoredValue,
+  value: string,
+) =>
   db.run(
     sql`update ${sql.identifier(table)} set ${sql.identifier(column)} = ${value} where rowid = ${row.id}`,
   );
@@ -58,7 +69,10 @@ export function assertEncryptionKeysAvailable(db: Queryable, keyring: Keyring): 
       db,
       table,
       column,
-      sql.join([sql`${sql.identifier(column)} like ${`${ENCRYPTED_PREFIX}%`}`, ...conditions], sql` and `),
+      sql.join(
+        [sql`${sql.identifier(column)} like ${`${ENCRYPTED_PREFIX}%`}`, ...conditions],
+        sql` and `,
+      ),
     )[0];
     if (unknown) {
       throw new Error(

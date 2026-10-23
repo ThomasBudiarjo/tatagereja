@@ -20,6 +20,8 @@ import {
   SESSION_TRANSPORTS,
   authResponseSchema,
   changePasswordBodySchema,
+  emailSchema,
+  passwordSchema,
   userSummarySchema,
 } from './auth';
 import { membershipSchema } from './church';
@@ -273,6 +275,55 @@ export const revokeSessionsResponseSchema = z.object({
   ok: z.literal(true),
   revokedSessions: z.number().int().nonnegative(),
 });
+
+/** Admin-assisted password reset links work this long, and once. */
+export const PASSWORD_RESET_TTL_MINUTES = 30;
+
+/** The administrator confirms they checked who is asking (in person, by phone). */
+export const createPasswordResetBodySchema = z.object({
+  identityConfirmed: z.literal(true, 'Confirm that you checked who is asking'),
+});
+export type CreatePasswordResetBody = z.infer<typeof createPasswordResetBodySchema>;
+
+/** The link is shown once; only its hash is stored. */
+export const passwordResetLinkSchema = z.object({
+  url: z.string(),
+  token: z.string(),
+  expiresAt: isoDateTimeSchema,
+  /** The member also needs a code from their authenticator (or a recovery code) to use it. */
+  twoFactorRequired: z.boolean(),
+});
+export type PasswordResetLink = z.infer<typeof passwordResetLinkSchema>;
+
+/** What the reset page shows before a new password is chosen. */
+export const passwordResetPreviewSchema = z.object({
+  name: z.string(),
+  /** Partly hidden, e.g. `ru***@example.com`. */
+  email: z.string(),
+  expiresAt: isoDateTimeSchema,
+  twoFactorRequired: z.boolean(),
+});
+export type PasswordResetPreview = z.infer<typeof passwordResetPreviewSchema>;
+
+export const passwordResetTokenParamsSchema = z.object({
+  token: z.string().trim().min(1).max(LIMITS.tokenMax),
+});
+
+export const completePasswordResetBodySchema = z.object({
+  token: z.string().trim().min(1).max(LIMITS.tokenMax),
+  newPassword: passwordSchema,
+  code: totpCodeSchema.optional(),
+  recoveryCode: recoveryCodeSchema.optional(),
+});
+export type CompletePasswordResetBody = z.infer<typeof completePasswordResetBodySchema>;
+
+/** Self-service reset for accounts with two-step verification: one unused recovery code. */
+export const recoveryPasswordResetBodySchema = z.object({
+  email: emailSchema,
+  recoveryCode: recoveryCodeSchema,
+  newPassword: passwordSchema,
+});
+export type RecoveryPasswordResetBody = z.infer<typeof recoveryPasswordResetBodySchema>;
 
 export const PASSWORD_STRENGTHS = ['very_weak', 'weak', 'fair', 'good', 'strong'] as const;
 export type PasswordStrength = (typeof PASSWORD_STRENGTHS)[number];

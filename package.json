@@ -21,7 +21,8 @@
     "format:write": "prettier --write .",
     "test": "bun run --cwd packages/shared test && bun run --cwd apps/api test",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build",
-    "db:generate": "bun run --cwd apps/api db:generate"
+    "db:generate": "bun run --cwd apps/api db:generate",
+    "db:rotate-key": "bun run --cwd apps/api db:rotate-key"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

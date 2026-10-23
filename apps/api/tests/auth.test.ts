@@ -133,9 +133,9 @@ describe('auth', () => {
     });
     expect(ok.status).toBe(200);
     expect((await t.request('GET', '/api/auth/me', { token: a.json.token })).status).toBe(401);
-    expect(
-      (await t.request('GET', '/api/auth/me', { token: ok.json.session.token })).status,
-    ).toBe(200);
+    expect((await t.request('GET', '/api/auth/me', { token: ok.json.session.token })).status).toBe(
+      200,
+    );
     expect((await t.request('GET', '/api/auth/me', { token: b.json.token })).status).toBe(401);
 
     const login = await t.request('POST', '/api/auth/login', {
@@ -266,13 +266,23 @@ describe('registration modes', () => {
     expect(missing.json.error.code).toBe('TURNSTILE_REQUIRED');
 
     const failed = await t.request('POST', '/api/auth/register', {
-      body: { name: 'T', email: 't1@example.com', password: 'kidung-pujian-91', turnstileToken: 'bad' },
+      body: {
+        name: 'T',
+        email: 't1@example.com',
+        password: 'kidung-pujian-91',
+        turnstileToken: 'bad',
+      },
     });
     expect(failed.status).toBe(400);
     expect(failed.json.error.code).toBe('TURNSTILE_FAILED');
 
     const ok = await t.request('POST', '/api/auth/register', {
-      body: { name: 'T', email: 't1@example.com', password: 'kidung-pujian-91', turnstileToken: 'good' },
+      body: {
+        name: 'T',
+        email: 't1@example.com',
+        password: 'kidung-pujian-91',
+        turnstileToken: 'good',
+      },
     });
     expect(ok.status).toBe(201);
     expect(seen).toEqual(['bad', 'good']);

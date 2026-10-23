@@ -23,7 +23,7 @@ const PUBLIC_WRITES = new Set([
   'POST /api/auth/login',
   'POST /api/auth/login/two-factor',
   'POST /api/auth/refresh',
-  'POST /api/auth/password-reset',
+  'POST /api/auth/password-reset/',
   'POST /api/auth/password-reset/recovery',
 ]);
 
@@ -65,6 +65,11 @@ const BODY_OVERRIDES: Record<string, unknown> = {
   'POST /api/auth/two-factor/disable': { password: 'kidung-pujian-91', code: '123456' },
   'POST /api/auth/two-factor/recovery-codes': { password: 'kidung-pujian-91', code: '123456' },
   'PATCH /api/churches/:churchId/modules': { modules: { finance: false } },
+  'POST /api/auth/password-reset/recovery': {
+    email: 'nobody@example.com',
+    recoveryCode: 'AAAAA-AAAAA',
+    newPassword: 'kidung-pujian-91',
+  },
   'POST /api/churches/:churchId/care/follow-ups/': { personId: randomUUID() },
 };
 
