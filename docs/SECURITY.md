@@ -219,8 +219,17 @@ server the person chooses. `public/csp-setup.js` (an external script) switches z
 `jitless` mode before the app loads, so validation never probes for `eval`. API answers get
 `default-src 'none'; sandbox` and `Cache-Control: no-store`.
 
-A Playwright run of the built app under this policy (sign in, invitations, reset links, sessions,
-sign-out) reports no policy violations.
+**Trusted Types** (`require-trusted-types-for 'script'`): the browser refuses plain strings in
+DOM sinks that can run code (`innerHTML`, `script.src`, …), so a string that reaches one cannot
+become script (DOM XSS). The app never writes HTML; its only policy, `tatagereja-turnstile`,
+lets exactly the Turnstile script URL through. The directive is left out when this server has
+Turnstile configured, because Cloudflare's script is not known to keep to Trusted Types. (A
+copy of the app served by a server without Turnstile that registers on another server with
+Turnstile still enforces it; if that widget fails, serve the app from that server.)
+
+A Playwright run of the built app under this policy (every route as the owner and as a member,
+sign in, invitations, reset links, two-step setup, sessions, sign-out) reports no policy or
+Trusted Types violations.
 
 ## Tests
 

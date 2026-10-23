@@ -27,6 +27,14 @@ const SPA_CSP = [
   "frame-ancestors 'none'",
 ].join('; ');
 
+/**
+ * Trusted Types: the DOM refuses HTML strings and script URLs that did not pass through a
+ * policy, so a string reaching `innerHTML` or `script.src` cannot run code (DOM XSS). The app
+ * itself creates one narrow policy, for the Turnstile loader. Left out when this server uses
+ * Turnstile, whose own script is not known to keep to it.
+ */
+const TRUSTED_TYPES = "require-trusted-types-for 'script'";
+
 /** JSON responses never render, so they get a policy that allows nothing. */
 const API_CSP =
   "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox";
@@ -58,16 +66,20 @@ const HSTS = 'max-age=63072000; includeSubDomains; preload';
  * Security headers added to every response. HSTS only when the request arrived over HTTPS;
  * API responses are not stored by browsers or proxies unless a route allows it.
  */
-export function securityHeaders(request: Request): Record<string, string> {
+export function securityHeaders(
+  request: Request,
+  options: { trustedTypes?: boolean } = {},
+): Record<string, string> {
   const pathname = new URL(request.url).pathname;
   const isApi = pathname === '/api' || pathname.startsWith('/api/');
   const https = isHttpsRequest(request);
+  const spa = [
+    SPA_CSP,
+    ...(options.trustedTypes === false ? [] : [TRUSTED_TYPES]),
+    ...(https ? ['upgrade-insecure-requests'] : []),
+  ].join('; ');
   const headers: Record<string, string> = {
-    'content-security-policy': isApi
-      ? API_CSP
-      : https
-        ? `${SPA_CSP}; upgrade-insecure-requests`
-        : SPA_CSP,
+    'content-security-policy': isApi ? API_CSP : spa,
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
     'referrer-policy': 'strict-origin-when-cross-origin',

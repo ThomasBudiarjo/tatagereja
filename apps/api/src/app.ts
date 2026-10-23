@@ -132,7 +132,7 @@ export function createApp(deps: Deps) {
           `${new Date().toISOString()} ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
         );
       }
-      Object.assign(set.headers, securityHeaders(request));
+      Object.assign(set.headers, securityHeaders(request, { trustedTypes: !config.turnstile }));
       // Bun also enforces `maxRequestBodySize`; this answers with a clear JSON error first.
       const length = Number(request.headers.get('content-length') ?? 0);
       if (length > config.maxBodyBytes) {

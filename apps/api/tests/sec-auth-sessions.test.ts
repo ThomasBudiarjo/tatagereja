@@ -567,6 +567,22 @@ describe('security headers', () => {
     expect(headers['content-security-policy']).toContain('upgrade-insecure-requests');
   });
 
+  it('requires Trusted Types for the app unless this server uses Turnstile', async () => {
+    const page = await t.app.handle(new Request('http://localhost/c/123'));
+    expect(page.headers.get('content-security-policy')).toContain(
+      "require-trusted-types-for 'script'",
+    );
+    const withTurnstile = createTestApp({
+      turnstile: { siteKey: 'site-key', secretKey: 'secret-key' },
+    });
+    try {
+      const response = await withTurnstile.app.handle(new Request('http://localhost/register'));
+      expect(response.headers.get('content-security-policy')).not.toContain('trusted-types');
+    } finally {
+      withTurnstile.close();
+    }
+  });
+
   it('locks API answers down completely', async () => {
     const response = await t.app.handle(new Request('http://localhost/api/meta'));
     expect(response.headers.get('content-security-policy')).toStartWith("default-src 'none'");
