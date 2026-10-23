@@ -22,6 +22,7 @@ import { Elysia } from 'elysia';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import {
+  calendarFeedTokens,
   churches,
   churchMemberships,
   churchRoles,
@@ -45,6 +46,7 @@ import {
 } from '../lib/errors';
 import { verifyPassword } from '../lib/password';
 import { offsetOf } from '../lib/query';
+import { enforceRateLimit } from '../lib/rate-limit';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
@@ -55,6 +57,7 @@ import { enabledModulesOf, moduleStates } from '../services/modules';
 import { notify } from '../services/notifications';
 import { filterMembers, loadMemberRows, summarizeMembers } from './admin-security/members';
 import { toMemberListItem } from './admin-security/serializers';
+import { PASSWORD_CHECK_LIMIT } from './admin-security/two-factor';
 
 /** Church fields compared and recorded in the audit log when the profile changes. */
 const auditedChurchFields = (row: ChurchRow) => ({
@@ -116,6 +119,10 @@ export const churchesModule = (deps: Deps) => {
 
   /** Removes a user's church-scoped assignments when they leave or are removed. */
   const detachUserFromChurch = (tx: Queryable, churchId: string, userId: string) => {
+    // Private calendar feeds would keep showing the church's calendar to a former member.
+    tx.delete(calendarFeedTokens)
+      .where(and(eq(calendarFeedTokens.churchId, churchId), eq(calendarFeedTokens.userId, userId)))
+      .run();
     tx.delete(groupLeaders)
       .where(and(eq(groupLeaders.churchId, churchId), eq(groupLeaders.userId, userId)))
       .run();
@@ -143,6 +150,7 @@ export const churchesModule = (deps: Deps) => {
   });
 
   const verifyOwnPassword = async (userId: string, password: string) => {
+    enforceRateLimit(deps.limiters, 'auth.password_check', userId, PASSWORD_CHECK_LIMIT);
     const user = db.select().from(users).where(eq(users.id, userId)).get();
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       throw unauthorized('Password is incorrect');
@@ -465,8 +473,9 @@ export const churchesModule = (deps: Deps) => {
             'member.role_change',
             `Changed ${row.user.name} from ${ROLE_LABELS[row.membership.role].toLowerCase()} to ${ROLE_LABELS[body.role].toLowerCase()}`,
             row.membership.id,
-            { role: row.membership.role },
-            { role: body.role },
+            // The unchanged name lets the audit viewer say whose role changed.
+            { name: row.user.name, role: row.membership.role },
+            { name: row.user.name, role: body.role },
           );
           notify(tx, {
             churchId: church.id,
@@ -512,8 +521,8 @@ export const churchesModule = (deps: Deps) => {
             suspended ? 'member.suspend' : 'member.reactivate',
             `${suspended ? 'Suspended' : 'Reactivated'} ${row.user.name}`,
             row.membership.id,
-            { status: row.membership.status },
-            { status: body.status },
+            { name: row.user.name, status: row.membership.status },
+            { name: row.user.name, status: body.status },
           );
           // Account-level, because a suspended member cannot open the church's notifications.
           notify(tx, {

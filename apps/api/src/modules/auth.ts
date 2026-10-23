@@ -39,6 +39,7 @@ import {
   clearLoginFailures,
   enabledTwoFactor,
   lockedUntilOf,
+  PASSWORD_CHECK_LIMIT,
   recordLoginEvent,
   registerLoginFailure,
   useSecondFactor,
@@ -338,6 +339,7 @@ export const authModule = (deps: Deps) => {
     .post(
       '/change-password',
       async ({ auth, audit, body }) => {
+        enforceRateLimit(deps.limiters, 'auth.password_check', auth.user.id, PASSWORD_CHECK_LIMIT);
         const user = db.select().from(users).where(eq(users.id, auth.user.id)).get();
         if (!user) throw notFound('User');
         const valid = await verifyPassword(body.currentPassword, user.passwordHash);
@@ -412,13 +414,23 @@ export const authModule = (deps: Deps) => {
     )
     .delete(
       '/sessions/:id',
-      ({ auth, params }) => {
-        const deleted = db
-          .delete(sessions)
-          .where(and(eq(sessions.id, params.id), eq(sessions.userId, auth.user.id)))
-          .returning({ id: sessions.id })
-          .get();
-        if (!deleted) throw notFound('Session');
+      ({ auth, audit, params }) => {
+        db.transaction((tx) => {
+          const deleted = tx
+            .delete(sessions)
+            .where(and(eq(sessions.id, params.id), eq(sessions.userId, auth.user.id)))
+            .returning({ id: sessions.id, userAgent: sessions.userAgent, ip: sessions.ip })
+            .get();
+          if (!deleted) throw notFound('Session');
+          recordAudit(tx, audit, {
+            module: 'admin-security',
+            action: 'account.session_revoke',
+            entityType: 'user',
+            entityId: auth.user.id,
+            summary: `${auth.user.name} signed out a session`,
+            before: { sessionId: deleted.id, userAgent: deleted.userAgent, ip: deleted.ip },
+          });
+        });
         return { ok: true as const };
       },
       { auth: true, params: idParamsSchema },

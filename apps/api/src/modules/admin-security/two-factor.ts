@@ -131,6 +131,12 @@ export const invalidSecondFactor = (factor: SecondFactor) => {
   return validationError(message, [{ path, message }]);
 };
 
+/**
+ * Re-entering the password behind a signed-in session (change password, delete church,
+ * transfer ownership) is limited per account, so a stolen session cannot guess it.
+ */
+export const PASSWORD_CHECK_LIMIT = { windowMs: 15 * 60_000, max: 10 };
+
 export const passwordIncorrect = () =>
   validationError('Password is incorrect', [
     { path: 'password', message: 'Password is incorrect' },
@@ -163,12 +169,18 @@ export function recordLoginEvent(
       createdAt: now.toISOString(),
     })
     .run();
-  if (entry.userId) {
-    const cutoff = addDays(now, -ADMIN_SECURITY_LIMITS.loginEventsRetentionDays).toISOString();
-    db.delete(loginEvents)
-      .where(and(eq(loginEvents.userId, entry.userId), lt(loginEvents.createdAt, cutoff)))
-      .run();
-  }
+  // Old history is pruned as it grows: per account, or per address tried for unknown ones.
+  const cutoff = addDays(now, -ADMIN_SECURITY_LIMITS.loginEventsRetentionDays).toISOString();
+  db.delete(loginEvents)
+    .where(
+      and(
+        entry.userId
+          ? eq(loginEvents.userId, entry.userId)
+          : and(isNull(loginEvents.userId), eq(loginEvents.email, entry.email.slice(0, 254))),
+        lt(loginEvents.createdAt, cutoff),
+      ),
+    )
+    .run();
 }
 
 /** Failures older than this no longer count towards a lockout. */
