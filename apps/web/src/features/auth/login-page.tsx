@@ -1,5 +1,11 @@
-import { loginBodySchema, type LoginBody } from '@tatagereja/shared';
+import {
+  isLoginChallenge,
+  loginBodySchema,
+  type LoginBody,
+  type LoginChallenge,
+} from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -9,12 +15,13 @@ import { Field, FormActions } from '@/components/ui/field';
 import { Input, PasswordInput } from '@/components/ui/input';
 import { Alert } from '@/components/ui/misc';
 import { useAcceptInvitation } from '@/features/invitations/api';
-import { getErrorMessage } from '@/lib/api';
+import { useLoginWithChallenge } from '@/features/admin-security/api';
+import { getErrorMessage, isApiClientError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { applyServerErrors } from '@/lib/forms';
 import { useServerStore } from '@/stores/server';
 import { AuthLayout } from './auth-layout';
-import { useLogin } from './api';
+import { TwoFactorStep } from './two-factor-step';
 
 type FormInput = z.input<typeof loginBodySchema>;
 
@@ -24,7 +31,8 @@ export function LoginPage() {
   const location = useLocation();
   const [params] = useSearchParams();
   const inviteToken = params.get('invite');
-  const login = useLogin();
+  const login = useLoginWithChallenge();
+  const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const accept = useAcceptInvitation();
   const currentUrl = useServerStore((state) => state.currentUrl);
   const server = useServerStore((state) => state.servers[currentUrl]);
@@ -35,26 +43,53 @@ export function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
+  const finish = async () => {
+    if (inviteToken) {
+      try {
+        const result = await accept.mutateAsync(inviteToken);
+        navigate(`/c/${result.churchId}`, { replace: true });
+        return;
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('auth.joinFailed')));
+      }
+    }
+    const from = (location.state as { from?: string } | null)?.from;
+    navigate(from && from !== '/welcome' ? from : '/', { replace: true });
+  };
+
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await login.mutateAsync(values);
-      if (inviteToken) {
-        try {
-          const result = await accept.mutateAsync(inviteToken);
-          navigate(`/c/${result.churchId}`, { replace: true });
-          return;
-        } catch (error) {
-          toast.error(getErrorMessage(error, t('auth.joinFailed')));
-        }
+      const result = await login.mutateAsync(values);
+      if (isLoginChallenge(result)) {
+        setChallenge(result);
+        return;
       }
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/welcome' ? from : '/', { replace: true });
+      await finish();
     } catch (error) {
-      if (!applyServerErrors(error, form.setError, ['email', 'password'])) {
+      if (isApiClientError(error) && error.code === 'ACCOUNT_LOCKED') {
+        form.setError('root', { message: t('auth.accountLocked') });
+      } else if (isApiClientError(error) && error.status === 401) {
+        form.setError('root', { message: t('auth.invalidCredentials') });
+      } else if (!applyServerErrors(error, form.setError, ['email', 'password'])) {
         form.setError('root', { message: getErrorMessage(error) });
       }
     }
   });
+
+  if (challenge) {
+    return (
+      <AuthLayout title={t('auth.twoFactorTitle')} description={t('auth.twoFactorDescription')}>
+        <TwoFactorStep
+          challenge={challenge}
+          onSignedIn={() => void finish()}
+          onRestart={() => {
+            setChallenge(null);
+            form.resetField('password');
+          }}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

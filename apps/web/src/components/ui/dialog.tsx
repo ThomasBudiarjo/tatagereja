@@ -4,6 +4,36 @@ import * as React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
+/**
+ * Radix returns focus to a `Trigger`; dialogs opened from state have none, so focus would fall
+ * back to the page. Focus stays trapped while a dialog is open, so the last element focused
+ * outside any dialog is the one that opened it: refocus it on close. Pass the result as the
+ * primitive Content's `onCloseAutoFocus`.
+ */
+function useReturnFocus(onCloseAutoFocus?: (event: Event) => void) {
+  const lastOutside = React.useRef<HTMLElement | null>(null);
+  React.useEffect(() => {
+    const track = (event: FocusEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        !target.closest('[role="dialog"],[role="alertdialog"]')
+      ) {
+        lastOutside.current = target;
+      }
+    };
+    document.addEventListener('focusin', track);
+    return () => document.removeEventListener('focusin', track);
+  }, []);
+  return (event: Event) => {
+    onCloseAutoFocus?.(event);
+    const opener = lastOutside.current;
+    if (event.defaultPrevented || !opener?.isConnected || opener === document.body) return;
+    event.preventDefault();
+    opener.focus();
+  };
+}
+
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogClose = DialogPrimitive.Close;
@@ -12,9 +42,11 @@ function DialogContent({
   className,
   children,
   hideClose = false,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { hideClose?: boolean }) {
   const { t } = useI18n();
+  const returnFocus = useReturnFocus(onCloseAutoFocus);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
@@ -23,6 +55,7 @@ function DialogContent({
           'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col gap-4 rounded-t-2xl border-t bg-card p-5 shadow-overlay safe-bottom outline-none data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-6 sm:data-[state=closed]:zoom-out-95 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0',
           className,
         )}
+        onCloseAutoFocus={returnFocus}
         {...props}
       >
         <div
@@ -81,6 +114,7 @@ const DialogBody = ({ className, ...props }: React.ComponentProps<'div'>) => (
 );
 
 export {
+  useReturnFocus,
   Dialog,
   DialogTrigger,
   DialogClose,

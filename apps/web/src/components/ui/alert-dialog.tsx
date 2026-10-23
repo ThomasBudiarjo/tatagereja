@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Button, type ButtonProps } from './button';
+import { useReturnFocus } from './dialog';
 import { Input } from './input';
 import { Label } from './label';
 
@@ -50,6 +51,7 @@ function ConfirmDialog({
   const matches = !confirmText || typed.trim() === confirmText.trim();
   // The translated sentence places the text to type; split around it to render it in bold.
   const prompt = t('common.typeToConfirm', { value: '\u0000' }).split('\u0000');
+  const returnFocus = useReturnFocus();
 
   const handleOpenChange = (next: boolean) => {
     if (loading) return;
@@ -62,6 +64,7 @@ function ConfirmDialog({
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <AlertDialogPrimitive.Content
+          onCloseAutoFocus={returnFocus}
           onEscapeKeyDown={(event) => {
             if (loading) event.preventDefault();
           }}

@@ -53,6 +53,8 @@ export const personInputSchema = z.object({
   photoUrl: optionalUrl,
   membershipStatus: z.enum(PERSON_MEMBERSHIP_STATUSES).default('visitor'),
   joinedAt: optionalDate,
+  /** Wedding anniversary shown in the directory and Warta Jemaat. */
+  weddingDate: optionalDate,
   notes: optionalText(LIMITS.longTextMax),
 });
 export type PersonInput = z.infer<typeof personInputSchema>;
