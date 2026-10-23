@@ -11,6 +11,8 @@ import { useServerStore } from '@/stores/server';
 
 const SCRIPT_URL = '/sw.js';
 const API_CACHE_PREFIX = 'tg-api:';
+/** Where the worker keeps the announced account across restarts. */
+const META_CACHE = 'tg-meta';
 /** How often an open app asks whether a new version was released. */
 const UPDATE_CHECK_MS = 30 * 60_000;
 
@@ -55,13 +57,18 @@ export function announceAccount(id: string | null): void {
   post({ type: 'account', id });
 }
 
-/** Deletes every API answer kept for offline use, whoever's it was. */
+/**
+ * Deletes every API answer kept for offline use, whoever's it was, and the worker's note of
+ * the account (also when no worker controls this page to hear the message).
+ */
 export async function clearOfflineData(): Promise<void> {
   announceAccount(null);
   if (typeof caches === 'undefined') return;
   const names = await caches.keys();
   await Promise.all(
-    names.filter((name) => name.startsWith(API_CACHE_PREFIX)).map((name) => caches.delete(name)),
+    names
+      .filter((name) => name.startsWith(API_CACHE_PREFIX) || name === META_CACHE)
+      .map((name) => caches.delete(name)),
   );
 }
 

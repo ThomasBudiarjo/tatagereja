@@ -65,6 +65,13 @@ function localeMessages({ inFirstDownload }: { inFirstDownload: string[] }): Plu
   };
 }
 
+/** Every file below `dir`, sub-directories included. */
+const filesIn = (dir: string): string[] =>
+  readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    return statSync(path).isDirectory() ? filesIn(path) : [path];
+  });
+
 /**
  * Writes a `.br` and a `.gz` twin of every compressible file of the build, at the slowest and
  * smallest settings, so the API server sends them as they are (apps/api/src/lib/http.ts)
@@ -73,11 +80,6 @@ function localeMessages({ inFirstDownload }: { inFirstDownload: string[] }): Plu
 function precompress(): Plugin {
   const compressible = /\.(?:js|mjs|css|html|svg|json|webmanifest|txt|xml|map|wasm)$/;
   let outDir = 'dist';
-  const filesIn = (dir: string): string[] =>
-    readdirSync(dir).flatMap((name) => {
-      const path = join(dir, name);
-      return statSync(path).isDirectory() ? filesIn(path) : [path];
-    });
   return {
     name: 'tatagereja-precompress',
     apply: 'build',
@@ -144,13 +146,16 @@ function serviceWorker(): Plugin {
         fileURLToPath(new URL('./service-worker.js', import.meta.url)),
         'utf8',
       );
-      // Any changed file of the build (their names carry content hashes) or of the worker
-      // itself is a new version.
-      const version = createHash('sha256')
+      // Any changed file of the build (their names carry content hashes), of `public/` (the
+      // CSP setup script, the manifest: precached under fixed names), of `index.html` or of
+      // the worker itself is a new version.
+      const hash = createHash('sha256')
         .update(Object.keys(bundle).sort().join('\n'))
         .update(template)
-        .digest('hex')
-        .slice(0, 12);
+        .update(readFileSync(fileURLToPath(new URL('./index.html', import.meta.url))));
+      const publicDir = fileURLToPath(new URL('./public', import.meta.url));
+      for (const file of filesIn(publicDir).sort()) hash.update(file).update(readFileSync(file));
+      const version = hash.digest('hex').slice(0, 12);
       this.emitFile({
         type: 'asset',
         fileName: 'sw.js',

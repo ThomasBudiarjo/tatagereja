@@ -423,8 +423,9 @@ registers once the first screen has its data and precaches the app shell: `index
 first download, the church shell, the home screen and both message chunks. Fingerprinted files
 are cache-first, navigations get the cached shell. API reads go to the network first; for the
 account the page announced, the answers of the screens viewed last (at most 80, for a day) are
-kept as an offline fallback, never for care, the register, finance, security, audit, members,
-invitations or exports, and deleted on sign-out or when another account signs in (see
+kept as an offline fallback, never for care, the register, finance, check-in, security, audit,
+members, invitations or exports nor a person's private details, and deleted on sign-out or when
+another account signs in (see
 [SECURITY.md](./SECURITY.md#offline-copies)). A new release shows "Versi baru tersedia" with
 "Muat ulang"; nothing reloads by itself. The app is installable: an Indonesian manifest with SVG
 and PNG icons (regular and maskable, from `scripts/generate-icons.ts`) and theme colors for light

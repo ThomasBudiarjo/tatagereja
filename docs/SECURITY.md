@@ -241,17 +241,22 @@ otherwise `no-store`, so browsers never keep member data; the fallback is bounde
 - Only reads (`GET`) of the server the app is served from. Requests to other servers (bearer
   sessions) never pass through the worker's cache.
 - Only for the account the page announced (`account` message, from the stored session). With no
-  announced account nothing is stored or served. The cache is named after the account
-  (`tg-api:<user id>`), and announcing another account deletes every other one, so one device
-  never holds two accounts' answers.
+  announced account nothing is stored or served. The worker writes the announced account down
+  (`tg-meta`), because a browser stops an idle worker and its memory with it. The cache is named
+  after the account (`tg-api:<user id>`), and announcing another account deletes every other
+  one, so one device never holds two accounts' answers. A copy that finishes writing after the
+  account changed is deleted with the rest.
 - Only an allow-list of screens people open most (church, directory, households, areas, groups,
-  events, calendar, announcements, Warta Jemaat, worship, attendance, check-in, facilities,
-  inventory, notifications, the dashboard), and never anything under care, the church register,
-  finance, security, the audit log, members, invitations, exports or backups, nor any sign-in or
-  account route, whatever the path.
+  events, calendar, announcements, Warta Jemaat, worship, attendance, facilities, inventory,
+  notifications, the dashboard), and never anything under care, the church register, finance,
+  check-in (children's alerts and pick-up notes), security, the audit log, members,
+  invitations, exports or backups, nor any sign-in or account route, whatever the path.
+- Never an answer carrying a person's private details (national ID, medical and private notes):
+  the server encrypts them at rest, and they do not land unencrypted in a phone's storage.
 - Answered only when the network fails, at most a day old, at most 80 answers.
 - Signing out (here or in another tab), a session the server ended, and switching account delete
-  them all from the page (`clearOfflineData`), independent of the worker.
+  them all, and the worker's note of the account, from the page (`clearOfflineData`),
+  independent of the worker.
 
 ## Tests
 
