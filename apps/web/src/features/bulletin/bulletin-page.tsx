@@ -96,7 +96,7 @@ export function BulletinPage() {
             { label: bulletin.title },
           ]}
           title={bulletin.title}
-          documentTitle={`${bulletin.title} · ${bulletin.issueDate}`}
+          documentTitle={`${bulletin.title} · ${formatDate(bulletin.issueDate, 'dateLong')}`}
           tone={BULLETIN_TONE}
           eyebrow={formatDate(bulletin.issueDate, 'dateLong')}
           actions={

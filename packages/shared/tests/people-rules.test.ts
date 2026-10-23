@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  callName,
   canEditPersonPrivacy,
   canEditPersonProfile,
   canRequestToJoinGroup,
@@ -125,5 +126,16 @@ describe('import helpers', () => {
     expect(peopleAgeBandOf('2020-01-01', '2026-10-22')).toBe('0-12');
     expect(peopleAgeBandOf('1990-01-01', '2026-10-22')).toBe('31-50');
     expect(peopleAgeBandOf(null, '2026-10-22')).toBe('unknown');
+  });
+});
+
+describe('callName', () => {
+  it('greets by the first name, skipping church and courtesy titles', () => {
+    expect(callName('Maria Simanjuntak')).toBe('Maria');
+    expect(callName('Pdt. Imanuel Pakpahan')).toBe('Imanuel');
+    expect(callName('Pnt. Bonar Sitompul')).toBe('Bonar');
+    expect(callName('Dkn. Ruth Siregar')).toBe('Ruth');
+    expect(callName('  Ibu Sri Wibowo ')).toBe('Sri');
+    expect(callName('Pdt.')).toBe('Pdt.');
   });
 });

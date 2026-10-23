@@ -119,10 +119,10 @@ export function FollowUpsPage() {
   const byStage = (value: FollowUpStage) =>
     (query.data?.items ?? []).filter((item) => item.stage === value);
   const addButton = canCreate ? (
-    <Button className="max-sm:size-11 max-sm:px-0" onClick={() => setState({ new: true })}>
+    <Button size="sm" onClick={() => setState({ new: true })}>
       <Plus />
       <span className="hidden sm:inline">{t('care.newFollowUp')}</span>
-      <span className="sr-only sm:hidden">{t('care.newFollowUp')}</span>
+      <span className="sm:hidden">{t('common.add')}</span>
     </Button>
   ) : null;
 

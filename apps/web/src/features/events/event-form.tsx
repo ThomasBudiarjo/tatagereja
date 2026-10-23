@@ -64,7 +64,7 @@ const formSchema = z
       context.addIssue({
         code: 'custom',
         path: ['untilDate'],
-        message: 'The end date must be on or after the first occurrence',
+        message: 'untilBeforeStart',
       });
     }
   });
@@ -238,7 +238,9 @@ function EventFormFields({
   const untilMessage =
     errors.untilDate?.message === 'untilRequired'
       ? t('events.untilRequired')
-      : errors.untilDate?.message;
+      : errors.untilDate?.message === 'untilBeforeStart'
+        ? t('events.untilBeforeStart')
+        : errors.untilDate?.message;
 
   return (
     <form

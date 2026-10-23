@@ -131,7 +131,7 @@ export function HouseholdsPage() {
         <>
           <ul
             className={cn(
-              'grid gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3',
+              'grid grid-cols-1 gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3',
               query.isPlaceholderData && 'opacity-60',
             )}
           >

@@ -1,5 +1,6 @@
 import {
   HOME_WIDGET_LABELS,
+  callName,
   can,
   has,
   localize,
@@ -48,6 +49,7 @@ import { dashboardQuery, useSaveDashboardPreferences } from './api';
 import { HomeQuickActions } from './quick-actions';
 import {
   AnnouncementsWidget,
+  AttentionWidget,
   AttendanceWidget,
   CelebrationsWidget,
   EventsWidget,
@@ -87,7 +89,7 @@ export function HomePage() {
   const { t, timeZone, formatDate, formatNumber } = useI18n();
   const query = useQuery(dashboardQuery(church.id));
   const [customizing, setCustomizing] = useState(false);
-  const firstName = user?.name.split(' ')[0] ?? '';
+  const firstName = user ? callName(user.name) : '';
 
   return (
     <Page size="wide">
@@ -177,6 +179,7 @@ export function HomePage() {
 
 function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => void }) {
   const { t } = useI18n();
+  const { access } = useChurch();
   const quickActionCount = useModuleMenu().quickActions.length;
   const cards = data.widgets.flatMap(
     (widget): { id: HomeWidget; node: React.ReactNode; wide?: boolean }[] => {
@@ -192,7 +195,10 @@ function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => vo
             ? [{ id: widget, node: <ScheduleWidget items={data.mySchedule} /> }]
             : [];
         case 'my_tasks':
-          return data.myTasks ? [{ id: widget, node: <TasksWidget data={data.myTasks} /> }] : [];
+          // People outside the care team only see it while someone handed them a task.
+          return data.myTasks && (data.myTasks.openCount > 0 || has(access, 'care.view'))
+            ? [{ id: widget, node: <TasksWidget data={data.myTasks} /> }]
+            : [];
         case 'my_kids':
           // Only parents with children in class need this card.
           return data.myKids && data.myKids.length > 0
@@ -235,6 +241,7 @@ function Widgets({ data, onCustomize }: { data: Dashboard; onCustomize: () => vo
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      <AttentionWidget />
       {/* Cards follow the caller's order; quick actions span the full width wherever they sit. */}
       {cards.map((card) => (
         <div key={card.id} className={cn('min-w-0', card.wide && 'lg:col-span-2')}>

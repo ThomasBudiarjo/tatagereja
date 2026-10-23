@@ -112,10 +112,10 @@ export function DiakoniaPage() {
     state.period !== 'year'
   );
   const recordButton = canManage ? (
-    <Button className="max-sm:size-11 max-sm:px-0" onClick={() => setState({ new: true })}>
+    <Button size="sm" onClick={() => setState({ new: true })}>
       <Plus />
       <span className="hidden sm:inline">{t('care.recordAid')}</span>
-      <span className="sr-only sm:hidden">{t('care.recordAid')}</span>
+      <span className="sm:hidden">{t('common.add')}</span>
     </Button>
   ) : null;
 

@@ -26,3 +26,20 @@ export function applyServerErrors<T extends FieldValues>(
   }
   return applied;
 }
+
+/**
+ * After a step of a long form fails validation, brings the first problem into view and puts
+ * the keyboard on it; the message may sit below the fold on a phone.
+ */
+export function revealFirstError(root: ParentNode | null = document) {
+  requestAnimationFrame(() => {
+    const target = root?.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]');
+    if (!target) return;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const field =
+      target.getAttribute('aria-invalid') === 'true'
+        ? target
+        : target.parentElement?.querySelector<HTMLElement>('input, select, textarea, button');
+    field?.focus({ preventScroll: true });
+  });
+}

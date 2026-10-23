@@ -88,11 +88,11 @@ export function ContributionsPage() {
         ]}
         actions={
           canRecord ? (
-            <Button asChild className="max-sm:size-11 max-sm:px-0">
+            <Button asChild size="sm">
               <Link to={`${base}/finance/giving/new`}>
                 <Plus />
                 <span className="hidden sm:inline">{t('finance.recordGift')}</span>
-                <span className="sr-only sm:hidden">{t('common.add')}</span>
+                <span className="sm:hidden">{t('common.add')}</span>
               </Link>
             </Button>
           ) : null

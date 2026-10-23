@@ -442,7 +442,7 @@ export const careDictionary = defineDictionary('care', {
     recordedByLabel: 'Recorded by',
   },
   id: {
-    nav: 'Pelayanan Pastoral',
+    nav: 'Pelayanan pastoral',
     description: 'Pendampingan, perkunjungan, pokok doa, tindak lanjut tamu, dan diakonia.',
     homeDescription:
       'Siapa yang perlu didampingi minggu ini, tugas Anda, dinding doa, dan tamu baru dalam satu layar.',
@@ -450,13 +450,13 @@ export const careDictionary = defineDictionary('care', {
     navCases: 'Pendampingan',
     navVisits: 'Perkunjungan',
     navPrayer: 'Pokok Doa',
-    navFollowUps: 'Tindak Lanjut Tamu',
+    navFollowUps: 'Tindak lanjut tamu',
     navTasks: 'Tugas',
     navDiakonia: 'Diakonia',
     prayerNavDescription: 'Bagikan pokok doa dan saling mendoakan.',
     quickActions: 'Aksi cepat',
     homeDescriptionMember: 'Saling mendoakan dan ikuti tugas pelayanan yang diberikan kepada Anda.',
-    backToCare: 'Kembali ke Pelayanan Pastoral',
+    backToCare: 'Kembali ke Pelayanan pastoral',
 
     careTeam: 'Tim pastoral',
     confidential: 'Rahasia',
@@ -736,7 +736,7 @@ export const careDictionary = defineDictionary('care', {
     deletePrayerTitle: 'Hapus pokok doa ini?',
     deletePrayerDescription: 'Pokok doa dihapus untuk semua orang, beserta jumlah yang berdoa.',
     prayerActions: 'Aksi untuk {title}',
-    prayerDetail: 'Pokok doa',
+    prayerDetail: 'Pokok Doa',
     backToPrayerWall: 'Kembali ke pokok doa',
     noWallTitle: 'Dinding doa masih sepi',
     noWallDescription: 'Jadilah yang pertama membagikan pokok doa untuk didoakan jemaat.',

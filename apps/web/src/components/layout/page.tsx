@@ -108,7 +108,7 @@ export function PageHeader({
   return (
     <header className={cn('flex animate-page-in flex-col gap-3', className)}>
       {back || hasTrail ? (
-        <div className="flex min-h-9 items-center gap-2">
+        <div className="flex min-h-9 items-center gap-2 print:hidden">
           {back ? (
             <Button
               asChild
@@ -125,29 +125,39 @@ export function PageHeader({
           {hasTrail ? <Breadcrumbs items={breadcrumbs} className="hidden md:block" /> : null}
         </div>
       ) : null}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3.5">
-          {icon ? <ToneIcon icon={icon} tone={tone} size="lg" className="mt-0.5" /> : null}
-          <div className="min-w-0">
-            {eyebrow ? (
-              <p data-tone={tone} className="text-overline mb-1 text-tone-ink">
-                {eyebrow}
-              </p>
-            ) : null}
-            <h1 className="text-2xl leading-tight font-bold tracking-tight text-balance sm:text-[1.75rem]">
-              {title}
-            </h1>
-            {description ? (
-              <p className="mt-1.5 max-w-2xl text-sm text-pretty text-muted-foreground sm:text-[0.9375rem]">
-                {description}
-              </p>
-            ) : null}
-          </div>
+      {/*
+        One grid so the description runs under the icon at full width on phones, where the
+        actions would otherwise squeeze it into a narrow column, and under the title from `sm`.
+      */}
+      <div
+        className={cn(
+          'grid items-start gap-x-3.5 gap-y-2',
+          icon ? 'grid-cols-[auto_minmax(0,1fr)_auto]' : 'grid-cols-[minmax(0,1fr)_auto]',
+        )}
+      >
+        {icon ? <ToneIcon icon={icon} tone={tone} size="lg" /> : null}
+        <div className={cn('min-w-0', icon && 'self-center')}>
+          {eyebrow ? (
+            <p data-tone={tone} className="text-overline mb-1 text-tone-ink">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h1 className="text-2xl leading-tight font-bold tracking-tight text-balance sm:text-[1.75rem]">
+            {title}
+          </h1>
         </div>
-        {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 pt-0.5">
-            {actions}
-          </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 pt-0.5">
+          {actions}
+        </div>
+        {description ? (
+          <p
+            className={cn(
+              'col-span-full max-w-2xl text-sm text-pretty text-muted-foreground sm:-mt-0.5 sm:text-[0.9375rem]',
+              icon && 'sm:col-start-2',
+            )}
+          >
+            {description}
+          </p>
         ) : null}
       </div>
     </header>
@@ -172,8 +182,9 @@ export function Section({
   return (
     <section className={cn('flex min-w-0 flex-col gap-3', className)}>
       {title || action ? (
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        // Actions move under the title on narrow screens instead of squeezing it.
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 basis-56">
             {title ? (
               <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold tracking-tight">
                 {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}

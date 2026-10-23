@@ -73,10 +73,10 @@ export function CampaignsPage() {
         ]}
         actions={
           canManage ? (
-            <Button className="max-sm:size-11 max-sm:px-0" onClick={() => setCreating(true)}>
+            <Button size="sm" onClick={() => setCreating(true)}>
               <Plus />
               <span className="hidden sm:inline">{t('finance.newCampaign')}</span>
-              <span className="sr-only sm:hidden">{t('common.add')}</span>
+              <span className="sm:hidden">{t('common.add')}</span>
             </Button>
           ) : null
         }

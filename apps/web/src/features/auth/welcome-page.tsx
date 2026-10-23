@@ -6,9 +6,9 @@ import { Alert } from '@/components/ui/misc';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { hostLabel } from '@/lib/utils';
-import { DEFAULT_SERVER_NAME, DEFAULT_SERVER_URL, useServerStore } from '@/stores/server';
+import { DEFAULT_SERVER_URL, useServerStore } from '@/stores/server';
 import { AuthLayout } from './auth-layout';
-import { probeAndRemember } from './api';
+import { probeAndRemember, useServerName } from './api';
 
 export function WelcomePage() {
   const { t } = useI18n();
@@ -17,6 +17,7 @@ export function WelcomePage() {
   const servers = useServerStore((state) => state.servers);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const defaultName = useServerName(DEFAULT_SERVER_URL);
 
   const choose = async (url: string) => {
     setLoading(url);
@@ -48,7 +49,7 @@ export function WelcomePage() {
           loading={loading === DEFAULT_SERVER_URL}
           disabled={!!loading}
         >
-          {t('auth.continueWith', { server: DEFAULT_SERVER_NAME })}
+          {t('auth.continueWith', { server: defaultName })}
           <ArrowRight />
         </Button>
         <Button

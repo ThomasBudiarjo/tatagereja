@@ -4,8 +4,8 @@ import { Link } from 'react-router';
 import { ToneIcon } from '@/components/ui/status-badge';
 import { useI18n } from '@/lib/i18n';
 import { useDocumentTitle } from '@/lib/use-document-title';
-import { hostLabel } from '@/lib/utils';
-import { useServerStore, isDefaultServer, DEFAULT_SERVER_NAME } from '@/stores/server';
+import { useServerStore } from '@/stores/server';
+import { useServerName } from './api';
 
 /** Auth screens: a form column, and on wide screens a warm panel describing the app. */
 export function AuthLayout({
@@ -22,9 +22,7 @@ export function AuthLayout({
   const { t } = useI18n();
   useDocumentTitle(title);
   const currentUrl = useServerStore((state) => state.currentUrl);
-  const server = useServerStore((state) => state.servers[currentUrl]);
-  const serverName =
-    server?.name ?? (isDefaultServer(currentUrl) ? DEFAULT_SERVER_NAME : hostLabel(currentUrl));
+  const serverName = useServerName(currentUrl);
   const highlights = [
     { icon: Users, tone: 'sky' as const, text: t('auth.welcomeHighlightPeople') },
     { icon: BookOpen, tone: 'violet' as const, text: t('auth.welcomeHighlightWorship') },

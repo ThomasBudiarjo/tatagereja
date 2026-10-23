@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Alert, PageLoader } from '@/components/ui/misc';
 import { AuthLayout } from '@/features/auth/auth-layout';
 import { getErrorMessage } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n';
+import { ROLE_KEYS } from '@/lib/i18n/labels';
 import { useAuth } from '@/stores/auth';
 import { publicInvitationQuery, useAcceptInvitation } from './api';
 
@@ -16,27 +17,30 @@ export function JoinPage() {
   const { isAuthenticated, user } = useAuth();
   const invitation = useQuery(publicInvitationQuery(token));
   const accept = useAcceptInvitation();
+  const { t, formatDate } = useI18n();
 
   const join = async () => {
     try {
       const result = await accept.mutateAsync(token);
       toast.success(
-        result.alreadyMember ? 'You are already a member of this church' : 'Welcome to the church!',
+        result.alreadyMember
+          ? t('invitations.alreadyMember')
+          : t('invitations.welcome', { church: invitation.data?.church.name ?? '' }),
       );
       navigate(`/c/${result.churchId}`, { replace: true });
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Could not accept the invitation'));
+      toast.error(getErrorMessage(error, t('invitations.joinFailed')));
     }
   };
 
   const encoded = encodeURIComponent(token);
 
   return (
-    <AuthLayout title="Church invitation" showServer={!isAuthenticated}>
+    <AuthLayout title={t('invitations.title')} showServer={!isAuthenticated}>
       {invitation.isPending ? (
         <PageLoader />
       ) : invitation.isError ? (
-        <Alert variant="error" title="Invitation not found">
+        <Alert variant="error" title={t('invitations.notFound')}>
           {getErrorMessage(invitation.error)}
         </Alert>
       ) : (
@@ -55,44 +59,40 @@ export function JoinPage() {
                 <p className="text-sm text-muted-foreground">{invitation.data.church.city}</p>
               ) : null}
               <p className="mt-1 text-xs text-muted-foreground">
-                Join as{' '}
-                <span className="font-medium text-foreground capitalize">
-                  {invitation.data.role}
-                </span>
+                {t('invitations.joinAs', { role: t(ROLE_KEYS[invitation.data.role]) })}
                 {invitation.data.expiresAt
-                  ? ` · expires ${formatDate(invitation.data.expiresAt)}`
+                  ? ` · ${t('invitations.expiresOn', { date: formatDate(invitation.data.expiresAt) })}`
                   : ''}
               </p>
             </div>
           </div>
           {invitation.data.status !== 'active' ? (
-            <Alert variant="warning" title="This invitation is no longer valid">
+            <Alert variant="warning" title={t('invitations.noLongerValid')}>
               {invitation.data.status === 'expired'
-                ? 'The invitation has expired. Ask an administrator for a new link.'
+                ? t('invitations.expired')
                 : invitation.data.status === 'exhausted'
-                  ? 'The invitation has reached its usage limit.'
-                  : 'The invitation was revoked by an administrator.'}
+                  ? t('invitations.exhausted')
+                  : t('invitations.revoked')}
             </Alert>
           ) : isAuthenticated ? (
             <>
               <p className="text-sm text-muted-foreground">
-                You are logged in as{' '}
-                <span className="font-medium text-foreground">{user?.email}</span>.
+                {t('invitations.loggedInAs', { email: user?.email ?? '' })}
               </p>
               <Button size="lg" onClick={() => void join()} loading={accept.isPending}>
-                Join {invitation.data.church.name}
+                {t('invitations.join', { church: invitation.data.church.name })}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/churches">Not now</Link>
+                <Link to="/churches">{t('invitations.notNow')}</Link>
               </Button>
             </>
           ) : (
             <>
               <Button size="lg" asChild>
-                <Link to={`/register?invite=${encoded}`}>Create an account and join</Link>
+                <Link to={`/register?invite=${encoded}`}>{t('invitations.registerAndJoin')}</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link to={`/login?invite=${encoded}`}>I already have an account</Link>
+                <Link to={`/login?invite=${encoded}`}>{t('invitations.haveAccount')}</Link>
               </Button>
             </>
           )}

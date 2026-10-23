@@ -10,12 +10,18 @@ import {
   updateProfileBodySchema,
   type AuthResponse,
 } from '@tatagereja/shared';
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import { api, probeServer, request } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { useAuthStore, useAuth } from '@/stores/auth';
-import { useServerStore, type KnownServer } from '@/stores/server';
+import { hostLabel } from '@/lib/utils';
+import {
+  DEFAULT_SERVER_NAME,
+  isDefaultServer,
+  useServerStore,
+  type KnownServer,
+} from '@/stores/server';
 import { useUiStore } from '@/stores/ui';
 
 export const metaQuery = (serverUrl: string) =>
@@ -24,6 +30,20 @@ export const metaQuery = (serverUrl: string) =>
     queryFn: () => probeServer(serverUrl, serverMetaSchema),
     staleTime: 5 * 60_000,
   });
+
+/**
+ * The name people know a server by. A self-hosted server that serves this app is the default
+ * one, so its own `SERVER_NAME` is shown rather than the hosted service's name, unless the build
+ * names the default server explicitly.
+ */
+export function useServerName(serverUrl: string): string {
+  const known = useServerStore((state) => state.servers[serverUrl]?.name);
+  const ask = !known && !import.meta.env.VITE_DEFAULT_SERVER_NAME && isDefaultServer(serverUrl);
+  const meta = useQuery({ ...metaQuery(serverUrl), enabled: ask, retry: false });
+  if (known) return known;
+  if (!isDefaultServer(serverUrl)) return hostLabel(serverUrl);
+  return (ask ? meta.data?.name : null) ?? DEFAULT_SERVER_NAME;
+}
 
 export async function probeAndRemember(serverUrl: string): Promise<KnownServer> {
   const meta = await queryClient.fetchQuery(metaQuery(serverUrl));

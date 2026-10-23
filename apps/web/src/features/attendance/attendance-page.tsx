@@ -102,14 +102,10 @@ function SessionsPage() {
               </Button>
             ) : null}
             {canCreate ? (
-              <Button
-                size="sm"
-                className="max-sm:size-11 max-sm:px-0"
-                aria-label={t('attendance.newSession')}
-                onClick={() => setState({ new: true }, { push: true })}
-              >
+              <Button size="sm" onClick={() => setState({ new: true }, { push: true })}>
                 <Plus />
                 <span className="hidden sm:inline">{t('attendance.newSession')}</span>
+                <span className="sm:hidden">{t('common.add')}</span>
               </Button>
             ) : null}
           </>

@@ -72,11 +72,11 @@ export function VisitsPage() {
   const query = useQuery({ ...visitsQuery(churchId, params), placeholderData: keepPreviousData });
   const filtered = !!(state.q || state.period || state.followUp || state.mine);
   const logVisit = canLog ? (
-    <Button asChild className="max-sm:size-11 max-sm:px-0">
+    <Button asChild size="sm">
       <Link to={`${base}/care/visits/new`}>
         <Plus />
         <span className="hidden sm:inline">{t('care.logVisit')}</span>
-        <span className="sr-only sm:hidden">{t('care.logVisit')}</span>
+        <span className="sm:hidden">{t('common.add')}</span>
       </Link>
     </Button>
   ) : null;

@@ -64,9 +64,10 @@ export function BulletinsPage() {
         actions={
           manager ? (
             <Button asChild size="sm">
-              <Link to={`${base}/bulletins/new`} aria-label={t('comms.bulletinNew')}>
+              <Link to={`${base}/bulletins/new`}>
                 <FilePlus2 />
                 <span className="hidden sm:inline">{t('comms.bulletinNew')}</span>
+                <span className="sm:hidden">{t('common.add')}</span>
               </Link>
             </Button>
           ) : null

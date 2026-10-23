@@ -87,10 +87,10 @@ export function TasksPage() {
         breadcrumbs={[{ label: t('care.nav'), to: `${base}/care` }, { label: t('care.navTasks') }]}
         actions={
           canCreate ? (
-            <Button className="max-sm:size-11 max-sm:px-0" onClick={() => setCreating(true)}>
+            <Button size="sm" onClick={() => setCreating(true)}>
               <Plus />
               <span className="hidden sm:inline">{t('care.newTask')}</span>
-              <span className="sr-only sm:hidden">{t('care.newTask')}</span>
+              <span className="sm:hidden">{t('common.add')}</span>
             </Button>
           ) : null
         }

@@ -58,6 +58,7 @@ export const eventsDictionary = defineDictionary('events', {
     repeatNone: 'Does not repeat',
     fieldUntil: 'Last date',
     untilRequired: 'Choose the last date',
+    untilBeforeStart: 'The last date must be on or after the first one',
     monthlyShortMonths: 'Months without this date are skipped.',
     seriesEditTitle: 'Part of a recurring series',
     seriesEditHint:
@@ -253,6 +254,7 @@ export const eventsDictionary = defineDictionary('events', {
     repeatNone: 'Tidak diulang',
     fieldUntil: 'Tanggal terakhir',
     untilRequired: 'Pilih tanggal terakhir',
+    untilBeforeStart: 'Tanggal terakhir tidak boleh sebelum tanggal pertama',
     monthlyShortMonths: 'Bulan yang tidak memiliki tanggal ini dilewati.',
     seriesEditTitle: 'Bagian dari kegiatan rutin',
     seriesEditHint:

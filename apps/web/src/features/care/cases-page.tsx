@@ -76,11 +76,11 @@ export function CasesPage() {
     state.status !== 'active'
   );
   const newCase = canCreate ? (
-    <Button asChild className="max-sm:size-11 max-sm:px-0">
+    <Button asChild size="sm">
       <Link to={`${base}/care/cases/new`}>
         <Plus />
         <span className="hidden sm:inline">{t('care.newCase')}</span>
-        <span className="sr-only sm:hidden">{t('care.newCase')}</span>
+        <span className="sm:hidden">{t('common.add')}</span>
       </Link>
     </Button>
   ) : null;

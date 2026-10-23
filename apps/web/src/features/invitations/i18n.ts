@@ -1,11 +1,41 @@
 import { defineDictionary } from '@/lib/i18n/define';
 
-/** Strings for this feature's screens. Its module owner moves the screens' text here. */
 export const invitationsDictionary = defineDictionary('invitations', {
   en: {
-    title: 'Invitation',
+    title: 'Church invitation',
+    notFound: 'Invitation not found',
+    joinAs: 'Join as {role}',
+    expiresOn: 'valid until {date}',
+    noLongerValid: 'This invitation is no longer valid',
+    expired: 'The invitation has expired. Ask an administrator for a new link.',
+    exhausted: 'The invitation has reached its usage limit. Ask an administrator for a new link.',
+    revoked: 'The invitation was revoked by an administrator.',
+    loggedInAs: 'You are logged in as {email}.',
+    join: 'Join {church}',
+    notNow: 'Not now',
+    registerAndJoin: 'Create an account and join',
+    haveAccount: 'I already have an account',
+    welcome: 'Welcome to {church}!',
+    alreadyMember: 'You are already a member of this church',
+    joinFailed: 'Could not accept the invitation',
   },
   id: {
-    title: 'Undangan',
+    title: 'Undangan gereja',
+    notFound: 'Undangan tidak ditemukan',
+    joinAs: 'Bergabung sebagai {role}',
+    expiresOn: 'berlaku sampai {date}',
+    noLongerValid: 'Undangan ini sudah tidak berlaku',
+    expired: 'Masa berlaku undangan sudah habis. Mintalah tautan baru kepada pengurus gereja.',
+    exhausted:
+      'Undangan sudah mencapai batas pemakaian. Mintalah tautan baru kepada pengurus gereja.',
+    revoked: 'Undangan ini sudah dicabut oleh pengurus gereja.',
+    loggedInAs: 'Anda masuk sebagai {email}.',
+    join: 'Bergabung dengan {church}',
+    notNow: 'Nanti saja',
+    registerAndJoin: 'Buat akun dan bergabung',
+    haveAccount: 'Saya sudah punya akun',
+    welcome: 'Selamat datang di {church}!',
+    alreadyMember: 'Anda sudah menjadi anggota gereja ini',
+    joinFailed: 'Undangan tidak dapat diterima',
   },
 });

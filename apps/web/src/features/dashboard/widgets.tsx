@@ -1,4 +1,4 @@
-import { can, fullName, has, type Dashboard } from '@tatagereja/shared';
+import { can, fullName, has, markdownExcerpt, type Dashboard } from '@tatagereja/shared';
 import {
   Baby,
   Bell,
@@ -7,7 +7,9 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
+  ChevronRight,
   ClipboardCheck,
+  Inbox,
   Flame,
   HandHeart,
   Heart,
@@ -18,6 +20,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from 'lucide-react';
+import { useQueries } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -27,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, ToneIcon } from '@/components/ui/status-badge';
 import type { Tone } from '@/components/ui/tone';
+import { useModuleMenu } from '@/features/registry';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { useCompleteMyTask, useMarkNotificationRead } from './api';
@@ -132,6 +136,67 @@ function SeeAll({ to, label }: { to: string; label?: string }) {
     <Button asChild variant="link" size="sm" className="h-9 px-1">
       <Link to={to}>{label ?? t('common.seeAll')}</Link>
     </Button>
+  );
+}
+
+/** Menu entries whose count already has its own home card (serving replies, children in class). */
+const COUNTED_ELSEWHERE = new Set(['worship:worship-me', 'checkin:checkin-me']);
+
+/**
+ * What waits for the caller across modules (offerings to verify, expense requests, room
+ * bookings, join requests, care tasks and prayer requests to review): the menu entries whose
+ * count badge is above zero, sharing the sidebar's queries. Nothing shows when nothing waits.
+ */
+export function AttentionWidget() {
+  const { t, formatNumber } = useI18n();
+  const { items, context } = useModuleMenu();
+  const counted = items.filter(
+    (item) => item.badge && !COUNTED_ELSEWHERE.has(`${item.moduleId}:${item.id}`),
+  );
+  const counts = useQueries({
+    queries: counted.map((item) => {
+      const options = item.badge!(context);
+      return {
+        queryKey: options.queryKey,
+        queryFn: options.queryFn,
+        refetchInterval: options.refetchInterval,
+        staleTime: options.staleTime ?? 60_000,
+      };
+    }),
+  });
+  const waiting = counted.flatMap((item, index) => {
+    const count = counts[index]?.data ?? 0;
+    return count > 0 ? [{ item, count }] : [];
+  });
+  if (waiting.length === 0) return null;
+  const total = waiting.reduce((sum, entry) => sum + entry.count, 0);
+  return (
+    <Widget
+      icon={Inbox}
+      tone="brand"
+      title={t('dashboard.attention')}
+      hint={t('dashboard.attentionHint', { count: total })}
+      className="border-primary/25 lg:col-span-2"
+    >
+      <Rows>
+        {waiting.map(({ item, count }) => (
+          <Row
+            key={`${item.moduleId}-${item.id}`}
+            to={item.href}
+            leading={<ToneIcon icon={item.icon} tone={item.tone} size="sm" />}
+            title={t(item.labelKey)}
+            trailing={
+              <>
+                <span className="min-w-6 rounded-full bg-primary px-2 text-center text-xs leading-6 font-semibold text-primary-foreground tabular">
+                  {count > 99 ? '99+' : formatNumber(count)}
+                </span>
+                <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+              </>
+            }
+          />
+        ))}
+      </Rows>
+    </Widget>
   );
 }
 
@@ -507,7 +572,7 @@ export function AnnouncementsWidget({ data }: { data: NonNullable<Dashboard['ann
                   </span>
                   <span className="line-clamp-1 text-sm font-semibold">{announcement.title}</span>
                   <span className="line-clamp-2 text-xs text-muted-foreground">
-                    {announcement.body}
+                    {markdownExcerpt(announcement.body, 200)}
                   </span>
                 </Link>
               ))}

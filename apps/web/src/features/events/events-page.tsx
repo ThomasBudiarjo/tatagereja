@@ -98,9 +98,10 @@ export function EventsPage() {
             </Button>
             {canCreate ? (
               <Button asChild size="sm">
-                <Link to={`${base}/events/new`} aria-label={t('events.new')}>
+                <Link to={`${base}/events/new`}>
                   <CalendarPlus />
                   <span className="hidden sm:inline">{t('events.new')}</span>
+                  <span className="sm:hidden">{t('common.add')}</span>
                 </Link>
               </Button>
             ) : null}

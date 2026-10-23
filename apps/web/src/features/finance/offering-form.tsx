@@ -14,7 +14,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Calculator, Church, Minus, Plus, Send, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type Control } from 'react-hook-form';
 import type { z } from 'zod';
 import { useChurch } from '@/components/layout/church-provider';
@@ -27,6 +27,7 @@ import { Alert, Segmented } from '@/components/ui/misc';
 import { Select } from '@/components/ui/select';
 import { Stepper } from '@/components/ui/stepper';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
+import { revealFirstError } from '@/lib/forms';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { useMutationToast } from '@/lib/use-mutation-toast';
@@ -83,6 +84,7 @@ export function OfferingForm({
     note: '',
   });
 
+  const formRef = useRef<HTMLFormElement>(null);
   const form = useForm<FormValues, unknown, OfferingBatchInput>({
     resolver: useFinanceResolver(zodResolver(offeringBatchInputSchema)),
     defaultValues: batch
@@ -171,11 +173,14 @@ export function OfferingForm({
     const valid = await form.trigger([...(STEP_FIELDS[step] ?? [])] as (keyof FormValues)[]);
     if (step === 1 && total <= 0) {
       form.setError('lines', { message: t('finance.enterAnAmount') });
+      revealFirstError(formRef.current);
       return;
     }
     if (valid) {
       setStep((current) => Math.min(2, current + 1));
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      revealFirstError(formRef.current);
     }
   };
 
@@ -209,6 +214,7 @@ export function OfferingForm({
 
   return (
     <form
+      ref={formRef}
       noValidate
       className="flex flex-col gap-5"
       onSubmit={(event) => {

@@ -1,3 +1,4 @@
+import { callName } from '@tatagereja/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Church, ChevronRight, Link2, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -104,7 +105,7 @@ export function ChurchesPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow={user ? t('churches.hello', { name: user.name.split(' ')[0] ?? '' }) : undefined}
+        eyebrow={user ? t('churches.hello', { name: callName(user.name) }) : undefined}
         title={t('churches.title')}
         description={t('churches.description')}
       />
