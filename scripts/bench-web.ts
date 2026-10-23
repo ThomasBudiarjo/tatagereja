@@ -16,7 +16,8 @@
  *          from the first contentful paint until the page went quiet
  *   Busy   the same sum over every long task, before the first paint too (script parsing and
  *          the first render of a single-page app happen before anything is painted)
- *   JS     script bytes on the wire (compressed), and every byte on the wire
+ *   JS     script bytes on the wire (compressed) before the first paint, in total, and every
+ *          byte on the wire (idle-time prefetches included)
  *
  * The page counts as quiet when no request is in flight and nothing was painted, changed or
  * run as a long task for 1.5 s.
@@ -72,6 +73,7 @@ type Sample = {
   ready: number;
   tbt: number;
   busy: number;
+  firstJsKb: number;
   jsKb: number;
   totalKb: number;
   requests: number;
@@ -151,6 +153,7 @@ async function measure(page: Page, url: string): Promise<Sample> {
   let lastNetwork = Date.now();
   let jsBytes = 0;
   let totalBytes = 0;
+  const scripts: { at: number; bytes: number }[] = [];
   let requests = 0;
   cdp.on('Network.requestWillBeSent', (event) => {
     inFlight.add(event.requestId);
@@ -168,12 +171,15 @@ async function measure(page: Page, url: string): Promise<Sample> {
     done(event.requestId);
     requests += 1;
     totalBytes += event.encodedDataLength;
-    if (types.get(event.requestId) === 'Script') jsBytes += event.encodedDataLength;
+    if (types.get(event.requestId) === 'Script') {
+      jsBytes += event.encodedDataLength;
+      scripts.push({ at: Date.now(), bytes: event.encodedDataLength });
+    }
   });
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   const read = () => page.evaluate(() => (window as unknown as { __vitals: Vitals }).__vitals);
   const deadline = Date.now() + 60_000;
-  let vitals = await read();
+  let vitals: Vitals;
   for (;;) {
     await page.waitForTimeout(250);
     vitals = await read();
@@ -193,8 +199,13 @@ async function measure(page: Page, url: string): Promise<Sample> {
         const start = Math.max(task.start, from);
         return sum + Math.max(0, task.start + task.duration - start - 50);
       }, 0);
+  const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+  const firstPaint = timeOrigin + vitals.fcp;
   await cdp.detach();
   return {
+    firstJsKb:
+      scripts.filter((script) => script.at <= firstPaint).reduce((sum, s) => sum + s.bytes, 0) /
+      1024,
     lcp: vitals.lcp,
     fcp: vitals.fcp,
     ready: vitals.changed,
@@ -284,13 +295,13 @@ await browser.close();
 
 const pad = (value: string, width: number) => value.padStart(width);
 console.info(
-  `${'Page'.padEnd(26)} ${pad('FCP ms', 7)} ${pad('LCP ms', 7)} ${pad('Ready', 7)} ${pad('TBT ms', 7)} ${pad('Busy', 7)} ${pad('JS KB', 7)} ${pad('All KB', 7)} ${pad('Req', 4)}`,
+  `${'Page'.padEnd(26)} ${pad('FCP ms', 7)} ${pad('LCP ms', 7)} ${pad('Ready', 7)} ${pad('TBT ms', 7)} ${pad('Busy', 7)} ${pad('JS@FCP', 7)} ${pad('JS KB', 7)} ${pad('All KB', 7)} ${pad('Req', 4)}`,
 );
 for (const { route, kind, samples } of results) {
   const of = (key: keyof Sample) => median(samples.map((sample) => sample[key]));
   const label = kind === 'warm' ? `${route} (warm)` : route;
   console.info(
-    `${label.padEnd(26)} ${pad(of('fcp').toFixed(0), 7)} ${pad(of('lcp').toFixed(0), 7)} ${pad(of('ready').toFixed(0), 7)} ${pad(of('tbt').toFixed(0), 7)} ${pad(of('busy').toFixed(0), 7)} ${pad(of('jsKb').toFixed(1), 7)} ${pad(of('totalKb').toFixed(1), 7)} ${pad(of('requests').toFixed(0), 4)}`,
+    `${label.padEnd(26)} ${pad(of('fcp').toFixed(0), 7)} ${pad(of('lcp').toFixed(0), 7)} ${pad(of('ready').toFixed(0), 7)} ${pad(of('tbt').toFixed(0), 7)} ${pad(of('busy').toFixed(0), 7)} ${pad(of('firstJsKb').toFixed(1), 7)} ${pad(of('jsKb').toFixed(1), 7)} ${pad(of('totalKb').toFixed(1), 7)} ${pad(of('requests').toFixed(0), 4)}`,
   );
 }
 const json = option('json', '');

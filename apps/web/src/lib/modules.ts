@@ -4,7 +4,7 @@ import { hasAll, hasAny } from '@tatagereja/shared';
 import type { ComponentType } from 'react';
 import type { RouteObject } from 'react-router';
 import type { ModuleTone } from '@/components/ui/tone';
-import type { MessageKey } from '@/lib/i18n';
+import { loadDictionaries, type MessageKey } from '@/lib/i18n';
 
 /*
  * The module registry contract. Each module describes itself in
@@ -135,7 +135,13 @@ export type ModuleManifest = {
 
 export const defineModule = (manifest: ModuleManifest): ModuleManifest => manifest;
 
-/** Loads a named page component on demand, so the first paint stays small on phones. */
+/**
+ * Loads a named page component on demand, so the first paint stays small on phones, together
+ * with the dictionaries of every feature (one chunk, fetched once in parallel with the page).
+ */
 export const lazyPage =
   <T extends string>(loader: () => Promise<Record<T, ComponentType>>, name: T) =>
-  async () => ({ Component: (await loader())[name] });
+  async () => {
+    const [page] = await Promise.all([loader(), loadDictionaries()]);
+    return { Component: page[name] };
+  };
