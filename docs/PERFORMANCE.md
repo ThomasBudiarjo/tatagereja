@@ -222,7 +222,7 @@ arrive (`apps/api/src/lib/cursor.ts`).
 Reports, absence lists and directory counts go through a small per-church cache
 (`apps/api/src/lib/cache.ts`): entries live for a minute and are dropped by any mutating request
 to the church (`POST`, `PUT`, `PATCH`, `DELETE` under `/api/churches/:churchId`) and by account
-changes a church shows (profile, account deletion, joining). The TTL bounds what no request
+changes a church shows (profile, account deletion, joining, registering with an invitation). The TTL bounds what no request
 changes: today, "upcoming", scheduled posts. Report computations that miss the cache count
 against a per-person budget of 300 in five minutes (`services/report-cache.ts`); answers from the
 cache are free.
@@ -251,8 +251,9 @@ cache are free.
 4. Give every list a maximum; use a cursor (`lib/cursor.ts`) for tables that grow without bound.
 5. Expensive read-only results go through `cachedReport` (or `deps.cache.remember` with a key that
    names everything the result depends on, including the caller's scope). Writes need nothing:
-   every mutating church request drops the church's entries. A write outside
-   `/api/churches/:churchId` that changes church data must be added to `invalidateForRequest`.
+   every mutating church request drops the church's entries, and any other write drops every
+   church unless its path is in `ACCOUNT_ONLY` (`lib/cache.ts`). Add a route there only when it
+   can never change church data (registration cannot: an invitation token joins a church).
 6. A column copied from another table for speed is written at every write site, kept in step
    when the source changes, and backfilled at startup in `backfillCopiedColumns`.
 7. Run the benchmark before and after a change that touches a hot path.

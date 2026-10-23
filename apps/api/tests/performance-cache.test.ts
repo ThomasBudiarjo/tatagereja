@@ -228,6 +228,34 @@ describe('cached church results stay correct after writes', () => {
     );
   });
 
+  it('never shows a hidden birthday to a viewer who may not see it, whoever asked first', async () => {
+    // A birthday three days from now, 40 years ago; the church day may differ by one from UTC.
+    const soon = new Date(Date.now() + 3 * 86_400_000);
+    soon.setUTCFullYear(soon.getUTCFullYear() - 40);
+    const person = await t.createPerson(s.owner.token, s.church.id, {
+      firstName: 'Tersembunyi',
+      lastName: 'Ulang Tahun',
+      birthDate: soon.toISOString().slice(0, 10),
+    });
+    const celebrates = async (token: string) =>
+      (await get('/directory/summary', token)).celebrations.some(
+        (item: { person: { id: string } }) => item.person.id === person.id,
+      );
+    expect(await celebrates(s.owner.token)).toBe(true);
+    expect(await celebrates(s.member.token)).toBe(true);
+
+    const hide = await t.request('PUT', `${base}/people/${person.id}/privacy`, {
+      token: s.owner.token,
+      body: { showPhone: true, showEmail: true, showAddress: false, showBirthday: false },
+    });
+    expect(hide.status).toBe(200);
+    // The private view is computed (and cached) first; the member still gets their own answer.
+    expect(await celebrates(s.owner.token)).toBe(true);
+    expect(await celebrates(s.member.token)).toBe(false);
+    expect(await celebrates(s.owner.token)).toBe(true);
+    expect(await celebrates(s.member.token)).toBe(false);
+  });
+
   it('keeps each church to its own answers', async () => {
     const other = await t.register('Other Owner');
     const church = await t.createChurch(other.token, 'GKI Lain');
