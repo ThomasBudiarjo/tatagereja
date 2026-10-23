@@ -232,6 +232,22 @@ describe('member and role management', () => {
     ).toBe(true);
   });
 
+  it('lets member managers make reset links only for members they could manage', () => {
+    expect(can.resetMemberPassword(admin, { role: 'member', userId: 'u-x' })).toBe(true);
+    expect(can.resetMemberPassword(admin, { role: 'owner', userId: 'u-owner' })).toBe(false);
+    expect(can.resetMemberPassword(admin, { role: 'administrator', userId: 'u-admin' })).toBe(
+      false,
+    );
+    expect(can.resetMemberPassword(member, { role: 'member', userId: 'u-x' })).toBe(false);
+    const counsellor = effectivePermissions('member', [['care.confidential']]);
+    expect(
+      can.resetMemberPassword(admin, { role: 'member', userId: 'u-x', permissions: counsellor }),
+    ).toBe(false);
+    expect(
+      can.resetMemberPassword(owner, { role: 'member', userId: 'u-x', permissions: counsellor }),
+    ).toBe(true);
+  });
+
   it('lets only administrators invite administrators', () => {
     const inviter = accessFor('member', { custom: [['invitations.manage']] });
     expect(can.inviteWithRole(inviter, 'member')).toBe(true);

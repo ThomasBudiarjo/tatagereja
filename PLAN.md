@@ -330,14 +330,20 @@ The API is the only security boundary; the interface is a convenience on top of 
   (administrators get no exception); members see only their own
   giving, registry records, children and schedule. Password hashes, token hashes and secrets are
   never serialised.
-- **Credentials.** Passwords are hashed with argon2id; session tokens and iCal feed tokens are
-  stored only as hashes; two-step secrets are encrypted at rest; secrets are compared in constant
-  time and codes are generated with a CSPRNG from an unambiguous alphabet.
+- **Credentials.** Passwords are hashed with argon2id (upgraded at sign-in) and checked against
+  the most common passwords; sessions are httpOnly SameSite=Strict cookies with a CSRF token for
+  the app on its own server, and short-lived access tokens with rotating, reuse-detecting refresh
+  tokens elsewhere, with idle and absolute timeouts; every bearer-style token (sessions, refresh
+  tokens, invitation and reset links, iCal feeds, recovery codes) is stored only as a hash;
+  confidential fields are encrypted with AES-256-GCM under a rotatable key; secrets are compared
+  in constant time and codes are generated with a CSPRNG. See
+  [docs/SECURITY.md](./docs/SECURITY.md).
 - **Abuse limits.** Rate limits on registration, sign-in, two-step codes, invitation tokens,
   check-out codes, prayer requests, join requests and data exports, progressive account lockout, Turnstile on registration, a request body limit
   (`MAX_BODY_KB`), and `TRUST_PROXY` so a client cannot spoof its address.
-- **Headers.** A strict Content Security Policy, `nosniff`, `X-Frame-Options`, `Referrer-Policy`
-  and HSTS behind HTTPS on every response.
+- **Headers.** A strict Content Security Policy (no inline script, no `eval`), `nosniff`,
+  `X-Frame-Options`, `Referrer-Policy`, COOP, CORP, a restrictive `Permissions-Policy` and
+  preload-ready HSTS behind HTTPS on every response.
 - **Integrity.** Ledger entries and registry records are corrected or voided, never deleted; closed
   finance periods refuse changes (`409 PERIOD_CLOSED`); counted offerings and expenses need a second
   person; sensitive writes are audited in the same transaction.
@@ -395,13 +401,18 @@ management actions appear next to the data they affect for the people allowed to
 27. Polish from walking through the demo church on phones and desktops: consistent layouts at 360px,
     deep links between modules (a profile opens that person's cases, giving and records), and empty,
     loading and error states on every screen
+28. Session and secret hardening: cookie sessions with CSRF defence, rotating refresh tokens with
+    reuse detection, idle and absolute timeouts, field encryption with key rotation, hashed
+    invitation links shown once, administrator reset links and recovery-code reset, common-password
+    checks and a strict CSP
 
 New modules follow the contract in [docs/ARCHITECTURE-MODULES.md](./docs/ARCHITECTURE-MODULES.md).
 
 ## Not yet
 
-- **Email and password reset.** The server sends no email yet, so a forgotten password needs an
-  administrator of the server; invitation links are shared by hand or QR code
+- **Email.** The server sends no email yet: a forgotten password is reset with a one-time link
+  from a church administrator or with a recovery code, and invitation links are shared by hand or
+  QR code
 - **Sign-in with Google.** The account model already separates people from login accounts, so it
   only needs to respect the registration mode
 - **Push notifications and WhatsApp delivery** of announcements, rosters and reminders (notifications

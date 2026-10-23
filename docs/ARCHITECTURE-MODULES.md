@@ -460,7 +460,11 @@ register a strict limiter under the same name in `createTestApp(..., { limiters 
 - Strip fields the caller may not see before serializing (private contact fields, confidential
   notes). Never return password hashes, token hashes or secrets.
 - Compare secrets with `safeEqual`; generate codes with `generateCode` (CSPRNG, unambiguous
-  alphabet) and tokens with `generateToken`.
+  alphabet) and tokens with `generateToken`. Store bearer-style tokens only as `hashToken(...)`
+  and show links that carry one only in the answer that made them.
+- Declare confidential free text (medical, pastoral, custody, identity numbers) with
+  `encryptedText(table, column)` from `db/encrypted.ts`; never filter or sort on such a column.
+  See [SECURITY.md](./SECURITY.md).
 - Audit sensitive writes; rate-limit guessable inputs (codes, tokens, logins).
 - Request bodies over `MAX_BODY_KB` (default 2 MiB) are refused with `413 PAYLOAD_TOO_LARGE`.
 - Security headers (CSP, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS behind HTTPS)
