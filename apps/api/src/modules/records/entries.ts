@@ -1,5 +1,7 @@
 import {
   OWN_RECORD_ROLES,
+  RECORD_ISSUES,
+  RECORDS_LIMITS,
   REGISTRY_RECORD_TYPE_LABELS,
   canManageRecords,
   canViewRegistry,
@@ -43,10 +45,12 @@ import {
   loadRecordRow,
   nextNumber,
   normalizeSubtype,
+  ownRecordView,
   previewSideEffects,
   recordsSettingsOf,
   redactRecordSnapshot,
   resolveRecordPeople,
+  revertibleEffects,
 } from '../../services/records';
 
 const view = { module: 'records', permission: ['records.view', 'records.manage'] } as const;
@@ -135,7 +139,7 @@ export const recordEntriesRouter = (deps: Deps) => {
         ),
       )
       .orderBy(asc(auditLogs.createdAt))
-      .limit(100)
+      .limit(RECORDS_LIMITS.historyMax)
       .all()
       .flatMap((row) => {
         const action = HISTORY_ACTIONS[row.action as keyof typeof HISTORY_ACTIONS];
@@ -249,7 +253,7 @@ export const recordEntriesRouter = (deps: Deps) => {
         const existing = body.recordId ? loadRecordRow(db, church.id, body.recordId) : null;
         if (existing && existing.type !== input.type) {
           throw validationError('The type of a record cannot be changed', [
-            { path: 'type', message: 'Void this record and enter a new one instead' },
+            { path: 'type', message: RECORD_ISSUES.typeLocked },
           ]);
         }
         resolveRecordPeople(db, church.id, input);
@@ -321,18 +325,27 @@ export const recordEntriesRouter = (deps: Deps) => {
       '/:id',
       ({ church, access, params }) => {
         const record = hydrateRecord(db, loadRecordRow(db, church.id, params.id));
-        // Someone who may not see the register learns nothing about other people's records.
-        if (!canViewRegistryRecord(access, record)) throw notFound('Record');
+        // Someone who may not see the register learns nothing about other people's records,
+        // nor about their own once voided, and never reads the secretariat's notes.
+        const viewer = canViewRegistry(access);
+        if (!canViewRegistryRecord(access, record) || (!viewer && record.status !== 'active')) {
+          throw notFound('Record');
+        }
         const settings = recordsSettingsOf(church);
+        const canManage = canManageRecords(access);
         return {
-          record,
-          canManage: canManageRecords(access),
+          record: viewer ? record : ownRecordView(record),
+          canManage,
           certificate: {
             signatoryName: settings.signatoryName,
             signatoryTitle: settings.signatoryTitle,
             footer: settings.certificateFooter,
           },
-          history: canViewRegistry(access) ? history(church.id, record.id) : [],
+          history: viewer ? history(church.id, record.id) : [],
+          revertibleEffects:
+            canManage && record.status === 'active'
+              ? revertibleEffects(db, church.id, record.id)
+              : [],
         };
       },
       { church: 'records', params: churchIdParamsSchema },
@@ -345,7 +358,7 @@ export const recordEntriesRouter = (deps: Deps) => {
         const input = body.record;
         if (input.type !== row.type) {
           throw validationError('The type of a record cannot be changed', [
-            { path: 'record.type', message: 'Void this record and enter a new one instead' },
+            { path: 'record.type', message: RECORD_ISSUES.typeLocked },
           ]);
         }
         const before = hydrateRecord(db, row);
@@ -393,7 +406,7 @@ export const recordEntriesRouter = (deps: Deps) => {
       ({ church, auth, audit, params, body }) => {
         const row = loadRecordRow(db, church.id, params.id);
         if (row.status === 'voided') throw conflict('This record is already voided');
-        const record = db.transaction((tx) => {
+        return db.transaction((tx) => {
           const now = nowIso();
           const updated = tx
             .update(registryRecords)
@@ -409,6 +422,8 @@ export const recordEntriesRouter = (deps: Deps) => {
             .returning()
             .get();
           if (!updated) throw notFound('Record');
+          const effects = body.revertEffects ? revertibleEffects(tx, church.id, row.id) : [];
+          applySideEffects(tx, church.id, effects);
           recordAudit(tx, audit, {
             module: 'records',
             action: 'registry_record.void',
@@ -416,11 +431,10 @@ export const recordEntriesRouter = (deps: Deps) => {
             entityId: row.id,
             summary: `Voided record ${row.number}`,
             before: { status: row.status },
-            after: { status: 'voided', voidReason: body.reason },
+            after: { status: 'voided', voidReason: body.reason, effects },
           });
-          return hydrateRecord(tx, updated);
+          return { record: hydrateRecord(tx, updated), effects };
         });
-        return { record, effects: [] };
       },
       { church: manage, params: churchIdParamsSchema, body: voidRegistryRecordBodySchema },
     );

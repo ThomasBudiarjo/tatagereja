@@ -5,6 +5,7 @@ import {
   recordDetailsSchema,
   recordNumberPattern,
   recordPrimaryRole,
+  recordSideEffectSchema,
   recordSideEffects,
   recordsSettingsSchema,
   type RecordSideEffect,
@@ -15,9 +16,16 @@ import {
   type SideEffectPerson,
 } from '@tatagereja/shared';
 import { and, asc, eq, inArray, max, ne } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, RegistryRecordPersonRow, RegistryRecordRow } from '../db/schema';
-import { people, personPrivateDetails, registryRecordPeople, registryRecords } from '../db/schema';
+import {
+  auditLogs,
+  people,
+  personPrivateDetails,
+  registryRecordPeople,
+  registryRecords,
+} from '../db/schema';
 import { conflict, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
 import { newId } from '../lib/tokens';
@@ -308,6 +316,7 @@ export const applySideEffects = (db: Queryable, churchId: string, effects: Recor
     const where = and(eq(people.id, effect.personId), eq(people.churchId, churchId));
     switch (effect.kind) {
       case 'membership_status':
+        if (!effect.to) break;
         db.update(people)
           .set({
             membershipStatus: effect.to as SideEffectPerson['membershipStatus'],
@@ -324,7 +333,7 @@ export const applySideEffects = (db: Queryable, churchId: string, effects: Recor
         const patch =
           effect.kind === 'baptism_date'
             ? { baptismDate: effect.to }
-            : { maritalStatus: effect.to as SideEffectPerson['maritalStatus'] };
+            : { maritalStatus: (effect.to ?? 'unspecified') as SideEffectPerson['maritalStatus'] };
         db.insert(personPrivateDetails)
           .values({ personId: effect.personId, churchId, ...patch, updatedAt: now })
           .onConflictDoUpdate({
@@ -337,6 +346,84 @@ export const applySideEffects = (db: Queryable, churchId: string, effects: Recor
     }
   }
 };
+
+const currentValue = (person: SideEffectPerson, kind: RecordSideEffect['kind']): string | null => {
+  switch (kind) {
+    case 'membership_status':
+      return person.membershipStatus;
+    case 'baptism_date':
+      return person.baptismDate;
+    case 'wedding_date':
+      return person.weddingDate;
+    case 'marital_status':
+      return person.maritalStatus;
+  }
+};
+
+const appliedEffectsSchema = z
+  .object({ effects: z.array(recordSideEffectSchema).catch([]) })
+  .catch({ effects: [] });
+
+/**
+ * The profile changes a record made when it was entered or corrected (kept in its audit trail)
+ * that are still in place, as the effects that undo them. A value someone changed since is
+ * left alone.
+ */
+export const revertibleEffects = (
+  db: Queryable,
+  churchId: string,
+  recordId: string,
+): RecordSideEffect[] => {
+  // Per person and field: the value before the first change and after the last one.
+  const applied = new Map<string, RecordSideEffect>();
+  for (const row of db
+    .select({ after: auditLogs.after })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.churchId, churchId),
+        eq(auditLogs.module, 'records'),
+        eq(auditLogs.entityType, 'registry_record'),
+        eq(auditLogs.entityId, recordId),
+        inArray(auditLogs.action, ['registry_record.create', 'registry_record.correct']),
+      ),
+    )
+    .orderBy(asc(auditLogs.createdAt))
+    .all()) {
+    for (const effect of appliedEffectsSchema.parse(row.after ?? {}).effects) {
+      const key = `${effect.personId}:${effect.kind}`;
+      const first = applied.get(key);
+      applied.set(key, first ? { ...effect, from: first.from } : effect);
+    }
+  }
+  if (applied.size === 0) return [];
+  const persons = sideEffectPeople(db, churchId, [
+    ...new Set([...applied.values()].map((effect) => effect.personId)),
+  ]);
+  return [...applied.values()].flatMap((effect) => {
+    const person = persons.get(effect.personId);
+    if (!person || effect.from === effect.to) return [];
+    if (effect.kind === 'membership_status' && effect.from === null) return [];
+    const current = currentValue(person, effect.kind);
+    if (current !== effect.to) return [];
+    return [
+      { personId: person.id, name: person.name, kind: effect.kind, from: current, to: effect.from },
+    ];
+  });
+};
+
+/**
+ * A record as the person it names sees it: without the secretariat's notes and the details
+ * that are never printed.
+ */
+export const ownRecordView = (record: RegistryRecord): RegistryRecord => ({
+  ...record,
+  notes: null,
+  details: {
+    ...record.details,
+    ...Object.fromEntries(PRIVATE_RECORD_DETAILS.map((key) => [key, null])),
+  },
+});
 
 /** The record as the audit log keeps it, without private details and notes. */
 export const auditSnapshot = (record: RegistryRecord) => ({

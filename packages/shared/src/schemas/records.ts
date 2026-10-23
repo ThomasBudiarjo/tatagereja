@@ -170,17 +170,33 @@ export const formatRecordNumber = (
 /** The numbering year of a record: the year of its date. */
 export const recordYearOf = (date: string): number => Number(date.slice(0, 4));
 
+/**
+ * The validation messages of the registry schemas (English, as the API answers). The interface
+ * translates them by value, so keep them in this one table.
+ */
+export const RECORD_ISSUES = {
+  patternSequence: 'The pattern needs a sequence such as {NNN}',
+  patternYear: 'The pattern needs the year ({YYYY} or {YY}) because numbers restart every year',
+  patternTaken: 'Another kind of record already uses this pattern',
+  personRequired: 'Choose a person or enter a name',
+  peopleCount: 'A marriage needs two spouses; other records need exactly one person',
+  roleMismatch: 'A person has a role that does not fit this kind of record',
+  personTwice: 'The same person is named twice',
+  baptismKind: 'Choose infant or adult baptism',
+  milestoneRequired: 'Name the milestone',
+  funeralBeforeDeath: 'The funeral cannot be before the death',
+  typeLocked: 'Void this record and enter a new one instead',
+} as const;
+export type RecordIssue = keyof typeof RECORD_ISSUES;
+
 // Sequences restart every year, so a pattern without the year would repeat numbers.
 export const numberPatternSchema = z
   .string()
   .trim()
   .min(1)
   .max(RECORDS_LIMITS.numberPatternMax)
-  .refine((value) => /\{N+\}/.test(value), 'The pattern needs a sequence such as {NNN}')
-  .refine(
-    (value) => /\{YYYY\}|\{YY\}/.test(value),
-    'The pattern needs the year ({YYYY} or {YY}) because numbers restart every year',
-  );
+  .refine((value) => /\{N+\}/.test(value), RECORD_ISSUES.patternSequence)
+  .refine((value) => /\{YYYY\}|\{YY\}/.test(value), RECORD_ISSUES.patternYear);
 
 /** Stored in `churches.settings.records`. */
 export const recordsSettingsSchema = z.object({
@@ -281,7 +297,7 @@ export const recordPersonInputSchema = z
     role: z.enum(RECORD_PERSON_ROLES),
   })
   .refine((value) => value.personId || value.name, {
-    message: 'Choose a person or enter a name',
+    message: RECORD_ISSUES.personRequired,
     path: ['name'],
   });
 export type RecordPersonInput = z.infer<typeof recordPersonInputSchema>;
@@ -334,34 +350,34 @@ export const registryRecordInputSchema = z
         ? roleCount(value.people, 'spouse') === 2
         : roleCount(value.people, 'subject') === 1,
     {
-      message: 'A marriage needs two spouses; other records need exactly one person',
+      message: RECORD_ISSUES.peopleCount,
       path: ['people'],
     },
   )
   .refine(
     (value) => value.people.every((person) => RECORD_TYPE_ROLES[value.type].includes(person.role)),
-    { message: 'A person has a role that does not fit this kind of record', path: ['people'] },
+    { message: RECORD_ISSUES.roleMismatch, path: ['people'] },
   )
   .refine(
     (value) => {
       const ids = value.people.flatMap((person) => (person.personId ? [person.personId] : []));
       return new Set(ids).size === ids.length;
     },
-    { message: 'The same person is named twice', path: ['people'] },
+    { message: RECORD_ISSUES.personTwice, path: ['people'] },
   )
   .refine(
     (value) => value.type !== 'baptism' || value.subtype === 'infant' || value.subtype === 'adult',
     {
-      message: 'Choose infant or adult baptism',
+      message: RECORD_ISSUES.baptismKind,
       path: ['subtype'],
     },
   )
   .refine((value) => value.type !== 'custom' || !!value.subtype, {
-    message: 'Name the milestone',
+    message: RECORD_ISSUES.milestoneRequired,
     path: ['subtype'],
   })
   .refine((value) => !value.details.funeralDate || value.details.funeralDate >= value.date, {
-    message: 'The funeral cannot be before the death',
+    message: RECORD_ISSUES.funeralBeforeDeath,
     path: ['details', 'funeralDate'],
   });
 export type RegistryRecordInput = z.infer<typeof registryRecordInputSchema>;
@@ -375,6 +391,8 @@ export type RegistryRecordCorrection = z.infer<typeof registryRecordCorrectionSc
 
 export const voidRegistryRecordBodySchema = z.object({
   reason: requiredText(3, RECORDS_LIMITS.correctionNoteMax),
+  /** Undo the profile changes the record made that are still in place (`revertibleEffects`). */
+  revertEffects: z.boolean().default(false),
 });
 export type VoidRegistryRecordBody = z.infer<typeof voidRegistryRecordBodySchema>;
 
@@ -410,7 +428,8 @@ export const recordSideEffectSchema = z.object({
   name: z.string(),
   kind: z.enum(RECORD_SIDE_EFFECT_KINDS),
   from: z.string().nullable(),
-  to: z.string(),
+  /** Null only when voiding clears a date the record had set. */
+  to: z.string().nullable(),
 });
 export type RecordSideEffect = z.infer<typeof recordSideEffectSchema>;
 
@@ -516,6 +535,11 @@ export const registryRecordDetailSchema = z.object({
   certificate: recordCertificateSchema,
   /** Only for people who may view the register; empty for someone opening their own record. */
   history: z.array(recordHistoryEntrySchema),
+  /**
+   * For registry managers of an active record: the profile changes it made that are still in
+   * place, as the changes that would undo them. The void dialog offers to apply them.
+   */
+  revertibleEffects: z.array(recordSideEffectSchema),
 });
 export type RegistryRecordDetail = z.infer<typeof registryRecordDetailSchema>;
 

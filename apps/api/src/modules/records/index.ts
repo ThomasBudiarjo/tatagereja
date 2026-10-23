@@ -1,6 +1,8 @@
 import {
   OWN_RECORD_ROLES,
+  RECORD_ISSUES,
   RECORDS_LIMITS,
+  RECORD_TYPE_CODES,
   REGISTRY_RECORD_TYPES,
   canViewRegistry,
   churchIdParamsSchema,
@@ -32,6 +34,8 @@ import {
 import { recordEntriesRouter } from './entries';
 
 const view = { module: 'records', permission: ['records.view', 'records.manage'] } as const;
+/** Numbering and the certificate signatory: registry managers and church administrators. */
+const settingsManagers = ['records.manage', 'settings.manage'] as const;
 
 const nextNumbersOf = (db: Queryable, church: ChurchRow) => {
   const year = currentYearIn(church.timezone);
@@ -40,17 +44,24 @@ const nextNumbersOf = (db: Queryable, church: ChurchRow) => {
   ) as Record<RegistryRecordType, string>;
 };
 
-/** Two types sharing one pattern would hand out the same numbers. */
+/**
+ * What a pattern prints apart from the year and sequence: `{TYPE}` spelled out and the padding
+ * dropped, so `B/{YYYY}/{N}` and `B/{YYYY}/{NNN}` (both "B/2026/100" one day) compare equal.
+ */
+const patternShape = (pattern: string, type: RegistryRecordType) =>
+  pattern.replace(/\{TYPE\}/g, RECORD_TYPE_CODES[type]).replace(/\{N+\}/g, '{N}');
+
+/** Two types whose patterns print the same numbers would hand out the same numbers. */
 const assertDistinctPatterns = (settings: RecordsSettings) => {
   const seen = new Map<string, RegistryRecordType>();
   for (const type of REGISTRY_RECORD_TYPES) {
-    const pattern = recordNumberPattern(settings, type);
+    const pattern = patternShape(recordNumberPattern(settings, type), type);
     const other = seen.get(pattern);
     if (other) {
       throw validationError('Each kind of record needs its own number pattern', [
         {
           path: `numberPatterns.${type}`,
-          message: `The ${other} records already use this pattern`,
+          message: RECORD_ISSUES.patternTaken,
         },
       ]);
     }
@@ -145,7 +156,10 @@ const recordsHomeRouter = (deps: Deps) => {
         settings: recordsSettingsOf(church),
         nextNumbers: nextNumbersOf(db, church),
       }),
-      { church: view, params: churchParamsSchema },
+      {
+        church: { ...view, permission: [...view.permission, ...settingsManagers] },
+        params: churchParamsSchema,
+      },
     )
     .put(
       '/settings',
@@ -167,7 +181,7 @@ const recordsHomeRouter = (deps: Deps) => {
         return { settings: body, nextNumbers: nextNumbersOf(db, updated) };
       },
       {
-        church: { module: 'records', permission: ['records.manage', 'settings.manage'] },
+        church: { module: 'records', permission: settingsManagers },
         params: churchParamsSchema,
         body: recordsSettingsSchema,
       },
