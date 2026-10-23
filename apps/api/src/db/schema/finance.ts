@@ -173,6 +173,14 @@ export const offeringBatches = sqliteTable(
     counter2Name: text('counter2_name'),
     notes: text('notes'),
     submittedAt: text('submitted_at'),
+    submittedBy: text('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+    /** The last person who changed the count; they cannot verify it either. */
+    updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Everyone who created or changed the count; none of them may verify it. */
+    editorUserIds: text('editor_user_ids', { mode: 'json' })
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     verifiedBy: text('verified_by').references(() => users.id, { onDelete: 'set null' }),
     verifiedAt: text('verified_at'),
     voidedAt: text('voided_at'),
@@ -204,6 +212,8 @@ export const offeringBatchLines = sqliteTable(
       .references(() => financeFunds.id),
     categoryId: text('category_id').references(() => financeCategories.id),
     method: text('method', { enum: ['cash', 'transfer', 'qris', 'other'] }).notNull(),
+    /** Where a transfer or QRIS line landed; null posts it to the batch account. */
+    accountId: text('account_id').references(() => financeAccounts.id),
     amount: integer('amount').notNull(),
     /** Banknote/coin counts for cash, keyed by face value in minor units: {"100000": 3}. */
     denominations: text('denominations', { mode: 'json' })
@@ -307,6 +317,7 @@ export const financeContributions = sqliteTable(
   (table) => [
     index('finance_contributions_church_received_idx').on(table.churchId, table.receivedAt),
     index('finance_contributions_person_idx').on(table.personId, table.receivedAt),
+    index('finance_contributions_campaign_idx').on(table.campaignId),
     uniqueIndex('finance_contributions_church_receipt_unique').on(
       table.churchId,
       table.receiptNumber,
@@ -350,6 +361,11 @@ export const expenseRequests = sqliteTable(
       .notNull()
       .default('draft'),
     requestedBy: text('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Everyone who created or changed the request; none of them may approve it. */
+    editorUserIds: text('editor_user_ids', { mode: 'json' })
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     submittedAt: text('submitted_at'),
     decidedBy: text('decided_by').references(() => users.id, { onDelete: 'set null' }),
     decidedAt: text('decided_at'),
