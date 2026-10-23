@@ -468,6 +468,11 @@ Modules are measured against a large church (`scripts/seed-large.ts`, `scripts/b
   need nothing: every mutating request under `/api/churches/:churchId` drops the church's entries.
 - Create date formatters with `dateTimeFormat()` from the shared package, not `new Intl.DateTimeFormat`.
 
+In the web app ([PERFORMANCE.md](./PERFORMANCE.md#web-app)): every screen is a `lazyPage`, heavy
+dependencies load where they are shown, main screens get a `prefetch` handle, long lists use
+`useWindowVirtualizer`, and `scripts/bundle-report.ts` shows what a change adds to the first
+download.
+
 ### Security checklist
 
 - Validate every body, query and param with a shared Zod schema; bound every string and array
@@ -577,6 +582,22 @@ base, isEnabled }` and should use the shared `can.*` rules. Every condition must
   page component can assume its route rule holds. The API still checks every request.
 - A route without `handle.access` is open to every active member (for example a person page:
   members open their own profile; the API decides what else they see).
+- `handle.prefetch` (optional) warms the data a screen opens with: it runs when a link to the
+  route is touched, hovered or focused, and in parallel with the page's code when the route
+  opens (deep links too), only when the module is on and `handle.access` holds. Import the query
+  factories inside it so the registry stays small, use the same parameters as the screen's
+  default state, and check `access` for anything the screen only shows to some:
+
+  ```ts
+  const prefetchFinanceHome: RoutePrefetch = async ({ churchId, access, client }) => {
+    const api = await import('./api');
+    void client.prefetchQuery(api.financeSetupQuery(churchId));
+    if (has(access, 'finance.view')) void client.prefetchQuery(api.financeSummaryQuery(churchId));
+  };
+  ```
+
+- Keep `module.tsx` light: it is in the church shell every screen waits for. It may import
+  icons, access rules and small badge helpers, never a page component or a heavy dependency.
 - Phone bottom tabs are Home, People, Events (entries with `mobileTab`), the Ministry hub
   (`/ministry`: every `ministry` entry) and the Menu (`/more`: tiles of every section).
 - A new module's landing page can start as `ModuleComingSoon` (icon, accent, highlights and the

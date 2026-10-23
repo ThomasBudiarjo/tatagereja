@@ -1,7 +1,8 @@
 # Performance
 
 TataGereja runs on one Bun process and one SQLite file. This page records how fast the API is for
-a large congregation, what keeps it fast, and the rules new code follows so it stays that way.
+a large congregation and how fast the web app opens on a mid-range Android phone over 3G
+([Web app](#web-app)), what keeps both fast, and the rules new code follows so it stays that way.
 
 ## Measuring
 
@@ -257,3 +258,191 @@ cache are free.
 6. A column copied from another table for speed is written at every write site, kept in step
    when the source changes, and backfilled at startup in `backfillCopiedColumns`.
 7. Run the benchmark before and after a change that touches a hot path.
+
+## Web app
+
+### Measuring
+
+```sh
+bun run build
+WEB_DIST_DIR=$PWD/apps/web/dist PORT=3204 DATABASE_PATH=/tmp/bench-web.db bun run start &
+bun scripts/seed-demo.ts --port 3204
+bun scripts/bench-web.ts --port 3204 --runs 3 [--warm] --json /tmp/bench-web.json
+
+BUNDLE_REPORT=/tmp/bundle.json bun run --cwd apps/web build
+bun scripts/bundle-report.ts /tmp/bundle.json            # first download, biggest chunks
+bun scripts/bundle-report.ts /tmp/bundle.json --chunk vendor   # what fills one chunk
+```
+
+`scripts/bench-web.ts` opens each page of the built app in a fresh Chromium context (an empty
+cache: a first visit) through the Chrome DevTools Protocol with the CPU slowed down four times
+and the DevTools "Fast 3G" network: 562.5 ms round trip, 1.44 Mbit/s down, 675 kbit/s up, a
+390 × 844 phone screen. It reports the median of three runs:
+
+| Column | Meaning                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------- |
+| FCP    | first contentful paint                                                                    |
+| LCP    | largest contentful paint                                                                  |
+| Ready  | the last change to the page before it went quiet (data shown, idle-time prefetches done)  |
+| TBT    | total blocking time: long tasks' time over 50 ms between the first paint and quiet        |
+| Busy   | the same sum from the start (a single-page app parses and renders before its first paint) |
+| JS     | script bytes on the wire (brotli) before the first paint                                  |
+
+With `--warm` every first visit is followed by a second load in the same context once the
+service worker has precached the app shell: a repeat visit, how people use an installed app.
+The service worker's own requests get the same round trip and bandwidth as the page's.
+
+Both tables were taken on the machine of the API tables (4 vCPU Intel Xeon @ 2.10 GHz),
+Chromium 141, against the demo church of `scripts/seed-demo.ts` signed in as its owner.
+
+### Before
+
+Measured on `ccr-b98ad5cc-t4fgxr` at `6b7aa97`.
+
+| Page             | FCP ms | LCP ms | Ready ms | TBT ms | Busy ms | JS KB |
+| ---------------- | -----: | -----: | -------: | -----: | ------: | ----: |
+| `/welcome`       |  4,876 |  4,876 |    4,866 |      0 |     461 | 385.0 |
+| `/login`         |  5,024 |  5,024 |    5,007 |      0 |     711 | 385.0 |
+| Home             |  4,204 |  8,120 |    8,375 |    328 |     859 | 385.1 |
+| People list      |  4,224 |  8,708 |    9,276 |    311 |     798 | 385.1 |
+| Finance home     |  4,280 |  9,236 |    9,020 |    314 |   1,077 | 385.1 |
+| Calendar (month) |  4,332 |  9,012 |    9,011 |    351 |     930 | 385.1 |
+
+Every page started with the same 1.4 MB of script (429 KB gzip, 385 KB brotli) in 14 chunks,
+two of them over Vite's 500 KB warning: React and every dependency, every module manifest with
+its badge queries and their schemas, every dictionary in both languages and most shared schemas.
+Signed-in pages then waited for the page chunk, then the church, then the widgets, one round
+trip after the other. On a big church the attendance roster of a service (7,100 people) mounted
+114,000 elements: 29.6 s until the roster showed, the longest task 12 s, and a search in the
+roster 11 s.
+
+### After
+
+First visit (no service worker yet):
+
+| Page             | FCP ms | LCP ms | Ready ms | TBT ms | Busy ms | JS KB |
+| ---------------- | -----: | -----: | -------: | -----: | ------: | ----: |
+| `/welcome`       |  3,544 |  3,544 |    3,531 |      0 |     233 | 212.0 |
+| `/login`         |  3,672 |  3,672 |   6,775¹ |    167 |     585 | 212.0 |
+| Home             |  2,880 |  6,652 |    7,549 |    293 |     502 | 212.1 |
+| People list      |  2,888 |  6,680 |    7,890 |    293 |     506 | 212.1 |
+| Finance home     |  2,880 |  7,484 |    8,714 |    410 |     599 | 212.1 |
+| Calendar (month) |  2,892 |  8,136 |    8,458 |    336 |     565 | 212.1 |
+
+¹ Includes the idle-time download of the signed-in shell while the person types.
+
+Repeat visit (the service worker serves the app shell; API reads still take the network):
+
+| Page             | FCP ms | LCP ms | Ready ms | TBT ms | Busy ms |
+| ---------------- | -----: | -----: | -------: | -----: | ------: |
+| `/welcome`       |  1,232 |  1,232 |    1,220 |      0 |     255 |
+| `/login`         |  1,232 |  1,232 |    1,958 |    159 |     498 |
+| Home             |    560 |  1,816 |    2,435 |    470 |     716 |
+| People list      |    532 |  2,224 |    2,995 |    374 |     554 |
+| Finance home     |    600 |  2,740 |    3,041 |    418 |     685 |
+| Calendar (month) |    644 |  2,796 |    3,132 |    292 |     557 |
+
+| Bundle                          | Before                   | After               |
+| ------------------------------- | ------------------------ | ------------------- |
+| First download (sign-in pages)  | 1,417 KB, 429 KB gzip    | 729 KB, 228 KB gzip |
+| … on the wire (brotli)          | 385 KB                   | 198 KB              |
+| Chunks in the first download    | 14                       | 7                   |
+| Chunks over 500 KB              | 2                        | 0 (largest 308 KB)  |
+| Attendance roster, 7,100 people | 29.6 s, 114,096 elements | 2.0 s, 900 elements |
+| Roster search                   | 11.2 s                   | 0.09 s              |
+
+The sign-in screens paint 1.3 s sooner on a first visit and in 1.2 s on a repeat one; every
+church screen paints its shell 1.3 s sooner and, on a repeat visit, its content in 1.8 to 2.8 s
+instead of 8 to 9 s.
+
+### Targets
+
+- **Home LCP under 2.5 s on the throttled profile: met on repeat visits (1.8 s)**, which is how
+  an installed app opens. A first visit cannot reach it on Fast 3G: the HTML, the first scripts,
+  the church shell and the data are four round trips of 562 ms each before the bytes (about
+  400 KB at 180 KB/s) have even started to count; home now shows at 6.7 s instead of 8.1 s.
+- **Initial JS for the sign-in page under 150 KB gzip: not met (228 KB gzip, 198 KB brotli).**
+  The dependencies the sign-in page cannot do without already weigh 188 KB gzip: react-dom 66,
+  react-router 31, zod 24, axios 18, react-hook-form 13, TanStack Query 10, sonner 9,
+  tailwind-merge 8, the icons and the rest 9. The app's own code is 43 KB. The next steps, in
+  order of size: replace axios with `fetch` in `lib/api.ts` (18 KB), load sonner with the first
+  toast (9 KB), move the sign-in hooks out of `features/admin-security/api.ts` so the sign-in
+  page does not pull the module's schemas and the permission catalog (6 KB). That still leaves
+  about 195 KB: below 150 KB needs a lighter renderer than React DOM.
+
+### What keeps it fast
+
+**The first download.** Only the welcome and sign-in screens, the router and the parts every
+screen needs are in it. Everything inside a church (`church-routes.tsx`: the church shell, the
+module registry and every module route) is patched into the router on the first visit to a
+church (`patchRoutesOnNavigation` in `router.tsx`), and every other screen, the account pages
+included, is its own chunk through `lazyPage`. The shared package is side-effect free
+(`"sideEffects": false`), so schemas no screen uses are dropped.
+
+**Messages.** The first download carries the common, sign-in and invitation dictionaries; every
+other message comes in one chunk per language (`virtual:locale-messages/<locale>`, generated from
+`features/dictionaries.ts` by a plugin in `vite.config.ts`, about 54 KB gzip). `lazyPage` awaits
+it in parallel with the page, so no screen renders a raw key. Switching language downloads the
+other chunk and screens translate again in place.
+
+**Chunks** (`build.rolldownOptions.output.codeSplitting` in `vite.config.ts`): React with React
+Router and the other first-screen dependencies are two vendor chunks an app release does not
+change (`immutable` for a year); the Radix UI primitives and the icons of later screens are one
+chunk each instead of dozens of tiny requests, each a round trip on HTTP/1.1. Rare and heavy
+dependencies load with the screens that use them: charts, print views, CSV parsing, date-fns
+(tree-shaken; dates format with `Intl`, there are no date-fns locales) and the QR encoder, which
+loads with the first QR code actually shown. Icons are named `lucide-react` imports, one module
+each.
+
+**Fetching ahead.** The first visit to a church fetches the church, the home screen and the
+dashboard while the registry downloads. Routes with a `prefetch` handle (home, directory,
+events, finance home) start their data while their code downloads, on a deep link too (a loader
+that returns at once). Touching, hovering (80 ms) or focusing a link fetches that screen's code
+and data (`components/layout/link-prefetch.tsx`). Once the current screen has its data
+(`whenQuiet`), the bottom tabs' code and, on the sign-in page, the church shell download in idle
+time. Nothing speculative is fetched with Data Saver on or on 2G (`mayPrefetch`).
+
+**Query freshness** (`lib/query-client.ts`). Reports, statements, summaries and the audit log are
+fresh for five minutes and never refetched because the app regained focus; setup and reference
+data (settings, roles, funds, service types, tags, custom fields) for five minutes; lists,
+details and the dashboard for thirty seconds. Screens left behind stay cached ten minutes for back
+navigation; paged lists keep the previous page on screen while the next loads
+(`placeholderData: keepPreviousData`).
+
+**Long lists.** `lib/use-window-virtualizer.ts` mounts only the rows near the screen of a list
+that scrolls with the page, with measured row heights, keyboard focus that scrolls the row in,
+and `aria-setsize`/`aria-posinset`; the attendance roster uses it and filters behind
+`useDeferredValue`. Days of the notifications inbox and of the audit log skip layout and paint
+while off screen (`offscreen-lazy`: `content-visibility: auto`), and loaded inbox rows are
+memoized, so the next page does not re-render them. Directory and ledger pages show 50 rows and
+need neither. Search inputs are debounced; list images load lazily with a fixed aspect ratio.
+Text uses the system font stack: there is no font to download.
+
+**The service worker** (`service-worker.js`, built to `/sw.js` with its precache list). It
+registers once the first screen has its data and precaches the app shell: `index.html`, the
+first download, the church shell, the home screen and both message chunks. Fingerprinted files
+are cache-first, navigations get the cached shell. API reads go to the network first; for the
+account the page announced, the answers of the screens viewed last (at most 80, for a day) are
+kept as an offline fallback, never for care, the register, finance, security, audit, members,
+invitations or exports, and deleted on sign-out or when another account signs in (see
+[SECURITY.md](./SECURITY.md#offline-copies)). A new release shows "Versi baru tersedia" with
+"Muat ulang"; nothing reloads by itself. The app is installable: an Indonesian manifest with SVG
+and PNG icons (regular and maskable, from `scripts/generate-icons.ts`) and theme colors for light
+and dark.
+
+### Rules for new web code
+
+1. Load every screen with `lazyPage`; never import a page, a page's API module or a heavy
+   dependency from a `module.tsx`, `router.tsx`, a shell or `lib/`. Check the first download with
+   `scripts/bundle-report.ts` after adding a dependency: it must stay out unless the sign-in page
+   needs it.
+2. Load a heavy dependency that only part of a screen needs (an encoder, a chart, an editor) with
+   `React.lazy` where it is shown.
+3. Give a module's main screens a `prefetch` handle that fetches what they open with, importing
+   query factories inside it and checking `access` like the screen.
+4. Give queries a `staleTime` that fits the data; reports and other expensive reads go under a
+   key with `report`, `summary` or `statement` so the defaults treat them as heavy.
+5. Virtualize a list that can show more than about a hundred rows at once
+   (`useWindowVirtualizer`); page or cursor everything else.
+6. Run `scripts/bench-web.ts` before and after a change to the first download, the shells or the
+   service worker.

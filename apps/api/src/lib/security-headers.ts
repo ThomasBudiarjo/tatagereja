@@ -30,7 +30,8 @@ const SPA_CSP = [
 /**
  * Trusted Types: the DOM refuses HTML strings and script URLs that did not pass through a
  * policy, so a string reaching `innerHTML` or `script.src` cannot run code (DOM XSS). The app
- * itself creates one narrow policy, for the Turnstile loader. Left out when this server uses
+ * itself creates two narrow policies, for the Turnstile loader and the service worker
+ * registration. Left out when this server uses
  * Turnstile, whose own script is not known to keep to it.
  */
 const TRUSTED_TYPES = "require-trusted-types-for 'script'";

@@ -151,7 +151,20 @@ PORT=3202 DATABASE_PATH=/tmp/large.db bun run start
 bun scripts/bench-api.ts --port 3202
 ```
 
-The results, and what keeps the API fast, are in [docs/PERFORMANCE.md](./docs/PERFORMANCE.md).
+`scripts/bench-web.ts` loads the built web app the way a mid-range Android phone on 3G would
+(Chrome DevTools Protocol: CPU four times slower, "Fast 3G" network) and reports paint times,
+blocking time and script bytes per page; `scripts/bundle-report.ts` shows what the first download
+contains:
+
+```sh
+WEB_DIST_DIR=$PWD/apps/web/dist PORT=3204 DATABASE_PATH=/tmp/web.db bun run start &
+bun scripts/seed-demo.ts --port 3204
+bun scripts/bench-web.ts --port 3204 --warm
+```
+
+The web app is installable (Indonesian manifest and icons) and keeps working offline on the
+screens viewed last; a new release asks "Versi baru tersedia — Muat ulang". The results, and what
+keeps the API and the web app fast, are in [docs/PERFORMANCE.md](./docs/PERFORMANCE.md).
 
 ## Screenshots
 
