@@ -7,7 +7,7 @@ import { forbidden } from '../../lib/errors';
 import { authPlugin } from '../../plugins/auth';
 import { moduleStatus } from '../../services/modules';
 import { coordinatedAreaIdsOf, todayIn } from '../../services/people';
-import { peopleStats } from '../../services/people-stats';
+import { cachedPeopleStats } from '../../services/people-stats';
 import { areasRouter } from './areas';
 import { directoryToolsRouter } from './directory-tools';
 import { directoryFieldsRouter } from './fields';
@@ -102,10 +102,14 @@ const peopleStatusRouter = (deps: Deps) => {
       },
       { church: 'people', params: churchParamsSchema },
     )
-    .get('/summary', ({ church, access }) => peopleStats(db, access, church.id, todayIn(church)), {
-      church: { module: 'people', permission: 'people.view' },
-      params: churchParamsSchema,
-    });
+    .get(
+      '/summary',
+      ({ church, access }) => cachedPeopleStats(deps.cache, db, access, church.id, todayIn(church)),
+      {
+        church: { module: 'people', permission: 'people.view' },
+        params: churchParamsSchema,
+      },
+    );
 };
 
 /**

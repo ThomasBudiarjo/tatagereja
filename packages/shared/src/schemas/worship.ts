@@ -16,6 +16,7 @@ import {
   requiredText,
 } from './common';
 import { personSummarySchema } from './person';
+import { dateTimeFormat } from '../utils';
 
 export const WORSHIP_LIMITS = {
   liturgyItemsMax: 100,
@@ -320,6 +321,7 @@ export const songListQuerySchema = paginationQuerySchema.extend({
 });
 export type SongListQuery = z.infer<typeof songListQuerySchema>;
 
+/** Song lists leave `lyrics` out (always null); the song detail carries them. */
 export const songListSchema = paginatedSchema(songSchema);
 export type SongList = z.infer<typeof songListSchema>;
 
@@ -751,7 +753,7 @@ export const windowsOverlap = (
 export const localDateOf = (iso: string, timeZone: string): string => {
   const date = new Date(iso);
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
@@ -765,7 +767,7 @@ export const localDateOf = (iso: string, timeZone: string): string => {
 /** The wall clock of an instant in a time zone, read back as if it were UTC (epoch ms). */
 const wallClockOf = (at: number, timeZone: string): number => {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const parts = dateTimeFormat('en-US', {
       timeZone,
       year: 'numeric',
       month: '2-digit',

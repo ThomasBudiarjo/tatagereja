@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   canManageBlockout,
   churchIdParamsSchema,
   churchParamsSchema,
@@ -26,6 +27,7 @@ import {
   hydrateRoster,
   ledTeamIdsOf,
   personSummaries,
+  rosterLookups,
   teamPersonIds,
 } from '../../services/worship';
 import { loadPerson } from './load';
@@ -64,8 +66,13 @@ export function scheduleItems(
     byService.set(row.service.id, entry);
   }
   const hydrated = new Map<string, MyScheduleItem>();
+  const lookups = rosterLookups(
+    db,
+    church.id,
+    rows.map((row) => row.assignment),
+  );
   for (const { service, rows: assignments } of byService.values()) {
-    for (const assignment of hydrateRoster(db, church, service, assignments)) {
+    for (const assignment of hydrateRoster(db, church, service, assignments, lookups)) {
       hydrated.set(assignment.id, {
         ...assignment,
         serviceTitle: service.title,
@@ -158,6 +165,7 @@ export const volunteersRouter = (deps: Deps) => {
           .from(volunteerBlockouts)
           .where(and(...conditions))
           .orderBy(asc(volunteerBlockouts.startDate))
+          .limit(LIMITS.listMax)
           .all();
         return { items: hydrateBlockouts(church.id, rows) };
       },

@@ -19,6 +19,7 @@ import {
 } from './common';
 import { attendanceSessionSummarySchema, eventInputSchema, eventSchema } from './event';
 import { personSummarySchema } from './person';
+import { dateTimeFormat } from '../utils';
 
 export const COMMS_LIMITS = {
   announcementRolesMax: 20,
@@ -49,7 +50,7 @@ const DAY_MS = 86_400_000;
 /** Milliseconds a time zone is ahead of UTC at an instant (Asia/Jakarta: +7 h). */
 export const timeZoneOffsetMs = (instant: number, timeZone: string): number => {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const parts = dateTimeFormat('en-US', {
       timeZone,
       hourCycle: 'h23',
       year: 'numeric',

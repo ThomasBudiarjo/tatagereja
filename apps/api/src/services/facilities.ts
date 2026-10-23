@@ -2,6 +2,7 @@ import {
   FACILITIES_LIMITS,
   bookingOccurrences,
   canSeeBookingNotes,
+  dateTimeFormat,
   isLoanOverdue,
   type AccessLike,
   type AssetLoan,
@@ -62,7 +63,7 @@ export const CONFLICTS_MAX = 10;
 /** `YYYY-MM-DD` of an instant in the church time zone. */
 export function dateIn(timeZone: string, at: Date = new Date()): string {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
@@ -83,9 +84,9 @@ export function describeRange(
   const tag = locale === 'id' ? 'id-ID' : 'en-GB';
   const options = (extra: Intl.DateTimeFormatOptions) => {
     try {
-      return new Intl.DateTimeFormat(tag, { timeZone, ...extra });
+      return dateTimeFormat(tag, { timeZone, ...extra });
     } catch {
-      return new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...extra });
+      return dateTimeFormat(tag, { timeZone: 'UTC', ...extra });
     }
   };
   const day = options({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
@@ -557,7 +558,7 @@ export function startOfDayIn(timeZone: string, at: Date = new Date()): Date {
   let offset = 0;
   try {
     const parts = Object.fromEntries(
-      new Intl.DateTimeFormat('en-US', {
+      dateTimeFormat('en-US', {
         timeZone,
         hourCycle: 'h23',
         year: 'numeric',

@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   can,
   churchIdParamsSchema,
   churchParamsSchema,
@@ -38,6 +39,7 @@ export const invitationsModule = (deps: Deps) => {
           .innerJoin(users, eq(users.id, invitations.createdBy))
           .where(eq(invitations.churchId, church.id))
           .orderBy(desc(invitations.createdAt))
+          .limit(LIMITS.listMax)
           .all();
         return {
           items: rows.map((row) => toInvitation(row.invitation, row.creatorName, config.appUrl)),

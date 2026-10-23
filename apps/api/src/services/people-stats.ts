@@ -5,6 +5,7 @@ import {
   ageOn,
   canSeeHiddenContact,
   daysUntilAnniversary,
+  has,
   peopleAgeBandOf,
   type AccessLike,
   type PeopleStats,
@@ -12,6 +13,7 @@ import {
 } from '@tatagereja/shared';
 import { and, count, eq } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
+import type { ResultCache } from '../lib/cache';
 import { households, people } from '../db/schema';
 import { privacyByPerson, privacyOf } from './people';
 import { effectiveAreaByPerson } from './people-households';
@@ -78,10 +80,12 @@ export function peopleStats(
     return keys.map((key) => ({ key, count: counts.get(key) ?? 0 }));
   };
 
-  const privacy = privacyByPerson(
-    db,
-    rows.map((row) => row.id),
-  );
+  const privacy = areaId
+    ? privacyByPerson(
+        db,
+        rows.map((row) => row.id),
+      )
+    : privacyByPerson(db, { churchId });
   const celebrations: UpcomingCelebration[] = [];
   const monthStart = `${today.slice(0, 7)}-01`;
   for (const row of rows) {
@@ -141,4 +145,27 @@ export function peopleStats(
     newThisMonth: rows.filter((row) => row.createdAt.slice(0, 10) >= monthStart).length,
     celebrations: celebrations.slice(0, CELEBRATIONS_MAX),
   };
+}
+
+/**
+ * `peopleStats` through the church's result cache. Hidden birthdays make the answer depend on
+ * who asks: holders of `people.private.view` share one entry, everyone else gets their own
+ * (their own birthday always counts).
+ */
+export function cachedPeopleStats(
+  cache: ResultCache,
+  db: Queryable,
+  access: AccessLike,
+  churchId: string,
+  today: string,
+  areaId?: string,
+): PeopleStats {
+  const viewer = has(access, 'people.private.view')
+    ? 'private'
+    : `${access.userId}:${access.personId ?? ''}`;
+  return cache.remember(
+    churchId,
+    `people-stats:${JSON.stringify([today, areaId ?? null, viewer])}`,
+    () => peopleStats(db, access, churchId, today, areaId),
+  );
 }

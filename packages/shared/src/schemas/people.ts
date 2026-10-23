@@ -174,7 +174,23 @@ export const DEFAULT_PERSON_PRIVACY = {
 // Date helpers for birthdays and anniversaries
 // ---------------------------------------------------------------------------------------------
 
+/** The number written in `value[from..to)`, or NaN when a character is not a digit. */
+const digitsAt = (value: string, from: number, to: number): number => {
+  let result = 0;
+  for (let index = from; index < to; index += 1) {
+    const digit = value.charCodeAt(index) - 48;
+    if (digit < 0 || digit > 9) return Number.NaN;
+    result = result * 10 + digit;
+  }
+  return result;
+};
+
 const parseYmd = (value: string): [number, number, number] => {
+  // The stored YYYY-MM-DD shape is read digit by digit: directory counts and reports parse
+  // several dates per person, thousands per request.
+  if (value.length === 10 && value[4] === '-' && value[7] === '-') {
+    return [digitsAt(value, 0, 4), digitsAt(value, 5, 7), digitsAt(value, 8, 10)];
+  }
   const [year, month, day] = value.split('-').map(Number);
   return [year ?? 0, month ?? 1, day ?? 1];
 };

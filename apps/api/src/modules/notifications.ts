@@ -11,6 +11,7 @@ import { and, count, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzl
 import { Elysia } from 'elysia';
 import { churchMemberships, notificationPreferences, notifications } from '../db/schema';
 import type { Deps } from '../deps';
+import { afterCursor, decodeCursor, keysetPage } from '../lib/cursor';
 import { notFound } from '../lib/errors';
 import { offsetOf } from '../lib/query';
 import { requestLocale } from '../lib/request';
@@ -72,20 +73,33 @@ export const notificationsModule = (deps: Deps) => {
         const where = and(...conditions);
         const total =
           db.select({ value: count() }).from(notifications).where(where).get()?.value ?? 0;
-        const rows = db
-          .select()
-          .from(notifications)
-          .where(where)
-          .orderBy(desc(notifications.createdAt), desc(notifications.id))
-          .limit(query.limit)
-          .offset(offsetOf(query))
-          .all();
+        const after = query.cursor ? decodeCursor(query.cursor, 2) : null;
+        const { rows, nextCursor } = keysetPage(
+          db
+            .select()
+            .from(notifications)
+            .where(
+              after
+                ? and(
+                    where,
+                    afterCursor([notifications.createdAt, notifications.id], after, 'desc'),
+                  )
+                : where,
+            )
+            .orderBy(desc(notifications.createdAt), desc(notifications.id))
+            .limit(query.limit + 1)
+            .offset(after ? 0 : offsetOf(query))
+            .all(),
+          query.limit,
+          (row) => [row.createdAt, row.id],
+        );
         return {
           items: rows.map((row) => toNotification(row, requestLocale(request))),
           total,
           page: query.page,
           limit: query.limit,
           unreadCount: unreadCount(auth.user.id, query.churchId),
+          nextCursor,
         };
       },
       { auth: true, query: notificationListQuerySchema },

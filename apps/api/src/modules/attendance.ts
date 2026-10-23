@@ -35,22 +35,23 @@ import {
   people,
 } from '../db/schema';
 import type { Deps } from '../deps';
-import { conflict, forbidden, notFound } from '../lib/errors';
+import { afterCursor, decodeCursor, keysetPage } from '../lib/cursor';
+import { conflict, forbidden, notFound, validationError } from '../lib/errors';
 import { likePattern, offsetOf } from '../lib/query';
 import { nowIso, toUtcIso } from '../lib/time';
 import { newId } from '../lib/tokens';
 import { authPlugin } from '../plugins/auth';
-import { toPersonSummary } from '../serializers';
+import { personSummaryColumns, toPersonSummary } from '../serializers';
 import {
   absenceScope,
-  absenceStreaks,
+  absenceStreaksOf,
   attendanceHistory,
+  cachedAbsences,
   headcountColumns,
   hydrateSessions,
   lastPresentByPerson,
-  listAbsences,
-  marksOf,
   stillResolved,
+  syncRecordTimes,
   toAbsenceAlert,
 } from '../services/attendance';
 import { changes, recordAudit } from '../services/audit';
@@ -60,8 +61,8 @@ import { notify } from '../services/notifications';
 import { groupIdsOfPerson, todayIn } from '../services/people';
 
 const SORTS = {
-  recent: [desc(attendanceSessions.sessionAt)],
-  oldest: [asc(attendanceSessions.sessionAt)],
+  recent: [desc(attendanceSessions.sessionAt), desc(attendanceSessions.id)],
+  oldest: [asc(attendanceSessions.sessionAt), asc(attendanceSessions.id)],
   title: [asc(attendanceSessions.title), desc(attendanceSessions.sessionAt)],
 } as const;
 
@@ -138,18 +139,19 @@ export const attendanceModule = (deps: Deps) => {
           : null;
     const rows = where
       ? db
-          .select()
+          .select(personSummaryColumns)
           .from(people)
           .where(where)
           .orderBy(asc(people.firstName), asc(people.lastName))
           .all()
       : [];
     // Inactive people who nevertheless have a record must still appear.
-    const extraIds = [...personIds].filter((id) => !rows.some((row) => row.id === id));
+    const listed = new Set(rows.map((row) => row.id));
+    const extraIds = [...personIds].filter((id) => !listed.has(id));
     const extras =
       extraIds.length > 0
         ? db
-            .select()
+            .select(personSummaryColumns)
             .from(people)
             .where(and(eq(people.churchId, session.churchId), inArray(people.id, extraIds)))
             .all()
@@ -216,6 +218,7 @@ export const attendanceModule = (deps: Deps) => {
             personId: mark.personId,
             churchId: session.churchId,
             status: mark.status,
+            sessionAt: session.sessionAt,
             note: mark.note,
             recordedBy: userId,
             recordedAt: now,
@@ -242,7 +245,7 @@ export const attendanceModule = (deps: Deps) => {
         const conditions: SQL[] = [eq(attendanceSessions.churchId, church.id)];
         if (!can.viewAllAttendance(access)) {
           if (access.leaderGroupIds.length === 0) {
-            return { items: [], total: 0, page: query.page, limit: query.limit };
+            return { items: [], total: 0, page: query.page, limit: query.limit, nextCursor: null };
           }
           conditions.push(inArray(attendanceSessions.groupId, access.leaderGroupIds));
         }
@@ -253,15 +256,43 @@ export const attendanceModule = (deps: Deps) => {
         const where = and(...conditions);
         const total =
           db.select({ value: count() }).from(attendanceSessions).where(where).get()?.value ?? 0;
-        const rows = db
-          .select()
-          .from(attendanceSessions)
-          .where(where)
-          .orderBy(...SORTS[query.sort])
-          .limit(query.limit)
-          .offset(offsetOf(query))
-          .all();
-        return { items: hydrateSessions(db, rows), total, page: query.page, limit: query.limit };
+        if (query.cursor && query.sort === 'title') {
+          throw validationError('Invalid request query', [
+            { path: 'cursor', message: 'Cursor paging needs the recent or oldest order' },
+          ]);
+        }
+        const after = query.cursor ? decodeCursor(query.cursor, 2) : null;
+        const { rows, nextCursor } = keysetPage(
+          db
+            .select()
+            .from(attendanceSessions)
+            .where(
+              after
+                ? and(
+                    where,
+                    afterCursor(
+                      [attendanceSessions.sessionAt, attendanceSessions.id],
+                      after,
+                      query.sort === 'oldest' ? 'asc' : 'desc',
+                    ),
+                  )
+                : where,
+            )
+            .orderBy(...SORTS[query.sort])
+            .limit(query.limit + 1)
+            .offset(after ? 0 : offsetOf(query))
+            .all(),
+          query.limit,
+          (row) => [row.sessionAt, row.id],
+        );
+        return {
+          items: hydrateSessions(db, rows),
+          total,
+          page: query.page,
+          limit: query.limit,
+          // Title order has no keyset; its pages use `page`.
+          nextCursor: query.sort === 'title' ? null : nextCursor,
+        };
       },
       { church: true, params: churchParamsSchema, query: attendanceListQuerySchema },
     )
@@ -332,17 +363,23 @@ export const attendanceModule = (deps: Deps) => {
       ({ church, access, params, body }) => {
         const session = loadSession(church.id, params.id);
         if (!can.recordAttendance(access, session)) throw forbidden('You cannot edit this session');
-        const updated = db
-          .update(attendanceSessions)
-          .set({
-            title: body.title,
-            sessionAt: toUtcIso(body.sessionAt),
-            notes: body.notes,
-            updatedAt: nowIso(),
-          })
-          .where(eq(attendanceSessions.id, session.id))
-          .returning()
-          .get();
+        const updated = db.transaction((tx) => {
+          const row = tx
+            .update(attendanceSessions)
+            .set({
+              title: body.title,
+              sessionAt: toUtcIso(body.sessionAt),
+              notes: body.notes,
+              updatedAt: nowIso(),
+            })
+            .where(eq(attendanceSessions.id, session.id))
+            .returning()
+            .get();
+          if (row && row.sessionAt !== session.sessionAt) {
+            syncRecordTimes(tx, row.id, row.sessionAt);
+          }
+          return row;
+        });
         if (!updated) throw notFound('Attendance session');
         return detail(updated, true);
       },
@@ -492,7 +529,7 @@ export const attendanceModule = (deps: Deps) => {
         if (!canViewAbsences(access, query.groupId)) {
           throw forbidden('You cannot view absences');
         }
-        const items = listAbsences(db, church.id, access, query);
+        const items = cachedAbsences(deps.cache, db, church.id, access, query);
         return {
           items,
           threshold: query.threshold,
@@ -508,9 +545,10 @@ export const attendanceModule = (deps: Deps) => {
         if (!canSeeAbsenceOf(access, groupIdsOfPerson(db, person.id))) {
           throw forbidden("You cannot act on this person's attendance");
         }
-        const streak = absenceStreaks(
-          marksOf(db, church.id, { groupIds: absenceScope(access), personIds: [person.id] }),
-        ).get(person.id);
+        const [streak] = absenceStreaksOf(db, church.id, {
+          groupIds: absenceScope(access),
+          personIds: [person.id],
+        });
         const existing = db
           .select()
           .from(absenceAlerts)

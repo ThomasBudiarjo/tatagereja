@@ -48,6 +48,7 @@ import {
   accountBalances,
   assertNoClosedPeriodFrom,
   fundBalances,
+  ledgerBalances,
   loadAccount,
   loadCategory,
   loadFund,
@@ -67,8 +68,9 @@ export const FINANCE_ANY: readonly Permission[] = [
 export function loadSetup(db: Queryable, churchId: string, access: AccessLike): FinanceSetup {
   const showBalances = has(access, 'finance.view');
   const showOpening = hasAny(access, ['finance.view', 'finance.manage']);
-  const accounts = showBalances ? accountBalances(db, churchId) : null;
-  const funds = showBalances ? fundBalances(db, churchId) : null;
+  const balances = showBalances ? ledgerBalances(db, churchId) : null;
+  const accounts = balances?.accounts ?? null;
+  const funds = balances?.funds ?? null;
   return {
     funds: db
       .select()

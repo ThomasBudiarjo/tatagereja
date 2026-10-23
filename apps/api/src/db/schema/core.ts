@@ -409,6 +409,12 @@ export const attendanceRecords = sqliteTable(
       .notNull()
       .references(() => churches.id, { onDelete: 'cascade' }),
     status: text('status', { enum: ['present', 'absent', 'excused'] }).notNull(),
+    /**
+     * Copy of the session's `session_at`, kept in step by services/attendance.ts, so absence
+     * streaks and last-seen dates are answered from one index instead of joining every mark
+     * to its session. Rows written before the column existed are filled in at startup.
+     */
+    sessionAt: text('session_at').notNull().default(''),
     note: text('note'),
     recordedBy: text('recorded_by')
       .notNull()
@@ -418,6 +424,15 @@ export const attendanceRecords = sqliteTable(
   (table) => [
     uniqueIndex('attendance_records_session_person_unique').on(table.sessionId, table.personId),
     index('attendance_records_person_idx').on(table.personId),
+    // Present/absent counts per session without reading the rows.
+    index('attendance_records_session_status_idx').on(table.sessionId, table.status),
+    // Absence streaks and last-present dates per person (covering).
+    index('attendance_records_church_status_person_idx').on(
+      table.churchId,
+      table.status,
+      table.personId,
+      table.sessionAt,
+    ),
   ],
 );
 

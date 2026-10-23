@@ -135,8 +135,37 @@ export const financeEntries = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [
-    index('finance_entries_church_date_idx').on(table.churchId, table.entryDate),
-    index('finance_entries_account_date_idx').on(table.accountId, table.entryDate),
+    // The ledger in posting order, and covering for date-range counts and every report sum.
+    index('finance_entries_church_date_idx').on(
+      table.churchId,
+      table.entryDate,
+      table.createdAt,
+      table.id,
+      table.voidedAt,
+      table.sourceType,
+      table.amount,
+      table.accountId,
+      table.fundId,
+      table.categoryId,
+    ),
+    // Covering: balances per account and per fund.
+    index('finance_entries_church_balance_idx').on(
+      table.churchId,
+      table.accountId,
+      table.fundId,
+      table.voidedAt,
+      table.amount,
+    ),
+    // One account's ledger in posting order; covering for its running balances.
+    index('finance_entries_account_date_idx').on(
+      table.churchId,
+      table.accountId,
+      table.entryDate,
+      table.createdAt,
+      table.id,
+      table.voidedAt,
+      table.amount,
+    ),
     index('finance_entries_fund_idx').on(table.fundId),
     index('finance_entries_category_idx').on(table.categoryId),
     index('finance_entries_source_idx').on(table.sourceType, table.sourceId),
@@ -315,7 +344,14 @@ export const financeContributions = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
-    index('finance_contributions_church_received_idx').on(table.churchId, table.receivedAt),
+    // Covering for the default list: newest first, with its count and total.
+    index('finance_contributions_church_received_idx').on(
+      table.churchId,
+      table.receivedAt,
+      table.createdAt,
+      table.voidedAt,
+      table.amount,
+    ),
     index('finance_contributions_person_idx').on(table.personId, table.receivedAt),
     index('finance_contributions_campaign_idx').on(table.campaignId),
     uniqueIndex('finance_contributions_church_receipt_unique').on(

@@ -398,18 +398,17 @@ export const conflictsOf = (
 ): RosterConflict[] => map.get(subjectKey(subject)) ?? [];
 
 /** Roster rows of one service with team, position, person and conflicts. */
-export function hydrateRoster(
+/** Team and position names and people of roster rows, loaded once for any number of services. */
+export function rosterLookups(
   db: Queryable,
-  church: Pick<ChurchRow, 'id' | 'timezone'>,
-  service: WorshipServiceRow,
-  rows: RosterAssignmentRow[],
-): RosterAssignment[] {
-  if (rows.length === 0) return [];
+  churchId: string,
+  rows: readonly RosterAssignmentRow[],
+) {
   const teamNames = new Map(
     db
       .select({ id: servingTeams.id, name: servingTeams.name })
       .from(servingTeams)
-      .where(eq(servingTeams.churchId, church.id))
+      .where(eq(servingTeams.churchId, churchId))
       .all()
       .map((row) => [row.id, row.name]),
   );
@@ -419,7 +418,7 @@ export function hydrateRoster(
       .from(servingPositions)
       .where(
         and(
-          eq(servingPositions.churchId, church.id),
+          eq(servingPositions.churchId, churchId),
           inArray(servingPositions.id, unique(rows.map((row) => row.positionId))),
         ),
       )
@@ -428,9 +427,25 @@ export function hydrateRoster(
   );
   const persons = personSummaries(
     db,
-    church.id,
+    churchId,
     rows.map((row) => row.personId),
   );
+  return { teamNames, positions, persons };
+}
+
+/**
+ * Roster rows of one service with names, people and conflicts. Callers hydrating several
+ * services pass `lookups` from one `rosterLookups` call over all their rows.
+ */
+export function hydrateRoster(
+  db: Queryable,
+  church: Pick<ChurchRow, 'id' | 'timezone'>,
+  service: WorshipServiceRow,
+  rows: RosterAssignmentRow[],
+  lookups: ReturnType<typeof rosterLookups> = rosterLookups(db, church.id, rows),
+): RosterAssignment[] {
+  if (rows.length === 0) return [];
+  const { teamNames, positions, persons } = lookups;
   const subjects = rows.map((row) => ({
     personId: row.personId,
     teamId: row.teamId,

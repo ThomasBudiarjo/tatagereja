@@ -1,6 +1,8 @@
+import { dateTimeFormat } from '@tatagereja/shared';
+
 /** Minutes a time zone is ahead of UTC at one instant. */
 function offsetMinutes(instant: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = dateTimeFormat('en-US', {
     timeZone,
     hourCycle: 'h23',
     year: 'numeric',
@@ -31,7 +33,7 @@ export function zonedDayStart(day: string, timeZone: string, endOfDay = false): 
   const midnightUtc = Date.UTC(year ?? 1970, (month ?? 1) - 1, (date ?? 1) + (endOfDay ? 1 : 0));
   let zone = timeZone;
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    dateTimeFormat('en-US', { timeZone: zone });
   } catch {
     zone = 'UTC';
   }

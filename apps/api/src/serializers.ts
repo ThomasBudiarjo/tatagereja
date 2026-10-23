@@ -20,6 +20,7 @@ import {
   type User,
   type UserSummary,
 } from '@tatagereja/shared';
+import { people } from './db/schema';
 import type {
   AnnouncementRow,
   AttendanceSessionRow,
@@ -131,6 +132,15 @@ export const toPerson = (row: PersonRow): Person => ({
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
+
+/** The columns `toPersonSummary` reads, for lists that select only those instead of `*`. */
+export const personSummaryColumns = {
+  id: people.id,
+  firstName: people.firstName,
+  lastName: people.lastName,
+  photoUrl: people.photoUrl,
+  membershipStatus: people.membershipStatus,
+};
 
 export const toPersonSummary = (
   row: Pick<PersonRow, 'id' | 'firstName' | 'lastName' | 'photoUrl' | 'membershipStatus'>,

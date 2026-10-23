@@ -63,6 +63,9 @@ export const LIMITS = {
   phoneMax: 40,
   pageSizeDefault: 50,
   pageSizeMax: 200,
+  /** Hard cap on lists that are not paged (groups, areas, rooms, campaigns, ...). */
+  listMax: 500,
+  cursorMax: 500,
   invitationMaxUsesMax: 10000,
   invitationMaxDays: 365,
   tokenMax: 200,

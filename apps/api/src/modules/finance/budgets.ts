@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   churchIdParamsSchema,
   churchParamsSchema,
   financeBudgetQuerySchema,
@@ -254,6 +255,7 @@ export const budgetsRouter = (deps: Deps) => {
             .from(financeCampaigns)
             .where(and(...conditions))
             .orderBy(asc(financeCampaigns.status), desc(financeCampaigns.startDate))
+            .limit(LIMITS.listMax)
             .all();
           return { items: hydrateCampaigns(db, church.id, rows) };
         },

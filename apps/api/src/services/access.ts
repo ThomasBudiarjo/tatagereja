@@ -9,7 +9,7 @@ import {
   type AccessLike,
   type Permission,
 } from '@tatagereja/shared';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, MembershipRow } from '../db/schema';
 import {
@@ -114,6 +114,76 @@ export function loadAccess(db: Queryable, church: ChurchRow, membership: Members
     personId: person?.id ?? null,
     permissions: effectivePermissions(membership.role, roles.permissionLists),
     roleIds: roles.roleIds,
+  };
+}
+
+const parseJsonArray = (value: string | null): unknown[] => {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * The church, the caller's membership and their access in one query (the `church` macro runs
+ * it on every church request): the membership and linked person are joined, and the custom
+ * roles and led groups are aggregated as JSON. `membership` is null for a non-member.
+ */
+export function loadChurchMembership(
+  db: Queryable,
+  churchId: string,
+  userId: string,
+): { church: ChurchRow; membership: MembershipRow | null; access: Access | null } | null {
+  const row = db
+    .select({
+      church: churches,
+      membership: churchMemberships,
+      personId: people.id,
+      roles: sql<string | null>`(
+        select json_group_array(json_array(${churchRoles.id}, json(${churchRoles.permissions})))
+        from ${membershipRoles}
+        inner join ${churchRoles} on ${churchRoles.id} = ${membershipRoles.roleId}
+        where ${membershipRoles.membershipId} = ${churchMemberships.id}
+      )`,
+      leaderGroupIds: sql<string | null>`(
+        select json_group_array(${groupLeaders.groupId})
+        from ${groupLeaders}
+        where ${groupLeaders.churchId} = ${churches.id} and ${groupLeaders.userId} = ${userId}
+      )`,
+    })
+    .from(churches)
+    .leftJoin(
+      churchMemberships,
+      and(eq(churchMemberships.churchId, churches.id), eq(churchMemberships.userId, userId)),
+    )
+    .leftJoin(people, and(eq(people.churchId, churches.id), eq(people.userId, userId)))
+    .where(eq(churches.id, churchId))
+    .get();
+  if (!row) return null;
+  const { church, membership } = row;
+  if (!membership) return { church, membership: null, access: null };
+  const roles = parseJsonArray(row.roles).filter(
+    (entry): entry is [string, unknown] => Array.isArray(entry) && typeof entry[0] === 'string',
+  );
+  return {
+    church,
+    membership,
+    access: {
+      userId: membership.userId,
+      role: membership.role,
+      leaderGroupIds: parseJsonArray(row.leaderGroupIds).filter(
+        (id): id is string => typeof id === 'string',
+      ),
+      personId: row.personId ?? null,
+      permissions: effectivePermissions(
+        membership.role,
+        roles.map(([, permissions]) => (Array.isArray(permissions) ? permissions : [])),
+      ),
+      roleIds: roles.map(([id]) => id),
+    },
   };
 }
 

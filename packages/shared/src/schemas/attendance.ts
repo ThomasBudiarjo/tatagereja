@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { ATTENDANCE_STATUSES, LIMITS, type AttendanceStatus } from '../constants';
 import type { LocalizedText } from '../localized';
 import {
+  cursorQuerySchema,
   idSchema,
   isoDateTimeSchema,
+  keysetPageSchema,
   optionalText,
   paginatedSchema,
   paginationQuerySchema,
@@ -119,10 +121,14 @@ export const attendanceListQuerySchema = paginationQuerySchema.extend({
   eventId: idSchema.optional(),
   mode: z.enum(ATTENDANCE_MODES).optional(),
   sort: z.enum(ATTENDANCE_SESSION_SORTS).default('recent'),
+  /** Keyset paging for the `recent` and `oldest` orders. */
+  ...cursorQuerySchema.shape,
 });
 export type AttendanceListQuery = z.infer<typeof attendanceListQuerySchema>;
 
-export const attendanceSessionListSchema = paginatedSchema(attendanceSessionViewSchema);
+export const attendanceSessionListSchema = paginatedSchema(attendanceSessionViewSchema).extend(
+  keysetPageSchema.shape,
+);
 export type AttendanceSessionList = z.infer<typeof attendanceSessionListSchema>;
 
 export const attendanceRecordSchema = personSummarySchema.extend({

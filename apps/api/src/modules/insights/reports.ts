@@ -33,7 +33,7 @@ import {
   type ReportSeries,
   type ReportTextKey,
 } from '@tatagereja/shared';
-import { and, eq, gte, inArray, isNull, lte, ne } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, isNull, lte, ne, sql, sum } from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { ChurchRow } from '../../db/schema';
 import {
@@ -61,6 +61,7 @@ import { enforceRateLimit } from '../../lib/rate-limit';
 import { authPlugin } from '../../plugins/auth';
 import { attendeesOf, headcountOf, localDayOf } from '../../services/attendance';
 import { recordAudit } from '../../services/audit';
+import { cachedReport } from '../../services/report-cache';
 import { assertModuleEnabled, moduleEnabled } from '../../services/modules';
 import { sendCsv } from '../../services/people';
 import { effectiveAreaByPerson } from '../../services/people-households';
@@ -303,17 +304,27 @@ export const insightsReportsRouter = (deps: Deps) => {
       .map((row) => ({ row, day: localDayOf(row.sessionAt, church.timezone) }))
       .filter(({ day }) => day >= query.from && day <= query.to);
     const ids = sessions.map(({ row }) => row.id);
+    // Sessions as a subquery rather than a list of ids: years of group meetings can exceed
+    // SQLite's limit on bound parameters.
+    const rangeSessions = db
+      .select({ id: attendanceSessions.id })
+      .from(attendanceSessions)
+      .where(and(...conditions));
 
     const present = new Map<string, number>();
     if (ids.length > 0) {
       for (const record of db
-        .select({ sessionId: attendanceRecords.sessionId })
+        .select({ sessionId: attendanceRecords.sessionId, value: count() })
         .from(attendanceRecords)
         .where(
-          and(inArray(attendanceRecords.sessionId, ids), eq(attendanceRecords.status, 'present')),
+          and(
+            inArray(attendanceRecords.sessionId, rangeSessions),
+            eq(attendanceRecords.status, 'present'),
+          ),
         )
+        .groupBy(attendanceRecords.sessionId)
         .all()) {
-        present.set(record.sessionId, (present.get(record.sessionId) ?? 0) + 1);
+        present.set(record.sessionId, record.value);
       }
     }
 
@@ -333,7 +344,7 @@ export const insightsReportsRouter = (deps: Deps) => {
           .where(
             and(
               eq(worshipServices.churchId, church.id),
-              inArray(worshipServices.attendanceSessionId, ids),
+              inArray(worshipServices.attendanceSessionId, rangeSessions),
             ),
           )
           .all()) {
@@ -346,7 +357,7 @@ export const insightsReportsRouter = (deps: Deps) => {
         .where(
           and(
             eq(checkinSessions.churchId, church.id),
-            inArray(checkinSessions.attendanceSessionId, ids),
+            inArray(checkinSessions.attendanceSessionId, rangeSessions),
           ),
         )
         .all()) {
@@ -677,36 +688,54 @@ export const insightsReportsRouter = (deps: Deps) => {
     const lengthDays = Math.round((Date.parse(query.to) - Date.parse(query.from)) / 86_400_000);
     const previousTo = dayBefore(query.from);
     const previousFrom = shiftDays(previousTo, -lengthDays);
-    const rows = db
-      .select({
-        entryDate: financeEntries.entryDate,
-        amount: financeEntries.amount,
-        sourceType: financeEntries.sourceType,
-        fundId: financeEntries.fundId,
-        categoryId: financeEntries.categoryId,
-      })
-      .from(financeEntries)
-      .where(
-        and(
-          eq(financeEntries.churchId, church.id),
-          isNull(financeEntries.voidedAt),
-          inArray(financeEntries.sourceType, ['offering', 'contribution']),
-          gte(financeEntries.entryDate, previousFrom),
-          lte(financeEntries.entryDate, query.to),
-        ),
-      )
-      .all()
-      .filter((row) => row.amount > 0);
-    const current = rows.filter((row) => row.entryDate >= query.from);
-    const previousTotal = rows
-      .filter((row) => row.entryDate < query.from)
-      .reduce((sum, row) => sum + row.amount, 0);
+    // Sums per day, source, fund and category in SQL; JS only folds them into periods.
+    const giving = and(
+      eq(financeEntries.churchId, church.id),
+      isNull(financeEntries.voidedAt),
+      inArray(financeEntries.sourceType, ['offering', 'contribution']),
+      sql`${financeEntries.amount} > 0`,
+    );
+    const amount = sql<number>`coalesce(${sum(financeEntries.amount)}, 0)`.mapWith(Number);
+    const current = and(
+      giving,
+      gte(financeEntries.entryDate, query.from),
+      lte(financeEntries.entryDate, query.to),
+    );
+    const previousTotal =
+      db
+        .select({ amount })
+        .from(financeEntries)
+        .where(
+          and(
+            giving,
+            gte(financeEntries.entryDate, previousFrom),
+            lte(financeEntries.entryDate, previousTo),
+          ),
+        )
+        .get()?.amount ?? 0;
     const offerings = emptyBuckets(periods);
     const contributions = emptyBuckets(periods);
     const total = emptyBuckets(periods);
     const byFund = new Map<string, number>();
     const byCategory = new Map<string, number>();
-    for (const row of current) {
+    // One pass over the covering ledger index; the breakdowns fold the same daily sums.
+    for (const row of db
+      .select({
+        entryDate: financeEntries.entryDate,
+        sourceType: financeEntries.sourceType,
+        fundId: financeEntries.fundId,
+        categoryId: financeEntries.categoryId,
+        amount,
+      })
+      .from(financeEntries)
+      .where(current)
+      .groupBy(
+        financeEntries.entryDate,
+        financeEntries.sourceType,
+        financeEntries.fundId,
+        financeEntries.categoryId,
+      )
+      .all()) {
       const period = periodStartOf(row.entryDate, query.interval);
       const target = row.sourceType === 'offering' ? offerings : contributions;
       target.set(period, (target.get(period) ?? 0) + row.amount);
@@ -731,7 +760,7 @@ export const insightsReportsRouter = (deps: Deps) => {
         .all()
         .map((row) => [row.id, row.name]),
     );
-    const sum = current.reduce((acc, row) => acc + row.amount, 0);
+    const givenTotal = [...total.values()].reduce((acc, value) => acc + value, 0);
     return {
       ...rangeOf(query),
       unit: 'money',
@@ -766,12 +795,12 @@ export const insightsReportsRouter = (deps: Deps) => {
         ),
       ],
       totals: {
-        total: sum,
+        total: givenTotal,
         offerings: [...offerings.values()].reduce((acc, value) => acc + value, 0),
         contributions: [...contributions.values()].reduce((acc, value) => acc + value, 0),
-        averagePerPeriod: periods.length === 0 ? 0 : Math.round(sum / periods.length),
+        averagePerPeriod: periods.length === 0 ? 0 : Math.round(givenTotal / periods.length),
         previousTotal,
-        change: ratio(sum - previousTotal, previousTotal),
+        change: ratio(givenTotal - previousTotal, previousTotal),
       },
     };
   };
@@ -861,7 +890,12 @@ export const insightsReportsRouter = (deps: Deps) => {
         text: (key) => localize(REPORT_TEXT[key], query.locale),
         label: (text) => localize(text, query.locale),
       };
-      const report: Report = { kind: params.kind, ...builders[params.kind](context) };
+      const report: Report = cachedReport(
+        deps,
+        { churchId: church.id, userId: auth.user.id, limiter: 'insights.report' },
+        `insights:${params.kind}:${JSON.stringify([range.from, range.to, range.interval, range.groupId ?? null, range.locale])}`,
+        () => ({ kind: params.kind, ...builders[params.kind](context) }),
+      );
       if (query.format !== 'csv') return report;
 
       enforceRateLimit(deps.limiters, 'insights.export', `${church.id}:${auth.user.id}`, {

@@ -30,3 +30,26 @@ export const invitationStatusOf = (invitation: {
   if (invitation.maxUses !== null && invitation.useCount >= invitation.maxUses) return 'exhausted';
   return 'active';
 };
+
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A cached `Intl.DateTimeFormat`. Creating one costs about fifty times as much as formatting
+ * with it, and reports and calendars format thousands of dates per request. Throws like the
+ * constructor for an unknown time zone (nothing is cached then).
+ */
+export function dateTimeFormat(
+  locale: string,
+  options: Intl.DateTimeFormatOptions = {},
+): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = dateTimeFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    // Keys come from a handful of call sites times the time zones in use; the cap only guards
+    // against an unexpected spread of options.
+    if (dateTimeFormats.size >= 500) dateTimeFormats.clear();
+    dateTimeFormats.set(key, format);
+  }
+  return format;
+}

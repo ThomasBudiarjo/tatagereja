@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { LIMITS } from '../constants';
 import { MODULE_IDS } from '../modules';
-import { idSchema, isoDateTimeSchema, paginatedSchema } from './common';
+import {
+  cursorQuerySchema,
+  idSchema,
+  isoDateTimeSchema,
+  keysetPageSchema,
+  paginatedSchema,
+} from './common';
 
 export const auditLogSchema = z.object({
   id: idSchema,
@@ -33,8 +39,9 @@ export const auditLogQuerySchema = z.object({
   to: z.iso.datetime({ offset: true }).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(LIMITS.auditPageSizeMax).default(50),
+  ...cursorQuerySchema.shape,
 });
 export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
 
-export const auditLogListSchema = paginatedSchema(auditLogSchema);
+export const auditLogListSchema = paginatedSchema(auditLogSchema).extend(keysetPageSchema.shape);
 export type AuditLogList = z.infer<typeof auditLogListSchema>;

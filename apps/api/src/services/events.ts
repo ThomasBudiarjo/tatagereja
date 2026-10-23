@@ -1,4 +1,5 @@
 import {
+  dateTimeFormat,
   type AccessLike,
   type Event,
   type EventDetails,
@@ -344,7 +345,7 @@ export function eventWhen(
   locale: Locale = 'id',
 ) {
   try {
-    return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-GB', {
+    return dateTimeFormat(locale === 'id' ? 'id-ID' : 'en-GB', {
       timeZone,
       weekday: 'short',
       day: 'numeric',

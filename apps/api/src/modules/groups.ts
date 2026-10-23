@@ -1,5 +1,6 @@
 import {
   DEFAULT_PERSON_PRIVACY,
+  LIMITS,
   addGroupMembersBodySchema,
   applyPersonPrivacy,
   can,
@@ -498,7 +499,8 @@ export const groupsModule = (deps: Deps) => {
           .filter((row) => canSeeGroup(access, row, mine.has(row.id)))
           .filter(
             (row) => !query.mine || mine.has(row.id) || access.leaderGroupIds.includes(row.id),
-          );
+          )
+          .slice(0, LIMITS.listMax);
         return { items: hydrate(access, rows) };
       },
       {

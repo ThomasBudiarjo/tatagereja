@@ -16,7 +16,21 @@ import {
   type FinancePending,
   type FinanceSummary,
 } from '@tatagereja/shared';
-import { and, asc, count, desc, eq, gt, gte, like, lt, lte, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  like,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Elysia } from 'elysia';
 import type { Queryable } from '../../db/client';
 import type { ChurchRow, FinanceEntryRow } from '../../db/schema';
@@ -27,6 +41,7 @@ import {
   offeringBatches,
 } from '../../db/schema';
 import type { Deps } from '../../deps';
+import { afterCursor, decodeCursor, keysetPage } from '../../lib/cursor';
 import { badRequest, conflict, notFound } from '../../lib/errors';
 import { likePattern, offsetOf } from '../../lib/query';
 import { nowIso } from '../../lib/time';
@@ -52,26 +67,35 @@ import {
 import { hydrateEntries, hydrateTransfers } from './serializers';
 import { loadSetup } from './setup';
 
-/** Income and expense of live entries, transfers left out (they move money, not earn it). */
-const earningsBetween = (db: Queryable, churchId: string, from: string, to: string) =>
-  db
-    .select({ income: incomeSum, expense: expenseSum })
-    .from(financeEntries)
-    .where(
-      and(
-        eq(financeEntries.churchId, churchId),
-        liveEntry,
-        gte(financeEntries.entryDate, from),
-        lte(financeEntries.entryDate, to),
-        or(
-          eq(financeEntries.sourceType, 'offering'),
-          eq(financeEntries.sourceType, 'contribution'),
-          eq(financeEntries.sourceType, 'expense'),
-          eq(financeEntries.sourceType, 'adjustment'),
+/**
+ * Income and expense of live entries per month (`YYYY-MM`), transfers left out (they move money,
+ * not earn it). One grouped scan of the covering ledger index for the whole range.
+ */
+const earningsByMonth = (db: Queryable, churchId: string, from: string, to: string) => {
+  const month = sql<string>`substr(${financeEntries.entryDate}, 1, 7)`;
+  return new Map(
+    db
+      .select({ month, income: incomeSum, expense: expenseSum })
+      .from(financeEntries)
+      .where(
+        and(
+          eq(financeEntries.churchId, churchId),
+          liveEntry,
+          gte(financeEntries.entryDate, from),
+          lte(financeEntries.entryDate, to),
+          or(
+            eq(financeEntries.sourceType, 'offering'),
+            eq(financeEntries.sourceType, 'contribution'),
+            eq(financeEntries.sourceType, 'expense'),
+            eq(financeEntries.sourceType, 'adjustment'),
+          ),
         ),
-      ),
-    )
-    .get() ?? { income: 0, expense: 0 };
+      )
+      .groupBy(month)
+      .all()
+      .map((row) => [row.month, { income: row.income, expense: row.expense }]),
+  );
+};
 
 /** Counts the caller can act on now: offering counts to verify and requests to decide. */
 export function pendingFor(db: Queryable, churchId: string, access: AccessLike): FinancePending {
@@ -93,12 +117,26 @@ export function pendingFor(db: Queryable, churchId: string, access: AccessLike):
   return { batches, expenses, total: batches + expenses };
 }
 
-/** Running balance after each live entry of one account, in posting order. */
-function runningBalances(db: Queryable, churchId: string, accountId: string, opening: number) {
-  const balances = new Map<string, number>();
-  let balance = opening;
-  for (const row of db
-    .select({ id: financeEntries.id, amount: financeEntries.amount })
+/**
+ * Running balance after each live entry of one account, in posting order. The sums run in SQL
+ * (a window over the account's entries); only the rows asked for (`ids`, a page) come back.
+ */
+function runningBalances(
+  db: Queryable,
+  churchId: string,
+  accountId: string,
+  opening: number,
+  ids?: readonly string[],
+) {
+  if (ids && ids.length === 0) return new Map<string, number>();
+  const ordered = db
+    .select({
+      id: financeEntries.id,
+      running:
+        sql<number>`sum(${financeEntries.amount}) over (order by ${financeEntries.entryDate}, ${financeEntries.createdAt}, ${financeEntries.id} rows between unbounded preceding and current row)`
+          .mapWith(Number)
+          .as('running'),
+    })
     .from(financeEntries)
     .where(
       and(
@@ -107,12 +145,15 @@ function runningBalances(db: Queryable, churchId: string, accountId: string, ope
         liveEntry,
       ),
     )
-    .orderBy(asc(financeEntries.entryDate), asc(financeEntries.createdAt), asc(financeEntries.id))
-    .all()) {
-    balance += row.amount;
-    balances.set(row.id, balance);
-  }
-  return balances;
+    .as('ordered');
+  return new Map(
+    db
+      .select({ id: ordered.id, running: ordered.running })
+      .from(ordered)
+      .where(ids ? inArray(ordered.id, [...ids]) : undefined)
+      .all()
+      .map((row) => [row.id, opening + row.running]),
+  );
 }
 
 export function financeSummary(
@@ -125,12 +166,13 @@ export function financeSummary(
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthOf = (key: string) => monthRange(Number(key.slice(0, 4)), Number(key.slice(5, 7)));
   const thisMonth = monthOf(monthStart);
-  const lastMonth = monthOf(addMonths(monthStart, -1));
-  const current = earningsBetween(db, church.id, thisMonth.from, thisMonth.to);
-  const previous = earningsBetween(db, church.id, lastMonth.from, lastMonth.to);
-  const trend = monthsBetween(addMonths(monthStart, -5), today).map((month) => {
-    const range = monthOf(month);
-    const totals = earningsBetween(db, church.id, range.from, range.to);
+  const trendStart = addMonths(monthStart, -5);
+  const earnings = earningsByMonth(db, church.id, monthOf(trendStart).from, thisMonth.to);
+  const none = { income: 0, expense: 0 };
+  const current = earnings.get(monthStart.slice(0, 7)) ?? none;
+  const previous = earnings.get(addMonths(monthStart, -1).slice(0, 7)) ?? none;
+  const trend = monthsBetween(trendStart, today).map((month) => {
+    const totals = earnings.get(month.slice(0, 7)) ?? none;
     return { month, income: totals.income, expense: totals.expense };
   });
   const recent = db
@@ -230,17 +272,27 @@ export const ledgerRouter = (deps: Deps) => {
             );
 
           const account = query.accountId ? loadAccount(db, church.id, query.accountId) : null;
-          const running = account
-            ? runningBalances(db, church.id, account.id, account.openingBalance)
-            : undefined;
+          const runningFor = (rows: readonly FinanceEntryRow[]) =>
+            account
+              ? runningBalances(
+                  db,
+                  church.id,
+                  account.id,
+                  account.openingBalance,
+                  rows.map((row) => row.id),
+                )
+              : undefined;
 
           if (query.format === 'csv') {
             enforceExportLimit(deps.limiters, church.id, auth.user.id);
+            const exported = ordered.limit(LIMITS.csvRowsMax).all();
             const items = hydrateEntries(
               db,
               church.id,
-              ordered.limit(LIMITS.csvRowsMax).all(),
-              running,
+              exported,
+              account
+                ? runningBalances(db, church.id, account.id, account.openingBalance)
+                : undefined,
             );
             Object.assign(
               set.headers,
@@ -276,12 +328,39 @@ export const ledgerRouter = (deps: Deps) => {
 
           const total =
             db.select({ value: count() }).from(financeEntries).where(where).get()?.value ?? 0;
-          const rows = ordered.limit(query.limit).offset(offsetOf(query)).all();
+          const after = query.cursor ? decodeCursor(query.cursor, 3) : null;
+          const { rows, nextCursor } = keysetPage(
+            (after
+              ? db
+                  .select()
+                  .from(financeEntries)
+                  .where(
+                    and(
+                      where,
+                      afterCursor(
+                        [financeEntries.entryDate, financeEntries.createdAt, financeEntries.id],
+                        after,
+                        'desc',
+                      ),
+                    ),
+                  )
+                  .orderBy(
+                    desc(financeEntries.entryDate),
+                    desc(financeEntries.createdAt),
+                    desc(financeEntries.id),
+                  )
+                  .limit(query.limit + 1)
+              : ordered.limit(query.limit + 1).offset(offsetOf(query))
+            ).all(),
+            query.limit,
+            (row) => [row.entryDate, row.createdAt, row.id],
+          );
           return {
-            items: hydrateEntries(db, church.id, rows, running),
+            items: hydrateEntries(db, church.id, rows, runningFor(rows)),
             total,
             page: query.page,
             limit: query.limit,
+            nextCursor,
           };
         },
         {

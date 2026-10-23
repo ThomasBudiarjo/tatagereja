@@ -2,6 +2,7 @@ import {
   GUARDIAN_RELATIONSHIPS,
   checkinSettingsSchema,
   childAge,
+  dateTimeFormat,
   isRatioExceeded,
   phoneLast4,
   suggestClass,
@@ -42,6 +43,7 @@ import {
 import { conflict, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
 import { generateCode, newId } from '../lib/tokens';
+import { syncRecordTimes } from './attendance';
 import { moduleSettings } from './modules';
 
 /*
@@ -55,7 +57,7 @@ export const checkinSettingsOf = (church: Pick<ChurchRow, 'settings'>): CheckinS
 /** Today's date (YYYY-MM-DD) in the church time zone. */
 export const todayIn = (timezone: string): string => {
   try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+    return dateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
@@ -640,7 +642,7 @@ export const uniqueSecurityCode = (
 export const zonedIso = (date: string, time: string, timeZone: string): string => {
   const guess = new Date(`${date}T${time}:00Z`);
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const parts = dateTimeFormat('en-US', {
       timeZone,
       hourCycle: 'h23',
       year: 'numeric',
@@ -687,9 +689,7 @@ const sessionMoment = (db: Queryable, session: CheckinSessionRow, timezone: stri
   }
   const openedOn = (() => {
     try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-        new Date(session.openedAt),
-      );
+      return dateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(session.openedAt));
     } catch {
       return session.openedAt.slice(0, 10);
     }
@@ -739,6 +739,7 @@ export const syncAttendance = (
       .set({ title, sessionAt, headcountChildren: childIds.length, updatedAt: now })
       .where(eq(attendanceSessions.id, existing.id))
       .run();
+    syncRecordTimes(db, existing.id, sessionAt);
   } else {
     attendanceId = newId();
     db.insert(attendanceSessions)
@@ -766,6 +767,7 @@ export const syncAttendance = (
           personId,
           churchId: session.churchId,
           status: 'present' as const,
+          sessionAt,
           note: null,
           recordedBy: userId,
           recordedAt: now,

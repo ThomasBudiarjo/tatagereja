@@ -1,11 +1,11 @@
 import { cors } from '@elysiajs/cors';
 import { Elysia } from 'elysia';
-import { stat } from 'node:fs/promises';
-import { join, resolve, sep } from 'node:path';
 import type { AppConfig } from './config';
 import type { Db } from './db/client';
 import type { Deps } from './deps';
-import { HttpError } from './lib/errors';
+import { createResultCache, invalidateForRequest } from './lib/cache';
+import { HttpError, badRequest } from './lib/errors';
+import { createStaticHandler, finalizeResponse } from './lib/http';
 import { createRateLimiter, type Limiters } from './lib/rate-limit';
 import { securityHeaders } from './lib/security-headers';
 import { createTurnstileVerifier } from './lib/turnstile';
@@ -72,6 +72,7 @@ export function createDeps(db: Db, config: AppConfig, overrides: Partial<Deps> =
     config,
     limiters: defaultLimiters(),
     verifyTurnstile: config.turnstile ? createTurnstileVerifier(config.turnstile.secretKey) : null,
+    cache: createResultCache(),
     ...overrides,
   };
 }
@@ -116,6 +117,7 @@ export function createApp(deps: Deps) {
       }),
     )
     .onRequest(({ request, set }) => {
+      invalidateForRequest(deps.cache, request.method, new URL(request.url).pathname);
       if (config.logRequests) {
         console.log(
           `${new Date().toISOString()} ${request.method} ${loggedPath(new URL(request.url).pathname)}`,
@@ -133,6 +135,11 @@ export function createApp(deps: Deps) {
           },
         };
       }
+    })
+    // JSON and text bodies: ETag with 304 on GET, and gzip or brotli when accepted.
+    .mapResponse(({ request, responseValue, set }) => finalizeResponse(request, responseValue, set))
+    .onAfterResponse(({ request }) => {
+      invalidateForRequest(deps.cache, request.method, new URL(request.url).pathname);
     })
     .onError(({ code, error, set, request }) => {
       if (error instanceof HttpError) {
@@ -168,28 +175,25 @@ export function createApp(deps: Deps) {
     .use(api);
 
   if (config.webDistDir) {
-    const dist = resolve(config.webDistDir);
-    const indexFile = join(dist, 'index.html');
+    const serveStatic = createStaticHandler(config.webDistDir);
     app.get('/*', async ({ request, set }) => {
-      const pathname = decodeURIComponent(new URL(request.url).pathname);
+      let pathname: string;
+      try {
+        pathname = decodeURIComponent(new URL(request.url).pathname);
+      } catch {
+        throw badRequest('Malformed URL');
+      }
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         throw new HttpError(404, 'NOT_FOUND', 'Route not found');
       }
-      const relative = pathname.replace(/^\/+/, '');
-      if (relative) {
-        const target = resolve(dist, relative);
-        if (target.startsWith(dist + sep)) {
-          const info = await stat(target).catch(() => null);
-          if (info?.isFile()) {
-            if (relative.startsWith('assets/')) {
-              set.headers['cache-control'] = 'public, max-age=31536000, immutable';
-            }
-            return Bun.file(target);
-          }
+      const response = await serveStatic(request, pathname);
+      // The security headers set for every request travel with the file.
+      for (const [name, value] of Object.entries(set.headers)) {
+        if (value !== undefined && !response.headers.has(name)) {
+          response.headers.set(name, String(value));
         }
       }
-      set.headers['cache-control'] = 'no-cache';
-      return Bun.file(indexFile);
+      return response;
     });
   }
 

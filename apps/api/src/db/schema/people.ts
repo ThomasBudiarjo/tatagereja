@@ -226,20 +226,24 @@ export const customFieldValues = sqliteTable(
  * `DEFAULT_PERSON_PRIVACY` (shared). Hidden fields are stripped by the API unless the caller
  * holds `people.private.view` or it is their own profile.
  */
-export const personPrivacySettings = sqliteTable('person_privacy_settings', {
-  personId: text('person_id')
-    .primaryKey()
-    .references(() => people.id, { onDelete: 'cascade' }),
-  churchId: text('church_id')
-    .notNull()
-    .references(() => churches.id, { onDelete: 'cascade' }),
-  showPhone: integer('show_phone', { mode: 'boolean' }).notNull().default(true),
-  showEmail: integer('show_email', { mode: 'boolean' }).notNull().default(true),
-  showAddress: integer('show_address', { mode: 'boolean' }).notNull().default(false),
-  showBirthday: integer('show_birthday', { mode: 'boolean' }).notNull().default(true),
-  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
-  updatedAt: text('updated_at').notNull(),
-});
+export const personPrivacySettings = sqliteTable(
+  'person_privacy_settings',
+  {
+    personId: text('person_id')
+      .primaryKey()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    churchId: text('church_id')
+      .notNull()
+      .references(() => churches.id, { onDelete: 'cascade' }),
+    showPhone: integer('show_phone', { mode: 'boolean' }).notNull().default(true),
+    showEmail: integer('show_email', { mode: 'boolean' }).notNull().default(true),
+    showAddress: integer('show_address', { mode: 'boolean' }).notNull().default(false),
+    showBirthday: integer('show_birthday', { mode: 'boolean' }).notNull().default(true),
+    updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('person_privacy_settings_church_idx').on(table.churchId)],
+);
 
 /** A member asking to join a public group; leaders or `groups.manage` decide. */
 export const groupJoinRequests = sqliteTable(

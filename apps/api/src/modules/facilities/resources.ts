@@ -1,4 +1,5 @@
 import {
+  LIMITS,
   canManageFacilities,
   churchIdParamsSchema,
   churchParamsSchema,
@@ -99,6 +100,7 @@ export const resourcesRouter = (deps: Deps) => {
           .from(facilityResources)
           .where(and(...conditions))
           .orderBy(asc(facilityResources.name))
+          .limit(LIMITS.listMax)
           .all();
         return { items: hydrateResources(db, church.id, rows) };
       },

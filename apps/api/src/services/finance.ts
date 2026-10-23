@@ -1,5 +1,10 @@
-import { financePeriodOf, periodKey, type FinanceCategoryKind } from '@tatagereja/shared';
-import { and, desc, eq, gt, gte, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
+import {
+  dateTimeFormat,
+  financePeriodOf,
+  periodKey,
+  type FinanceCategoryKind,
+} from '@tatagereja/shared';
+import { and, desc, eq, gt, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Queryable } from '../db/client';
 import type {
@@ -52,7 +57,7 @@ export const periodLabel = (year: number, month: number): string =>
 export function dayIn(instant: string | Date, timeZone: string): string {
   const date = typeof instant === 'string' ? new Date(instant) : instant;
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
@@ -257,8 +262,35 @@ export function voidEntriesOf(
   return rows.length;
 }
 
+/**
+ * Live ledger totals per account and per fund from one grouped scan of the covering balance
+ * index (church, account, fund), instead of one full scan per breakdown.
+ */
+function ledgerTotals(db: Queryable, churchId: string) {
+  const byAccount = new Map<string, number>();
+  const byFund = new Map<string, number>();
+  for (const row of db
+    .select({
+      accountId: financeEntries.accountId,
+      fundId: financeEntries.fundId,
+      total: sumOf(financeEntries.amount),
+    })
+    .from(financeEntries)
+    .where(and(eq(financeEntries.churchId, churchId), liveEntry))
+    .groupBy(financeEntries.accountId, financeEntries.fundId)
+    .all()) {
+    byAccount.set(row.accountId, (byAccount.get(row.accountId) ?? 0) + row.total);
+    byFund.set(row.fundId, (byFund.get(row.fundId) ?? 0) + row.total);
+  }
+  return { byAccount, byFund };
+}
+
 /** Balance of each account: opening balance plus every live entry. */
-export function accountBalances(db: Queryable, churchId: string): Map<string, number> {
+export function accountBalances(
+  db: Queryable,
+  churchId: string,
+  totals: Map<string, number> = ledgerTotals(db, churchId).byAccount,
+): Map<string, number> {
   const balances = new Map<string, number>();
   for (const account of db
     .select({ id: financeAccounts.id, opening: financeAccounts.openingBalance })
@@ -267,13 +299,8 @@ export function accountBalances(db: Queryable, churchId: string): Map<string, nu
     .all()) {
     balances.set(account.id, account.opening);
   }
-  for (const row of db
-    .select({ accountId: financeEntries.accountId, total: sumOf(financeEntries.amount) })
-    .from(financeEntries)
-    .where(and(eq(financeEntries.churchId, churchId), liveEntry))
-    .groupBy(financeEntries.accountId)
-    .all()) {
-    balances.set(row.accountId, (balances.get(row.accountId) ?? 0) + row.total);
+  for (const [accountId, total] of totals) {
+    balances.set(accountId, (balances.get(accountId) ?? 0) + total);
   }
   return balances;
 }
@@ -283,28 +310,29 @@ export function accountBalances(db: Queryable, churchId: string): Map<string, nu
  * are not assigned to a fund.
  */
 export function fundBalances(db: Queryable, churchId: string): Map<string, number> {
-  return new Map(
-    db
-      .select({ fundId: financeEntries.fundId, total: sumOf(financeEntries.amount) })
-      .from(financeEntries)
-      .where(and(eq(financeEntries.churchId, churchId), liveEntry))
-      .groupBy(financeEntries.fundId)
-      .all()
-      .map((row) => [row.fundId, row.total]),
-  );
+  return ledgerTotals(db, churchId).byFund;
+}
+
+/** Account and fund balances together, from one scan of the ledger. */
+export function ledgerBalances(db: Queryable, churchId: string) {
+  const totals = ledgerTotals(db, churchId);
+  return { accounts: accountBalances(db, churchId, totals.byAccount), funds: totals.byFund };
 }
 
 /** The next receipt number of the year, e.g. `KW-2026-00042`. Call inside the transaction. */
 export function nextReceiptNumber(db: Queryable, churchId: string, date: string): string {
   const year = date.slice(0, 4);
   const prefix = `KW-${year}-`;
+  // A byte range instead of LIKE 'KW-2026-%' (LIKE ignores case, so it cannot use the unique
+  // index): '.' sorts right after '-', so this reads one index entry.
   const last = db
     .select({ value: sql<string | null>`max(${financeContributions.receiptNumber})` })
     .from(financeContributions)
     .where(
       and(
         eq(financeContributions.churchId, churchId),
-        like(financeContributions.receiptNumber, `${prefix}%`),
+        gte(financeContributions.receiptNumber, prefix),
+        lt(financeContributions.receiptNumber, `KW-${year}.`),
       ),
     )
     .get()?.value;

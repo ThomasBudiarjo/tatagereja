@@ -4,6 +4,7 @@ import {
   applyPersonPrivacy,
   canSeeGroup,
   canSeeHiddenContact,
+  dateTimeFormat,
   has,
   type AccessLike,
   type DirectoryPerson,
@@ -25,6 +26,7 @@ import {
   type SQL,
   type SQLWrapper,
 } from 'drizzle-orm';
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Queryable } from '../db/client';
 import type { ChurchRow, PersonRow } from '../db/schema';
 import {
@@ -51,7 +53,7 @@ import { likePattern } from '../lib/query';
 /** Today's date (YYYY-MM-DD) in the church time zone. */
 export const todayIn = (church: Pick<ChurchRow, 'timezone'>): string => {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    return dateTimeFormat('en-CA', {
       timeZone: church.timezone,
       year: 'numeric',
       month: '2-digit',
@@ -247,15 +249,16 @@ export function directoryConditions(
 /** Privacy choices of several people; people without a row get the defaults. */
 export function privacyByPerson(
   db: Queryable,
-  personIds: readonly string[],
+  personIds: readonly string[] | { churchId: string },
 ): Map<string, PersonPrivacy> {
   const result = new Map<string, PersonPrivacy>();
-  if (personIds.length === 0) return result;
-  for (const row of db
-    .select()
-    .from(personPrivacySettings)
-    .where(inArray(personPrivacySettings.personId, [...personIds]))
-    .all()) {
+  if (Array.isArray(personIds) && personIds.length === 0) return result;
+  // A whole church (directory counts, exports) is one indexed read, not thousands of parameters.
+  const where =
+    'churchId' in personIds
+      ? eq(personPrivacySettings.churchId, personIds.churchId)
+      : inArray(personPrivacySettings.personId, [...personIds]);
+  for (const row of db.select().from(personPrivacySettings).where(where).all()) {
     result.set(row.personId, {
       showPhone: row.showPhone,
       showEmail: row.showEmail,
@@ -304,9 +307,33 @@ export type HouseholdLink = {
 };
 
 /** Household membership of several people. */
+/** Id lists longer than this are matched through the church's people instead of one by one. */
+const MANY_PEOPLE = 500;
+
+/**
+ * `column IN (personIds)`. For a long list (a CSV export, the whole directory) it matches every
+ * person of `churchId` through a subquery instead: binding and preparing thousands of
+ * parameters costs more than the few extra rows, which callers ignore as they look rows up by id.
+ */
+export function personIdsIn(
+  db: Queryable,
+  column: SQLiteColumn,
+  personIds: readonly string[],
+  churchId?: string,
+): SQL {
+  if (churchId && personIds.length > MANY_PEOPLE) {
+    return inArray(
+      column,
+      db.select({ id: people.id }).from(people).where(eq(people.churchId, churchId)),
+    );
+  }
+  return inArray(column, [...personIds]);
+}
+
 export function householdLinksByPerson(
   db: Queryable,
   personIds: readonly string[],
+  churchId?: string,
 ): Map<string, HouseholdLink> {
   const result = new Map<string, HouseholdLink>();
   if (personIds.length === 0) return result;
@@ -320,7 +347,7 @@ export function householdLinksByPerson(
     })
     .from(householdMembers)
     .innerJoin(households, eq(households.id, householdMembers.householdId))
-    .where(inArray(householdMembers.personId, [...personIds]))
+    .where(personIdsIn(db, householdMembers.personId, personIds, churchId))
     .all()) {
     result.set(row.personId, row);
   }
@@ -331,25 +358,30 @@ export function householdLinksByPerson(
 export function personAreaOverrides(
   db: Queryable,
   personIds: readonly string[],
+  churchId?: string,
 ): Map<string, string> {
   if (personIds.length === 0) return new Map();
   return new Map(
     db
       .select({ personId: personAreas.personId, areaId: personAreas.areaId })
       .from(personAreas)
-      .where(inArray(personAreas.personId, [...personIds]))
+      .where(personIdsIn(db, personAreas.personId, personIds, churchId))
       .all()
       .map((row) => [row.personId, row.areaId]),
   );
 }
 
-export function tagIdsByPerson(db: Queryable, personIds: readonly string[]): Map<string, string[]> {
+export function tagIdsByPerson(
+  db: Queryable,
+  personIds: readonly string[],
+  churchId?: string,
+): Map<string, string[]> {
   const result = new Map<string, string[]>();
   if (personIds.length === 0) return result;
   for (const row of db
     .select({ personId: personTagAssignments.personId, tagId: personTagAssignments.tagId })
     .from(personTagAssignments)
-    .where(inArray(personTagAssignments.personId, [...personIds]))
+    .where(personIdsIn(db, personTagAssignments.personId, personIds, churchId))
     .all()) {
     const list = result.get(row.personId) ?? [];
     list.push(row.tagId);
@@ -386,10 +418,15 @@ export function hydrateDirectory(
   rows: readonly PersonRow[],
 ): DirectoryPerson[] {
   const ids = rows.map((row) => row.id);
-  const privacy = privacyByPerson(db, ids);
-  const links = householdLinksByPerson(db, ids);
-  const overrides = personAreaOverrides(db, ids);
-  const tags = tagIdsByPerson(db, ids);
+  // Rows of one church: long lists are read church-wide (see `personIdsIn`).
+  const churchId = rows[0]?.churchId;
+  const privacy =
+    churchId && ids.length > MANY_PEOPLE
+      ? privacyByPerson(db, { churchId })
+      : privacyByPerson(db, ids);
+  const links = householdLinksByPerson(db, ids, churchId);
+  const overrides = personAreaOverrides(db, ids, churchId);
+  const tags = tagIdsByPerson(db, ids, churchId);
   return rows.map((row) => {
     const link = links.get(row.id);
     const person: DirectoryPerson = {
