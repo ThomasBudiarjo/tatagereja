@@ -1,4 +1,4 @@
-import { careVisitInputSchema, type CareVisit, type CareVisitInput } from '@tatagereja/shared';
+import { careVisitInputSchema, has, type CareVisit, type CareVisitInput } from '@tatagereja/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { Footprints, HandHeart, Lock, MapPin, Pencil, Trash2, Users } from 'lucide-react';
@@ -16,7 +16,7 @@ import { Field, FormActions } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { Alert } from '@/components/ui/misc';
 import { SkeletonCards, SkeletonText } from '@/components/ui/skeleton';
-import { ErrorState } from '@/components/ui/states';
+import { ErrorState, NoAccessState } from '@/components/ui/states';
 import { useUnsavedChangesGuard } from '@/components/ui/unsaved-changes';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -204,7 +204,10 @@ export function VisitPage() {
 
 export function NewVisitPage() {
   const { t } = useI18n();
-  const { base } = useChurch();
+  const { base, access } = useChurch();
+  const [search] = useSearchParams();
+  // Without care.manage a visit can only be recorded for a case the caller accompanies.
+  if (!has(access, 'care.manage') && !search.get('caseId')) return <NoAccessState />;
   return (
     <Page size="narrow">
       <PageHeader
