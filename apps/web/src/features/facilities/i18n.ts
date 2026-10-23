@@ -123,7 +123,7 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     photoUrlHint: 'A link to a photo (https://...).',
     fieldColor: 'Colour',
     fieldFeatures: 'Features',
-    featuresPlaceholder: 'Projector, sound system, AC... press Enter after each',
+    featuresPlaceholder: 'Type one and press Enter',
     removeFeature: 'Remove {feature}',
     fieldRequiresApproval: 'Requests need approval',
     fieldRequiresApprovalHint:
@@ -261,7 +261,6 @@ export const facilitiesDictionary = defineDictionary('facilities', {
       other: '{countLabel} assets · total value {value}',
     },
     colAsset: 'Asset',
-    colCategory: 'Category',
     colLocation: 'Location',
     colCondition: 'Condition',
     colStatus: 'Status',
@@ -495,7 +494,7 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     photoUrlHint: 'Tautan ke foto (https://...).',
     fieldColor: 'Warna',
     fieldFeatures: 'Fasilitas',
-    featuresPlaceholder: 'Proyektor, sound system, AC... tekan Enter setiap selesai',
+    featuresPlaceholder: 'Ketik lalu tekan Enter',
     removeFeature: 'Hapus {feature}',
     fieldRequiresApproval: 'Pengajuan perlu disetujui',
     fieldRequiresApprovalHint:
@@ -623,7 +622,6 @@ export const facilitiesDictionary = defineDictionary('facilities', {
     printLabels: 'Cetak label',
     assetsSummary: '{countLabel} aset · nilai total {value}',
     colAsset: 'Aset',
-    colCategory: 'Kategori',
     colLocation: 'Lokasi',
     colCondition: 'Kondisi',
     colStatus: 'Status',

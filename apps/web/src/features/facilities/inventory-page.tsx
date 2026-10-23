@@ -135,21 +135,20 @@ export function InventoryPage() {
           )}
           <span className="min-w-0">
             <span className="block truncate font-semibold">{asset.name}</span>
-            <span className="block font-mono text-xs text-muted-foreground">{asset.code}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              <span className="font-mono">{asset.code}</span>
+              {asset.category ? ` · ${asset.category}` : ''}
+            </span>
           </span>
         </span>
       ),
     },
     {
-      id: 'category',
-      header: t('facilities.colCategory'),
-      cell: (asset) => asset.category ?? '—',
-      hideBelowLg: true,
-    },
-    {
       id: 'location',
       header: t('facilities.colLocation'),
-      cell: (asset) => asset.resourceName ?? asset.location ?? '—',
+      cell: (asset) => (
+        <span className="line-clamp-2 max-w-48">{asset.resourceName ?? asset.location ?? '—'}</span>
+      ),
     },
     {
       id: 'condition',
@@ -198,7 +197,7 @@ export function InventoryPage() {
               src={asset.custodian.photoUrl}
               size="xs"
             />
-            <span className="truncate">{fullName(asset.custodian)}</span>
+            <span className="max-w-40 truncate">{fullName(asset.custodian)}</span>
           </span>
         ) : (
           '—'

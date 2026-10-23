@@ -266,7 +266,13 @@ export function AssetPage() {
                   </p>
                 </div>
                 {canManage ? (
-                  <Button size="sm" variant="outline" onClick={() => setReturning(true)}>
+                  // Phones already show "Mark returned" in the action bar above.
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hidden sm:inline-flex"
+                    onClick={() => setReturning(true)}
+                  >
                     {t('facilities.markReturned')}
                   </Button>
                 ) : null}

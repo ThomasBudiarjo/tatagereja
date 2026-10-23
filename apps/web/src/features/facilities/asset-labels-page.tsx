@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router';
@@ -10,7 +10,7 @@ import { PrintButton, PrintSheet } from '@/components/ui/print';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { assetQuery } from './api';
+import { assetQuery, assetsQuery } from './api';
 import { INVENTORY_TONE } from './facilities-lib';
 
 /** Labels printed on one sheet at most. */
@@ -19,7 +19,8 @@ const ID_PATTERN = /^[0-9a-f-]{36}$/i;
 
 /**
  * Printable QR labels, three across on A4. Each code opens the asset page, so whoever scans a
- * sticker on a projector or a chair lands on its record (after signing in).
+ * sticker on a projector or a chair lands on its record (after signing in). `?ids=` picks the
+ * assets (the inventory list passes its page); without it the first assets by code are printed.
  */
 export function AssetLabelsPage() {
   const { churchId, base, church } = useChurch();
@@ -34,9 +35,17 @@ export function AssetLabelsPage() {
     ),
   ].slice(0, LABELS_MAX);
   const queries = useQueries({ queries: ids.map((id) => assetQuery(churchId, id)) });
-  const assets = queries.flatMap((query) => (query.data ? [query.data.asset] : []));
-  const failed = queries.find((query) => query.isError);
-  const loading = queries.some((query) => query.isPending);
+  const everything = useQuery({
+    ...assetsQuery(churchId, { sort: 'code', limit: LABELS_MAX }),
+    enabled: ids.length === 0,
+  });
+  const assets =
+    ids.length > 0
+      ? queries.flatMap((query) => (query.data ? [query.data.asset] : []))
+      : (everything.data?.items ?? []);
+  const failed = ids.length > 0 ? queries.find((query) => query.isError) : everything;
+  const loading = ids.length > 0 ? queries.some((query) => query.isPending) : everything.isPending;
+  const placeholders = ids.length > 0 ? ids : Array.from({ length: 6 }, (_, index) => `${index}`);
   const origin = window.location.origin;
 
   return (
@@ -54,10 +63,10 @@ export function AssetLabelsPage() {
           ]}
           actions={assets.length > 0 ? <PrintButton size="sm" /> : null}
         />
-        {failed ? <Alert variant="warning">{getErrorMessage(failed.error)}</Alert> : null}
+        {failed?.isError ? <Alert variant="warning">{getErrorMessage(failed.error)}</Alert> : null}
       </div>
 
-      {ids.length === 0 ? (
+      {!loading && assets.length === 0 ? (
         <EmptyState
           icon={QrCode}
           tone={INVENTORY_TONE}
@@ -68,7 +77,7 @@ export function AssetLabelsPage() {
         <PrintSheet className="p-4 sm:p-6">
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
             {loading && assets.length === 0
-              ? ids.map((id) => (
+              ? placeholders.map((id) => (
                   <li key={id}>
                     <Skeleton className="h-44 rounded-xl" />
                   </li>

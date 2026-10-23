@@ -12,6 +12,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ErrorState } from '@/components/ui/states';
+import type { Tone } from '@/components/ui/tone';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -36,6 +37,22 @@ const SCOPE_LABELS: Record<Scope, MessageKey> = {
 export function LoansPage() {
   const { churchId, base, access } = useChurch();
   const { t, formatDate } = useI18n();
+  /** The due state of an open loan, as a badge on wide screens and a lead-in on phones. */
+  const dueOf = (loan: AssetLoan): { tone: Tone; label: string } | null => {
+    if (loan.returnedAt) return null;
+    if (loan.isOverdue) {
+      return {
+        tone: 'danger',
+        label: t('facilities.overdueSinceShort', { date: formatDate(loan.dueDate, 'dayMonth') }),
+      };
+    }
+    return loan.dueDate
+      ? {
+          tone: 'info',
+          label: t('facilities.dueOn', { date: formatDate(loan.dueDate, 'dayMonth') }),
+        }
+      : { tone: 'neutral', label: t('facilities.noDueDate') };
+  };
   const canManage = canManageInventory(access);
   const [state, setState, reset] = useUrlState({ scope: 'open', q: '', page: 1 });
   const scope: Scope = (SCOPES as readonly string[]).includes(state.scope)
@@ -109,43 +126,49 @@ export function LoansPage() {
             title={(loan) => (
               <span className="flex min-w-0 items-baseline gap-2">
                 <span className="truncate">{loan.assetName}</span>
-                <span className="shrink-0 font-mono text-xs font-normal text-muted-foreground">
+                <span className="hidden shrink-0 font-mono text-xs font-normal text-muted-foreground sm:inline">
                   {loan.assetCode}
                 </span>
               </span>
             )}
-            subtitle={(loan) =>
-              [
-                loan.borrowerName,
-                loan.groupName,
-                loan.returnedAt
-                  ? t('facilities.returnedOn', { date: formatDate(loan.returnedAt, 'dateShort') })
-                  : t('facilities.borrowedOn', { date: formatDate(loan.checkedOutAt) }),
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            }
-            trailing={(loan) =>
-              loan.returnedAt ? (
-                loan.conditionIn ? (
-                  <ConditionBadge condition={loan.conditionIn} />
-                ) : null
-              ) : loan.isOverdue ? (
-                <StatusBadge tone="danger" size="sm">
-                  {t('facilities.overdueSinceShort', {
-                    date: formatDate(loan.dueDate, 'dayMonth'),
-                  })}
-                </StatusBadge>
-              ) : loan.dueDate ? (
-                <StatusBadge tone="info" size="sm">
-                  {t('facilities.dueOn', { date: formatDate(loan.dueDate, 'dayMonth') })}
-                </StatusBadge>
-              ) : (
-                <StatusBadge tone="neutral" size="sm">
-                  {t('facilities.noDueDate')}
-                </StatusBadge>
-              )
-            }
+            subtitle={(loan) => {
+              const due = dueOf(loan);
+              return (
+                <>
+                  {/* Phones have no room for the badge: the due date leads the second line. */}
+                  {due ? (
+                    <span data-tone={due.tone} className="font-medium text-tone-ink sm:hidden">
+                      {due.label}
+                      {' · '}
+                    </span>
+                  ) : null}
+                  {[
+                    loan.borrowerName,
+                    loan.groupName,
+                    loan.returnedAt
+                      ? t('facilities.returnedOn', {
+                          date: formatDate(loan.returnedAt, 'dateShort'),
+                        })
+                      : t('facilities.borrowedOn', { date: formatDate(loan.checkedOutAt) }),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </>
+              );
+            }}
+            trailing={(loan) => {
+              if (loan.returnedAt) {
+                return loan.conditionIn ? <ConditionBadge condition={loan.conditionIn} /> : null;
+              }
+              const due = dueOf(loan);
+              return due ? (
+                <span className="hidden sm:contents">
+                  <StatusBadge tone={due.tone} size="sm">
+                    {due.label}
+                  </StatusBadge>
+                </span>
+              ) : null;
+            }}
             actionsLabel={(loan) => t('facilities.loanActions', { name: loan.assetName })}
             actions={(loan) => [
               {

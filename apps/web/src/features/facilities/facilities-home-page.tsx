@@ -32,7 +32,7 @@ import { ErrorState } from '@/components/ui/states';
 import type { ModuleTone } from '@/components/ui/tone';
 import { getErrorMessage } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { overviewQuery } from './api';
+import { overviewQuery, resourcesQuery } from './api';
 import { FACILITIES_TONE, INVENTORY_TONE } from './facilities-lib';
 import { BookingStatusBadge, FacilitiesNav, OccurrenceRow } from './facilities-ui';
 
@@ -45,6 +45,10 @@ export function FacilitiesHomePage() {
   const manager = canManageFacilities(access);
   const canBook = canRequestBooking(access);
   const data = overview.data;
+  // Today's rows name their room; the overview only carries its id.
+  const resources = useQuery({ ...resourcesQuery(churchId), enabled: facilities });
+  const resourceName = (id: string) =>
+    resources.data?.items.find((resource) => resource.id === id)?.name;
 
   return (
     <Page size="wide">
@@ -215,6 +219,7 @@ export function FacilitiesHomePage() {
                       <OccurrenceRow
                         key={`${item.bookingId}-${item.startsAt}`}
                         occurrence={item}
+                        resourceName={resourceName(item.resourceId)}
                         showDate={false}
                         to={`${base}/facilities/bookings/${item.bookingId}`}
                       />
