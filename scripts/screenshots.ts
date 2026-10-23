@@ -65,7 +65,26 @@ const routes = list(
   ),
 );
 
-type Session = { token: string; expiresAt: string; user: unknown };
+type Session = { token: string; expiresAt: string; sessionExpiresAt: string; user: unknown };
+
+/**
+ * The browser opens the server's own origin, so the app uses a cookie session there: sign in
+ * once more as the page would and hand the httpOnly cookie to each browser context.
+ */
+type BrowserSession = { cookie: { name: string; value: string }; user: unknown; expiresAt: string };
+
+async function browserSignIn(): Promise<BrowserSession> {
+  const response = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: base, 'sec-fetch-site': 'same-origin' },
+    body: JSON.stringify({ email, password, transport: 'cookie' }),
+  });
+  const body = (await response.json()) as { user: unknown; sessionExpiresAt: string };
+  const [pair = ''] = (response.headers.get('set-cookie') ?? '').split(';');
+  const [name = '', value = ''] = pair.split('=');
+  if (!response.ok || !value) throw new Error(`Cookie sign-in failed (HTTP ${response.status})`);
+  return { cookie: { name, value }, user: body.user, expiresAt: body.sessionExpiresAt };
+}
 
 async function api<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
   const response = await fetch(`${base}/api${path}`, {
@@ -184,7 +203,7 @@ async function seed(token: string): Promise<string> {
   return church.id;
 }
 
-async function capture(browser: Browser, session: Session | null, churchId: string | null) {
+async function capture(browser: Browser, session: BrowserSession | null, churchId: string | null) {
   for (const locale of locales) {
     for (const theme of themes) {
       for (const viewport of viewports) {
@@ -195,6 +214,11 @@ async function capture(browser: Browser, session: Session | null, churchId: stri
           locale: locale === 'id' ? 'id-ID' : 'en-GB',
           reducedMotion: 'reduce',
         });
+        if (session) {
+          await context.addCookies([
+            { ...session.cookie, url: base, httpOnly: true, sameSite: 'Strict' },
+          ]);
+        }
         await context.addInitScript(
           ({ origin, session, theme, locale }) => {
             localStorage.setItem(
@@ -202,9 +226,15 @@ async function capture(browser: Browser, session: Session | null, churchId: stri
               JSON.stringify({ state: { theme, locale, lastChurchId: null }, version: 1 }),
             );
             if (session) {
+              const stored = {
+                transport: 'cookie',
+                user: session.user,
+                sessionExpiresAt: session.expiresAt,
+                refreshToken: null,
+              };
               localStorage.setItem(
                 'tatagereja.auth',
-                JSON.stringify({ state: { sessions: { [origin]: session } }, version: 1 }),
+                JSON.stringify({ state: { sessions: { [origin]: stored } }, version: 2 }),
               );
             }
           },
@@ -237,7 +267,7 @@ const churchId = flag('seed')
 const browser = await chromium.launch();
 try {
   console.info(`Capturing ${base} into ${out}`);
-  await capture(browser, session, churchId);
+  await capture(browser, await browserSignIn(), churchId);
   if (flag('anonymous')) await capture(browser, null, null);
 } finally {
   await browser.close();

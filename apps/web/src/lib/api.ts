@@ -53,6 +53,8 @@ const GENERIC_MESSAGES: Partial<Record<ClientErrorCode, MessageKey>> = {
   RATE_LIMITED: 'common.errorRateLimited',
   MODULE_DISABLED: 'common.errorModuleDisabled',
   MEMBERSHIP_SUSPENDED: 'common.errorSuspended',
+  CSRF_FAILED: 'common.errorCsrf',
+  SESSION_REVOKED: 'common.errorSessionRevoked',
   PAYLOAD_TOO_LARGE: 'common.errorPayloadTooLarge',
   INTERNAL: 'common.errorInternal',
 };
@@ -82,8 +84,9 @@ export const getErrorMessage = (error: unknown, fallback?: string): string => {
 export const api = axios.create({ timeout: 20_000 });
 
 /** Requests that start a session (or need none): no credentials are added or renewed. */
-const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/password-reset'];
-const isPublicPath = (url: string) => PUBLIC_PATHS.some((path) => url.startsWith(path));
+const PUBLIC_PATH =
+  /^\/auth\/(?:login(?:\/two-factor)?|register|refresh|password-reset(?:\/[^/?]+|\/recovery)?)(?:\?|$)/;
+const isPublicPath = (url: string) => PUBLIC_PATH.test(url);
 const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };

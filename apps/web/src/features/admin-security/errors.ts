@@ -26,6 +26,18 @@ const MESSAGE_KEYS: Record<string, MessageKey> = {
   'Two-step verification is not on': 'admin-security.errTwoFactorOff',
   'Enter the 6-digit code': 'profile.codeInvalid',
   'Enter the recovery code': 'profile.recoveryInvalid',
+  'This password is too common. Choose one that is harder to guess':
+    'admin-security.errPasswordCommon',
+  'Do not use your email address or name as your password': 'admin-security.errPasswordPersonal',
+  'This password is too long': 'admin-security.errPasswordLong',
+  'This account also belongs to another church where you cannot reset it. Ask the server administrator':
+    'admin-security.errResetElsewhere',
+  'Only an active invitation can get a new link': 'admin-security.errInviteInactive',
+  'An account could not be created with these details. If you already have one, sign in instead':
+    'admin-security.errRegisterConflict',
+  'This email and recovery code do not match': 'auth.recoveryMismatch',
+  'Enter a code from your authenticator app or a recovery code': 'admin-security.errCodeRequired',
+  'Confirm that you checked who is asking': 'admin-security.resetConfirmRequired',
 };
 
 /** Codes whose message is the same for every request of the module. */
@@ -34,6 +46,7 @@ const CODE_KEYS: Partial<Record<ClientErrorCode, MessageKey>> = {
   LOCKOUT_PREVENTED: 'admin-security.errLockout',
   TWO_FACTOR_REQUIRED: 'admin-security.errCodeRequired',
   TWO_FACTOR_SETUP_REQUIRED: 'admin-security.errSetupRequired',
+  RESET_LINK_INVALID: 'auth.resetInvalidBody',
 };
 
 const translated = (message: string) => {

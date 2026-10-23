@@ -15,7 +15,8 @@ import {
 } from '@tatagereja/shared';
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
-import { api, probeServer, request } from '@/lib/api';
+import { localizeSecurityError } from '@/features/admin-security/errors';
+import { api, probeServer, request as rawRequest } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { forgetSession, storeSession, transportFor, useAuth, useAuthStore } from '@/stores/auth';
 import { hostLabel } from '@/lib/utils';
@@ -26,6 +27,12 @@ import {
   type KnownServer,
 } from '@/stores/server';
 import { useUiStore } from '@/stores/ui';
+
+/** Account answers (password rules, reset links) in the interface language. */
+const request: typeof rawRequest = (schema, config) =>
+  rawRequest(schema, config).catch((error: unknown) => {
+    throw localizeSecurityError(error);
+  });
 
 export const metaQuery = (serverUrl: string) =>
   queryOptions({
